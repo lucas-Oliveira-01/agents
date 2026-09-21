@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antigravity.local/schemas/audit-run.schema.json",
+  "title": "AuditRun",
+  "description": "Aggregate container tracking the execution state and references to underlying entities.",
+  "type": "object",
+  "properties": {
+    "run_id": { "$ref": "shared.schema.json#/$defs/uuid" },
+    "target_snapshot_ref": { "$ref": "shared.schema.json#/$defs/fingerprint" },
+    "plan_ref": { "$ref": "shared.schema.json#/$defs/uuid" },
+    "previous_run_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Reference to the previous run for incremental context. Optional."
+    },
+    "recovery_from_ref": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Reference to an interrupted run this run is reconciling. Optional."
+    },
+    "execution_completeness": {
+      "type": "string",
+      "enum": ["PLANNED", "RUNNING", "COMPLETE", "PARTIAL", "FAILED", "BLOCKED"]
+    },
+    "coverage_completeness": {
+      "type": "string",
+      "enum": ["PENDING", "FULL", "PARTIAL", "NONE"]
+    },
+    "failure_state": {
+      "type": "string",
+      "enum": ["NONE", "INFRA_ERROR", "SAFETY_BLOCK", "SNAPSHOT_DRIFT", "BUDGET_EXHAUSTED"]
+    },
+    "budget_state": {
+      "type": "string",
+      "enum": ["HEALTHY", "WARNING", "EXHAUSTED"]
+    },
+    "publication_state": {
+      "type": "string",
+      "enum": ["NOT_PUBLISHED", "PUBLISHED_COMPLETE", "PUBLISHED_PARTIAL"]
+    },
+    "work_item_refs": {
+      "type": "array",
+      "items": { "$ref": "shared.schema.json#/$defs/uuid" }
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": [
+    "run_id", "target_snapshot_ref", "plan_ref",
+    "execution_completeness", "coverage_completeness",
+    "failure_state", "budget_state", "publication_state",
+    "work_item_refs", "artifact_refs"
+  ],
+  "additionalProperties": false
+}

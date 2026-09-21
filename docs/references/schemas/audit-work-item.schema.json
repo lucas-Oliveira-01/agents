@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antigravity.local/schemas/audit-work-item.schema.json",
+  "title": "AuditWorkItem",
+  "description": "Atomic unit of work, combining immutable plan details and mutable execution state.",
+  "type": "object",
+  "properties": {
+    "work_item_id": { "$ref": "shared.schema.json#/$defs/uuid" },
+    "plan_ref": { "$ref": "shared.schema.json#/$defs/uuid" },
+    "auditor": { "type": "string" },
+    "target_surface": { "type": "string" },
+    "action": {
+      "type": "string",
+      "enum": ["REUSE", "REVALIDATE", "REAUDIT"]
+    },
+    "decision_basis": { "type": "string" },
+    "effective_execution_policy": { "$ref": "shared.schema.json#/$defs/execution_policy" },
+    "data_egress_policy": { "$ref": "shared.schema.json#/$defs/egress_policy" },
+    "execution_state": {
+      "type": "string",
+      "enum": ["PLANNED", "RUNNING", "TERMINATED"]
+    },
+    "failure_state": {
+      "type": "string",
+      "enum": ["NONE", "INFRA_ERROR", "SAFETY_BLOCK", "SCHEMA_VIOLATION", "TIMEOUT", "BUDGET_EXHAUSTED"]
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "attempt_id": { "$ref": "shared.schema.json#/$defs/uuid" },
+          "started_at": { "$ref": "shared.schema.json#/$defs/timestamp" },
+          "finished_at": { "$ref": "shared.schema.json#/$defs/timestamp" },
+          "failure_reason": { "type": "string" },
+          "receipt_ref": { "$ref": "shared.schema.json#/$defs/uuid" }
+        },
+        "required": ["attempt_id", "started_at"],
+        "additionalProperties": false
+      }
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": [
+    "work_item_id", "plan_ref", "auditor", "target_surface",
+    "action", "decision_basis", "effective_execution_policy", "data_egress_policy",
+    "execution_state", "failure_state", "attempts", "artifact_refs"
+  ],
+  "additionalProperties": false
+}

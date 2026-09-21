@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antigravity.local/schemas/target-snapshot.schema.json",
+  "title": "TargetSnapshot",
+  "description": "Immutable representation of the exact target and methodology being audited.",
+  "type": "object",
+  "properties": {
+    "snapshot_fingerprint": { "$ref": "shared.schema.json#/$defs/fingerprint" },
+    "target_mode": { 
+      "type": "string", 
+      "enum": ["COMMIT", "WORKTREE", "EXPLICIT_SNAPSHOT"] 
+    },
+    "project_state": {
+      "type": "object",
+      "properties": {
+        "repository_identity": { "type": "string" },
+        "revision_identity": { "type": "string" },
+        "working_tree_state": { "type": "string", "enum": ["CLEAN", "DIRTY", "UNTRACKED_ONLY"] },
+        "submodules_state": { 
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string" },
+              "revision": { "type": "string" }
+            },
+            "required": ["path", "revision"],
+            "additionalProperties": false
+          }
+        },
+        "tracked_input_fingerprints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": { "type": "string" },
+              "fingerprint": { "$ref": "shared.schema.json#/$defs/fingerprint" }
+            },
+            "required": ["path", "fingerprint"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["repository_identity", "revision_identity", "working_tree_state", "submodules_state", "tracked_input_fingerprints"],
+      "additionalProperties": false
+    },
+    "methodology_state": {
+      "type": "object",
+      "properties": {
+        "audit_contract_version": { "$ref": "shared.schema.json#/$defs/version" },
+        "auditor_versions": {
+          "type": "object",
+          "additionalProperties": { "$ref": "shared.schema.json#/$defs/version" }
+        },
+        "policy_version": { "$ref": "shared.schema.json#/$defs/version" }
+      },
+      "required": ["audit_contract_version", "auditor_versions", "policy_version"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["snapshot_fingerprint", "target_mode", "project_state", "methodology_state"],
+  "additionalProperties": false
+}

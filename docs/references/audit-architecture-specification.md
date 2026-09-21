@@ -88,7 +88,7 @@ A implementação física do agente `project-audit` **NÃO DEVE** iniciar até q
 2. [x] **Canonical Data Model** (Aprovado)
 3. [x] **Semantic Validators** (Aprovado)
 4. [x] **Cross-model consistency check** (Revisão final de consistência estrutural e autoridade)
-5. [ ] **JSON Schemas derivados do modelo** (Representação mecânica da estrutura)
+5. [x] **JSON Schemas derivados do modelo** (Representação mecânica da estrutura)
 6. [ ] **Schema validation passou**
 7. [ ] **Schema ↔ Model consistency passou**
 8. [ ] **Architecture Frozen** (Nenhuma decisão arquitetural implícita)

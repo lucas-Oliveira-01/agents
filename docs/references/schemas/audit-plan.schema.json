@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antigravity.local/schemas/audit-plan.schema.json",
+  "title": "AuditPlan",
+  "description": "Frozen-at-start plan outlining the scope, applicability, and global budget.",
+  "type": "object",
+  "properties": {
+    "plan_id": { "$ref": "shared.schema.json#/$defs/uuid" },
+    "frozen_at": { "$ref": "shared.schema.json#/$defs/timestamp" },
+    "target_snapshot_ref": { "$ref": "shared.schema.json#/$defs/fingerprint" },
+    "requested_scope": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "applicability_decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "domain": { "type": "string" },
+          "applicable": { "type": "boolean" },
+          "decision_basis": { "type": "string" },
+          "evidence_refs": {
+            "type": "array",
+            "items": { "$ref": "shared.schema.json#/$defs/uuid" }
+          }
+        },
+        "required": ["domain", "applicable", "decision_basis", "evidence_refs"],
+        "additionalProperties": false
+      }
+    },
+    "resolved_scope": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "work_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "work_item_id": { "$ref": "shared.schema.json#/$defs/uuid" }
+        },
+        "required": ["work_item_id"],
+        "additionalProperties": false
+      }
+    },
+    "budget_envelope": {
+      "type": "object",
+      "properties": {
+        "max_tokens": { "type": "integer" },
+        "max_cost_usd": { "type": "number" },
+        "max_duration_seconds": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "execution_policy": { "$ref": "shared.schema.json#/$defs/execution_policy" },
+    "egress_policy": { "$ref": "shared.schema.json#/$defs/egress_policy" }
+  },
+  "required": [
+    "plan_id", "frozen_at", "target_snapshot_ref", 
+    "requested_scope", "applicability_decisions", "resolved_scope", 
+    "work_items", "execution_policy", "egress_policy"
+  ],
+  "additionalProperties": false
+}

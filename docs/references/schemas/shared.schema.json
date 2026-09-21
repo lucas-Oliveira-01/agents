@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antigravity.local/schemas/shared.schema.json",
+  "title": "Shared Orchestrator Definitions",
+  "description": "Common definitions for Layer 2 JSON schemas.",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 fingerprint"
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic or commit-based version string"
+    },
+    "finding_fingerprint": {
+      "type": "object",
+      "description": "Stable identity descriptor for a finding",
+      "properties": {
+        "domain": { "type": "string" },
+        "control_surface": { "type": "string" },
+        "defect_type": { "type": "string" }
+      },
+      "required": ["domain", "control_surface", "defect_type"],
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Attributable provenance of an action or generation",
+      "properties": {
+        "actor": { "type": "string" },
+        "policy_version": { "type": "string" },
+        "generated_at": { "$ref": "#/$defs/timestamp" }
+      },
+      "required": ["actor", "generated_at"],
+      "additionalProperties": false
+    },
+    "execution_policy": {
+      "type": "object",
+      "properties": {
+        "filesystem": { "type": "string", "enum": ["read-only", "temporary-write", "none"] },
+        "network": { "type": "string", "enum": ["disabled", "restricted", "full"] },
+        "credentials": { "type": "string", "enum": ["none", "explicit-only"] },
+        "timeout_ms": { "type": "integer" }
+      },
+      "required": ["filesystem", "network", "credentials"],
+      "additionalProperties": false
+    },
+    "egress_policy": {
+      "type": "object",
+      "properties": {
+        "destination": { "type": "string", "enum": ["LOCAL_ONLY", "APPROVED_EXTERNAL"] },
+        "allow_sensitive": { "type": "boolean" }
+      },
+      "required": ["destination", "allow_sensitive"],
+      "additionalProperties": false
+    }
+  }
+}

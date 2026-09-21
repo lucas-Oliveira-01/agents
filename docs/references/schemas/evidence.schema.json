@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antigravity.local/schemas/evidence.schema.json",
+  "title": "Evidence",
+  "description": "Immutable factual observation serving as the basis for findings.",
+  "type": "object",
+  "properties": {
+    "evidence_id": { "$ref": "shared.schema.json#/$defs/uuid" },
+    "target_snapshot_ref": { "$ref": "shared.schema.json#/$defs/fingerprint" },
+    "work_item_ref": { "$ref": "shared.schema.json#/$defs/uuid" },
+    "source_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "validity": {
+      "type": "string",
+      "enum": ["VALID", "STALE", "INVALID", "NOT_DETERMINABLE"]
+    },
+    "provenance": { "$ref": "shared.schema.json#/$defs/provenance" },
+    "fingerprint": { "$ref": "shared.schema.json#/$defs/fingerprint" }
+  },
+  "required": [
+    "evidence_id", "target_snapshot_ref", "work_item_ref",
+    "source_refs", "dependencies", "validity", "provenance", "fingerprint"
+  ],
+  "additionalProperties": false
+}
