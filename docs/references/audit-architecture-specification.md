@@ -88,7 +88,7 @@ A implementação física do agente `project-audit` **NÃO DEVE** iniciar até q
 2. [x] **ADR-04** (Evidence/Incremental Semantics)
 3. [x] **ADR-05** (Trust/Execution Semantics)
 4. [x] **ADR-07** (Failure/Retry/Recovery Semantics)
-5. [ ] **Canonical Data Model** (Modelagem Semântica dos Contratos Internos da Camada 2)
+5. [x] **Canonical Data Model** (Modelagem Semântica dos Contratos Internos da Camada 2)
 6. [ ] **Semantic Validators** (Regras de negócio que o schema não pode codificar sozinho)
 7. [ ] **JSON Schemas Físicos** (A representação final do modelo)
 8. [ ] **Architecture Frozen**
