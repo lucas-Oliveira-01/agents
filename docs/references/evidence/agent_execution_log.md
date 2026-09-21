@@ -1,4 +1,6 @@
 # Agent Execution Log — SmartServ Technical Audit
+
+> **Provenance Note:** This retrospective log is the direct result of executing the experimental prompt `auditoring/audit/project-audit.md` (now preserved in `docs/sources/project-audit-v1.md`). The failures documented here led to the adoption of the Fail-Closed Agent Orchestration architecture (see `docs/decisions/orchestration-fail-closed.md`).
 ## Retrospective completo: raciocínio, decisões, erros e suas causas
 
 ---
