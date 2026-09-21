@@ -38,16 +38,28 @@ Para evitar *overengineering* (a criação de "managers" para tudo), as preocupa
 
 ---
 
-## 3. Contratos Canônicos (Entidades Lógicas)
+## 3. Contratos Canônicos (As 3 Camadas)
 
-Estes contratos representam estruturas de dados que necessitam de serialização/interoperabilidade (JSON Schemas persistidos), e não dezenas de DTOs internos efêmeros:
+Para não misturar responsabilidades, o sistema é dividido em três camadas estritas de contrato:
 
-- **`TargetSnapshot`**: Identidade exata e determinística do alvo auditado (commit + working tree status + dependências ativas + versões metodológicas).
-- **`AuditPlan`**: Estrutura gerada pelo Orchestrator contendo escopo, aplicabilidade, budget global, políticas e itens de trabalho.
-- **`AuditWorkItem`**: A unidade operacional atômica do incrementalismo (contém `work_id`, `auditor`, `target_snapshot`, `inputs`, `data_egress_policy`, etc).
-- **`AuditRun`**: Estado persistente da execução em andamento (`PLANNED`, `RUNNING`, `COMPLETED`, `PARTIAL`, `FAILED`).
-- **`Evidence` / `EvidenceValidity`**: Objeto imutável contendo a prova, e a determinação de se a prova material ainda se sustenta.
-- **`FindingFingerprint`**: Identidade lógica e estável de um problema (baseada no domínio, controle afetado, semântica do ativo), não estritamente acoplada a números de linha.
+### Camada 1: Audit Output Contract (Especializado)
+- **Formato:** Markdown (`00_inventory.md`, `01_coverage.md`, `02_analytical.md`, `03_ledger.md`).
+- **Função:** Saída universal gerada pelos Specialized Auditors (`security-audit`, `code-audit`).
+- Eles **não** devolvem JSON. Devolvem prosa técnica estruturada.
+
+### Camada 2: Orchestrator Internal Contracts (Estado Persistido)
+- **Formato:** Modelos Semânticos / JSON Interno (armazenado em `.audit/runs/`).
+- **Função:** Controle do pipeline de orquestração.
+- **Entidades:** 
+  - `TargetSnapshot`: Identidade do alvo (commit + dependências metodológicas).
+  - `AuditPlan`: Estrutura de escopo e budget.
+  - `AuditWorkItem`: Unidade atômica com estado de execução.
+  - `AuditRun`: O container persistente da execução global.
+  - `Evidence / FindingFingerprint`: Identidades lógicas de problemas e suas provas.
+
+### Camada 3: Normalizer Canonical Contract (A Fonte da Verdade)
+- **Formato:** JSON rigoroso (`report_data.json` regido por `report_data.schema.json`).
+- **Função:** Output 100% determinístico produzido exclusivamente pela ferramenta `audit-normalize`. Nenhuma outra entidade gera esse arquivo.
 
 ---
 
@@ -56,27 +68,27 @@ Estes contratos representam estruturas de dados que necessitam de serialização
 - **Single-Writer State:** O Orchestrator é a única *autoridade* capaz de publicar/mutacionar o estado canônico do *run*. O mecanismo concreto (file lock, atomic rename) é detalhe, mas a propriedade de um único publicador é arquitetural.
 - **Evidence > Narrative:** A severidade ou confiança de um *finding* deve ser justificada por evidência atribuível (código fonte, metadados, execução). Narrativa do LLM sozinha não pode elevar o status epistêmico.
 - **Determinismo do Normalizer:** O `audit-normalize` nunca usa LLM e nunca "inventa" categorias.
-- **Auditoria Incompleta ≠ Ausência de Problemas:** Se o *Budget* acabar, o estado do módulo é `PARTIAL`.
 - **Sem Delegação Recursiva no Provider:** Agente chama OmniRoute. OmniRoute chama LLM. Sem loop no provider.
+- **Diferenciação Estrita de Falha (ADR-07):** `BLOCKED` (restrição de segurança deliberada) ≠ `FAILED` (erro de infra) ≠ `PARTIAL` (budget esgotado, com resultados válidos).
 
 ---
 
-## 5. Indefinições (Requerem Decisão Futura)
+## 5. Indefinições Estruturais
 
-- **Algoritmo Exato do "Evidence Dependency Graph":** Como rastrear matematicamente que uma mudança no `pom.xml` invalida a evidência em `UserService.java` (Heurística simples ou AST profundo?).
-- **Algoritmo do "Finding Fingerprint":** Como gerar um hash estável para um problema que sobrevive a refatorações que mudam as linhas de código.
-- **Layout Físico do `.audit/`:** A estrutura de diretórios (`runs/`, `state/`, `cache/`) ainda precisa ser congelada.
-- **Single-Writer Lock Protocol:** Como garantir que execuções assíncronas abortem graciosamente ou enfileirem escritas.
+- **Algoritmo Exato do "Evidence Dependency Graph":** A semântica existe (mudança em X invalida Y), mas o mecanismo de descoberta (heurística vs AST) ainda não foi congelado.
+- **Mecanismo de Lock do `.audit/`:** Como garantir o Single-Writer fisicamente.
 
 ---
 
-## 6. Critério Objetivo para `Architecture Frozen`
+## 6. O Caminho para `Architecture Frozen`
 
-A implementação física do agente `project-audit` **NÃO DEVE** iniciar até que todos os itens abaixo estejam *checados*:
+A implementação física do agente `project-audit` **NÃO DEVE** iniciar até que a seguinte esteira termine:
 
-- [ ] ADRs 04, 05 e 06 documentadas e aprovadas.
-- [ ] Estrutura JSON/Schema canônica para `AuditPlan` e `AuditWorkItem` formalizada.
-- [ ] Estrutura JSON/Schema para `TargetSnapshot` e `AuditRun` formalizada.
-- [ ] Definição objetiva do Lifecycle de Evidência vs Lifecycle de Finding mapeada.
-- [ ] Semântica de falhas e *budgets* (quando abortar, quando considerar PARTIAL) formalizada.
-- [ ] Estrutura inicial do repositório `.audit/` acordada.
+1. [x] **ADR-06** (Target Identity)
+2. [x] **ADR-04** (Evidence/Incremental Semantics)
+3. [x] **ADR-05** (Trust/Execution Semantics)
+4. [x] **ADR-07** (Failure/Retry/Recovery Semantics)
+5. [ ] **Canonical Data Model** (Modelagem Semântica dos Contratos Internos da Camada 2)
+6. [ ] **Semantic Validators** (Regras de negócio que o schema não pode codificar sozinho)
+7. [ ] **JSON Schemas Físicos** (A representação final do modelo)
+8. [ ] **Architecture Frozen**
