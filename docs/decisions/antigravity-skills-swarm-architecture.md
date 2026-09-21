@@ -1,44 +1,182 @@
 # Antigravity Swarm Architecture & Skills Manifesto
 
-**Target Audience:** Autonomous Agents, Principal Agents, Sub-Agents, Orchestrators.
-**Purpose:** Provide strict architectural context on how to combine Antigravity native capabilities, memory persistence, and parallel delegation to achieve highly autonomous, cost-effective, and stateful multi-agent swarms.
+**Document Type:** Architectural Reference & Operational Specification  
+**Target Audience:** Autonomous Agents, Principal Orchestrators, Local Subagents, Skill Developers  
+**Status:** Active / Canonical  
 
-## 1. The Multi-Agent Swarm Paradigm (Levels of Operation)
+---
 
-Antigravity permits the creation of hybrid, hierarchical agent ecosystems. Do not attempt to process 100% of a massive codebase linearly within a single context window. Instead, utilize the 3-tier architecture:
+## 1. Executive Summary & Core Principles
 
-*   **Level 1 (Principal Agent):** Handles user alignment, deep reasoning, and high-level strategy. Invokes local sub-agents.
-*   **Level 2 (Local Sub-Agents):** Stateful agents running concurrently in the background (via `invoke_subagent`). They read local files, communicate via `send_message`, and interact with the filesystem. They act as "Middle Managers" (e.g., Code Researcher, Security Reviewer).
-*   **Level 3 (OmniRoute Leaf Agents):** Stateless, hyper-parallelized, cheap workers invoked via MCP `omnirouter`. They do NOT have filesystem access. Level 2 agents must pass strict context chunks to Level 3 via `delegar_tarefa` for brute-force execution (e.g., translating 300 files simultaneously).
+This specification defines the multi-tier agent architecture, memory persistence model, and delegation standards within the Antigravity ecosystem. The primary objective is to maximize execution quality, traceability, and autonomy while strictly minimizing token consumption and context degradation.
 
-## 2. Available Global Skills Ecosystem
+### Core Architectural Axioms
+1. **Hierarchical Task Decomposition:** Monolithic context processing across large codebases is prohibited. Workloads must be decomposed across specialized, hierarchical agent tiers.
+2. **Stateless vs. Stateful Segregation:** Stateful operations requiring local filesystem access and iterative reasoning are decoupled from stateless, hyper-parallel cognitive offloading.
+3. **Deterministic Superiority:** Automated transformations, schema validations, and state consolidations must rely on deterministic scripts and schemas rather than unstructured LLM evaluation.
+4. **Continuous Persistence:** Durable knowledge, architectural decisions, and operational handoffs must be systematically committed to the persistent memory layer (`ai-memory`).
+5. **Progressive Disclosure:** Runtime agents must only ingest context relevant to the active decision branch, loading extended references and domain guides strictly on demand.
 
-Agents MUST proactively leverage the following global skills and MCP tools to achieve swarm efficiency. 
+---
 
-### 🧠 The AI-Memory Suite (State & Persistence)
-*   **`ai-memory-durable-pages`**: Use for explicit wiki mutations. Save durable/time-bounded project knowledge, record architectural decisions, rules, or update existing project notes. (Provides long-term memory to the swarm).
-*   **`ai-memory-retrieval`**: Read-only access to project history, prior context, past rules, and recent activity. Always query this before initiating massive refactors to avoid breaking established paradigms.
-*   **`ai-memory-learning-maintenance`**: Use for memory hygiene. Consolidate observations, review session lessons, prune stale memory, and resolve contradictions in the wiki.
-*   **`ai-memory-handoff`**: Manage session continuity. Use to pass the baton between sessions or agents, saving context so the next worker can resume smoothly.
-*   **`ai-memory-messaging`**: Cross-project/agent inbox routing. Leave messages in a project's inbox to coordinate asynchronous events.
-*   **`ai-memory-routing-install`**: Used to install or repair the memory integration hooks (like `CLAUDE.md` or local rules).
+## 2. Multi-Tier Agent Swarm Topology
 
-### 🚀 OmniRoute Delegation (Brute-Force & Parallelism)
-*   **`omniroute-delegation`**: The ultimate tool for cognitive offloading. Exposes `delegar_tarefa` via MCP. 
-    *   *Usage:* Send heavily structured prompts (Objetivo, Contexto, Restrições, Formato, Critérios) to remote leaf models.
-    *   *Rule:* ALWAYS invoke multiple tasks concurrently using parallel tool calling. Do not loop sequentially. Use for massive linting, security analysis, or file translation where local context overhead is unnecessary.
+The swarm operates across three discrete execution tiers with rigid privilege boundaries.
 
-### 🛡️ Auditing & Normalization
-*   **`audit-normalize`**: Takes raw markdown audit findings and normalizes them into strict, deterministically merged JSON reports (`report_data.json`).
-    *   *Usage:* After a swarm of agents finishes analyzing a repository, pass their unstructured notes to this skill to generate a unified, conflict-free ledger.
+```mermaid
+flowchart TD
+    User([User / System Trigger]) --> L1[Level 1: Principal Agent]
+    
+    subgraph L1_Scope [Strategic Layer]
+        L1
+    end
 
-### ⚙️ System & Customization Guides
-*   **`antigravity-guide`**: The ultimate reference for Antigravity (AGY) tools, UI, slash commands, and workflows. Read this when uncertain about IDE integration or native features.
-*   **`agy-customizations`**: Deep dive into how skills, rules, hooks, and MCP servers are discovered and loaded. Use this when you (the Agent) are tasked with programming a *new* skill or extending the machine's capabilities.
+    subgraph L2_Scope [Tactical Layer - Stateful Subagents]
+        L2A["Level 2 Agent: Code Researcher"]
+        L2B["Level 2 Agent: Domain Auditor"]
+        L2C["Level 2 Agent: Security Reviewer"]
+    end
 
-## 3. Best Practices for New Skill Creation & Prompting
+    subgraph L3_Scope [Execution Layer - Stateless Workers]
+        L3A["Level 3 Leaf: Syntax Transformer"]
+        L3B["Level 3 Leaf: Chunk Classifier"]
+        L3C["Level 3 Leaf: Pattern Extractor"]
+    end
 
-When generating prompts for new sub-agents or writing new `SKILL.md` files, follow these mandates:
-1.  **Compose, Do Not Re-invent:** If a new skill requires memory persistence, do not write a custom file-writer. Explicitly instruct the skill to call `ai-memory-durable-pages`.
-2.  **Stateless vs Stateful Boundaries:** If a task requires reading 50 files and compiling data, use a Level 2 local sub-agent. If a task requires looking at 1 isolated file and formatting it, delegate to Level 3 (`omniroute-delegation`).
-3.  **Assume Memory Exists:** New prompts should instruct agents to read `ai-memory-retrieval` upon booting to inherit the user's specific project quirks.
+    subgraph Persistence [Durable Storage & Memory]
+        AIMem[(ai-memory Knowledge Graph)]
+        GitRepo[(Git Repository & Docs)]
+    end
+
+    L1 -->|invoke_subagent| L2A
+    L1 -->|invoke_subagent| L2B
+    L1 -->|invoke_subagent| L2C
+    
+    L2A <-->|send_message| L1
+    L2B <-->|send_message| L1
+    L2C <-->|send_message| L1
+
+    L2B -->|delegar_tarefa (batch/parallel)| L3A
+    L2B -->|delegar_tarefa (batch/parallel)| L3B
+    L2B -->|delegar_tarefa (batch/parallel)| L3C
+
+    L1 <-->|read/write| AIMem
+    L2A <-->|read/write| AIMem
+    L1 <-->|commit/edit| GitRepo
+```
+
+### 2.1 Level 1: Principal Agent (Strategic Orchestration)
+- **Role:** Central orchestrator responsible for user alignment, high-level planning, strategic reasoning, and task decomposition.
+- **Capabilities:** Direct user communication, subagent invocation (`invoke_subagent`), skill discovery, global memory management (`ai-memory`), and Git revision control.
+- **Execution Mandates:**
+  - Never execute repetitive, file-by-file linear tasks directly within the primary context window.
+  - Formulate unambiguous execution plans, assign scoped workloads to Level 2 agents, and synthesize final deliverables.
+
+### 2.2 Level 2: Local Subagents (Tactical Stateful Managers)
+- **Role:** Domain-specific autonomous workers operating concurrently in isolated execution contexts (e.g., Code Researcher, Security Auditor, Test Engine).
+- **Capabilities:** Direct local filesystem access (`view_file`, `replace_file_content`, `run_command`), asynchronous message-based communication (`send_message`), and Level 3 task dispatching.
+- **Execution Mandates:**
+  - Execute background analysis or file mutations within bounded task definitions.
+  - Coordinate with the Principal Agent via structured message responses.
+  - Offload high-volume, isolated sub-tasks to Level 3 workers instead of consuming local execution steps.
+
+### 2.3 Level 3: OmniRoute Leaf Agents (Stateless Execution Workers)
+- **Role:** High-throughput, cost-optimized leaf workers executing pure transformations, classifications, extraction, and chunk analysis.
+- **Capabilities:** Invoked via the MCP OmniRoute tool `delegar_tarefa`. Strictly sandboxed with **zero filesystem access**.
+- **Execution Mandates:**
+  - Must receive self-contained context and explicit operational contracts (Objective, Context, Constraints, Format, Criteria).
+  - Must be invoked in parallel batches (`call_mcp_tool` concurrency) rather than sequential iterations.
+  - Level 2 callers must perform deterministic validation on Level 3 outputs before ingestion.
+
+---
+
+## 3. Global Skills Ecosystem
+
+Swarm components must proactively leverage the following canonical skills and MCP tools:
+
+### 3.1 AI-Memory Suite (Persistence & State Management)
+The `ai-memory` subsystem serves as the immutable long-term memory across sessions and agents:
+
+| Skill | Category | Operational Purpose |
+| :--- | :--- | :--- |
+| `ai-memory-durable-pages` | Write / Mutation | Records canonical decisions (ADRs), permanent project constraints, domain models, and pinned operational rules. |
+| `ai-memory-retrieval` | Read-Only | Queries historical decisions, conventions, resolved gotchas, and architectural guidelines prior to modifying code. |
+| `ai-memory-learning-maintenance` | Hygiene / Audit | Audits wiki consistency, consolidates transient observations, resolves contradictions, and runs memory forget sweeps. |
+| `ai-memory-handoff` | Session Continuity | Serializes pending tasks, blockers, and contextual artifacts during agent handoffs or session transitions. |
+| `ai-memory-messaging` | Asynchronous I/O | Manages inter-project or inter-agent inboxes for asynchronous coordination across isolated repositories. |
+| `ai-memory-routing-install` | Infrastructure | Configures agent routing tables, manages instruction snippets, and repairs local/global skill bindings. |
+
+### 3.2 OmniRoute Delegation Engine (Cognitive Offloading)
+Exposed through the `omniroute-delegation` skill and the MCP `omnirouter` server:
+
+- **Core Functionality:** Exposes `delegar_tarefa(prompt, modelo_ou_rota)` to route workloads dynamically through local or remote model endpoints based on policy configurations (e.g., `auto/coding`, `auto/fast`, `auto/cheap`).
+- **Standardized Prompt Contract:**
+  Every delegation payload to Level 3 must conform to the 5-field schema:
+  1. **Objective (`Objetivo`):** Concrete, single-purpose outcome required.
+  2. **Context (`Contexto`):** Complete, self-contained textual data (code snippet, AST segment, diff chunk).
+  3. **Constraints (`Restrições`):** Strict operational boundaries (e.g., no markdown wrapping, strict schema adherence).
+  4. **Format (`Formato`):** Exact expected response format (JSON schema, CSV, or raw code block).
+  5. **Criteria (`Critérios`):** Explicit validation standards for output acceptance.
+- **Concurrency Directive:** Sequential loops calling `delegar_tarefa` one by one are prohibited when chunks are mutually independent. Schedulers must dispatch requests concurrently via parallel tool calls.
+
+### 3.3 Auditing & Normalization Engine
+Exposed through the `audit-normalize` skill:
+
+- **Core Functionality:** Ingests raw, unstructured Markdown findings emitted by heterogeneous audit agents and transforms them into a canonical, schema-compliant `report_data.json` dataset.
+- **Operating Guarantees:** 
+  - Strictly deterministic and non-destructive.
+  - Tracks full provenance and detects conflicting findings without executing secondary LLM hallucinations.
+  - Serves as the authoritative source for subsequent report publishing and issue creation.
+
+### 3.4 System & Customization Guides
+- **`antigravity-guide`:** Canonical reference for Antigravity native tools, slash commands, background tasks, and environment lifecycle mechanics.
+- **`agy-customizations`:** Complete architectural guide for extending the agent runtime (authoring skills, defining custom rules, implementing MCP sidecars, and managing loading priorities).
+
+---
+
+## 4. Communication & Delegation Protocols
+
+### 4.1 Tier Boundary Matrix
+
+| Characteristic | Level 1 (Principal) | Level 2 (Subagent) | Level 3 (OmniRoute Leaf) |
+| :--- | :--- | :--- | :--- |
+| **Statefulness** | Stateful | Stateful | Stateless |
+| **Filesystem Access** | Full Read/Write | Full Read/Write | None (Payload only) |
+| **Tool Group** | Full CLI / Subagents / MCP | Subagent Tools / MCP | No tools |
+| **Execution Medium** | Native Session | `invoke_subagent` Process | HTTP / MCP Gateway |
+| **Invocation Pattern** | Event-driven (User) | Asynchronous Task | Massively Parallel Batch |
+| **Recursion Policy** | May invoke Level 2 | May invoke Level 3 | Recursive invocation prohibited |
+
+### 4.2 Error Handling & Quality Escalation
+When deploying lower-tier models through OmniRoute:
+1. **Validation First:** All Level 3 outputs must pass deterministic schema or regex validation upon return to Level 2.
+2. **Escalation Trigger:** If a leaf task fails schema validation or returns an uncertainty flag, the Level 2 agent must escalate the task to a high-capacity model rather than re-querying the failing leaf.
+3. **No Blind Trust:** Untrusted model outputs must never be written directly to the codebase without syntactical and logical verification.
+
+---
+
+## 5. Directives for Skill Creation & Prompt Authoring
+
+When defining new subagents or authoring `SKILL.md` specifications, agents must adhere to the following rules:
+
+### Rule 1: Composition Over Duplication
+Never reimplement capabilities provided by the global ecosystem.
+- For persistence, invoke `ai-memory-durable-pages` instead of creating ad-hoc local files.
+- For report synthesis, feed raw findings into `audit-normalize` instead of crafting custom JSON mergers.
+- For multi-file inspection, delegate parallel slices to `omniroute-delegation`.
+
+### Rule 2: Strict Boundary Enforcement
+- If a task requires scanning multiple directory hierarchies or modifying codebases, encapsulate it in a **Level 2 Subagent**.
+- If a task involves transforming, extracting, or categorizing an isolated data slice, route it to a **Level 3 OmniRoute Worker**.
+
+### Rule 3: Memory Assumption
+All new subagent definitions and runtime prompts must incorporate initialization logic that queries `ai-memory-retrieval` at boot time. Swarm agents must inherit project-specific idioms, conventions, and architectural gotchas before generating solutions.
+
+### Rule 4: Progressive Disclosure in Skills
+Skill definitions (`SKILL.md`) must act as **runtime routers**, remaining compact (target < 500 lines):
+- Do not overload `SKILL.md` with exhaustive background documentation.
+- Maintain separate directories: `references/` for on-demand domain knowledge, `scripts/` for deterministic utilities, and `assets/` for templates and schemas.
+- Reference documentation must only be read by an agent when a specific conditional branch mandates it.
+
+### Rule 5: Non-Contamination of User Codebases
+Auxiliary operational states, raw audit artifacts, and internal LLM traces must never pollute the primary project repository. Machine-generated states and audit records must be isolated within independent sub-repositories or designated directory trees (e.g., `.audit/`).

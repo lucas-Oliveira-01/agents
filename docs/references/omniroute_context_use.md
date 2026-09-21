@@ -1,1610 +1,537 @@
-# CONTEXTO DE TRANSFERÊNCIA — OMNIROUTE + AGENTES + AUDITORIA
+# Arquitetura de Referência: Delegação, Roteamento e Auditoria Técnica com OmniRoute
 
-## 1. OBJETIVO DESTE CHAT
+## 1. Visão Geral e Contexto Operacional
 
-Estou desenvolvendo uma arquitetura pessoal de agentes/skills para desenvolvimento de software, auditoria técnica e gerenciamento persistente de contexto.
+### 1.1 Objetivo e Escopo da Arquitetura
+Este documento estabelece a especificação arquitetural canônica para a integração entre o ecossistema de agentes/skills do Antigravity, o gateway local de roteamento de modelos de linguagem **OmniRoute** e os pipelines de auditoria técnica de software.
 
-Um dos objetivos centrais é maximizar:
+O sistema destina-se a atuar como uma infraestrutura de apoio analítico, revisão de código, auditoria de segurança/qualidade, diagnóstico arquitetural e gerenciamento persistente de contexto.
 
-```text
-QUALIDADE
-+
-RELIABILIDADE
-+
-TRACEABILITY
-----------------
-com o menor custo possível de tokens/créditos
-```
+### 1.2 Restrições Operacionais e Integridade Acadêmica/Institucional
+O sistema opera sob diretrizes estritas de não interferência autônoma no código-fonte do projeto auditado:
+* **Geração Autônoma Proibida**: É vedada a geração ou modificação direta e autônoma de código de produção por parte dos agentes de IA, garantindo conformidade com regras acadêmicas e institucionais de autoria intelectual.
+* **Foco Analítico e Consultivo**: A atuação das LLMs restringe-se exclusivamente a:
+  * Análise estática e dinâmica;
+  * Revisão e auditoria de vulnerabilidades/qualidade;
+  * Diagnóstico e explicação arquitetural;
+  * Documentação e sumarização técnica;
+  * Planejamento e triagem de tarefas.
 
-Quero investigar como usar o **OmniRoute** como uma infraestrutura local de roteamento e offloading de LLMs.
+### 1.3 Princípio Fundamental de Otimização
+A arquitetura é orientada pela equação de eficiência máxima:
 
-Não quero simplesmente "usar modelos menores".
+$$\text{Eficiência} = \frac{\text{Qualidade} \times \text{Confiabilidade} \times \text{Rastreabilidade}}{\text{Custo de Tokens / Latência}}$$
 
-Quero descobrir:
-
-> Como executar cada tarefa com o mecanismo/modelo mais barato que consiga manter a qualidade exigida?
-
-Quero explorar profundamente os limites técnicos do OmniRoute antes de definir a arquitetura final.
+O objetivo primário não é a mera substituição arbitrária por modelos compactos, mas a seleção determinística e dinâmica do mecanismo de menor custo financeiro e computacional capaz de satisfazer os requisitos de qualidade da tarefa.
 
 ---
 
-# 2. CONTEXTO DO USUÁRIO
+## 2. Princípios de Engenharia e Modelo Mental
 
-Sou estudante de Engenharia de Software e escrevo meu próprio código.
+### 2.1 Separação Estrita: Script Determinístico vs. Cognição LLM
+O sistema impõe distinção estrita entre operações determinísticas e operações cognitivas:
 
-Não quero que IA gere ou modifique código por mim por causa das regras acadêmicas da minha faculdade.
+| Categoria | Mecanismo de Execução | Exemplos de Aplicação |
+| :--- | :--- | :--- |
+| **Evidência Determinística** | Scripts nativos, CLI, parsers AST | Cálculo de hashes (SHA-256), `git diff`, inventário de arquivos, AST parsing, extração de dependências, execução de testes unitários, validação sintática e de schemas JSON. |
+| **Interpretação Cognitiva** | Modelos de Linguagem (LLMs via OmniRoute) | Raciocínio sobre segurança e fluxos de autenticação, análise arquitetural, correlação de regras de negócio entre módulos, interpretação de casos limítrofes e ambíguos. |
 
-Uso IA principalmente para:
+> **Regra de Ouro**: Nenhuma operação computacional determinística deve ser delegada a uma LLM.
+
+### 2.2 Desacoplamento via Políticas de Execução (*Task Policies*)
+O Orquestrador de Agentes não seleciona modelos concretos (ex: Claude 3.5 Sonnet, GPT-4o, Llama 3) nem provedores específicos (OpenAI, Anthropic, Ollama). Em vez disso, o sistema opera através de **Políticas de Execução Abstratas**:
 
 ```text
-análise
-revisão
-auditoria
-explicação
-documentação
-planejamento
-pesquisa
-diagnóstico
+[Tarefa Cognitiva]
+       ↓
+[Política Abstrata] (fast, cheap, coding, context-optimized, quality-first)
+       ↓
+[OmniRoute]
+       ↓ (Avaliação de custo, latência, quotas, saúde e cache affinity)
+[Modelo / Provedor Concreto]
 ```
 
-Portanto, o objetivo desta infraestrutura não é criar um agente que programe autonomamente tudo.
+Dessa forma, alterações em disponibilidade, preços ou modelos de mercado afetam unicamente as tabelas de roteamento do OmniRoute, mantendo a camada de agentes completamente desacoplada.
 
-É criar uma infraestrutura de apoio, análise e delegação controlada.
+### 2.3 Hierarquia de Execução e Portões de Escalonamento (*Escalation Gates*)
+A delegação cognitiva segue uma progressão de menor custo para maior capacidade, controlada por validações determinísticas:
+
+```text
+               ┌───────────────────────────────┐
+               │    Tarefa Identificada        │
+               └──────────────┬────────────────┘
+                              │
+                              ▼
+               ┌───────────────────────────────┐
+               │ Ferramenta Determinística /   │
+               │ Script Nativo                 │
+               └──────────────┬────────────────┘
+                              │ Sucesso
+                              ▼
+               ┌───────────────────────────────┐
+               │ Modelo Econômico (cheap/fast) │
+               └──────────────┬────────────────┘
+                              │
+                              ▼
+               ┌───────────────────────────────┐
+               │ Validação Objetiva do Schema  │
+               └──────┬─────────────────┬──────┘
+                      │ Aprovado        │ Reprovado / Ambíguo
+                      ▼                 ▼
+          ┌─────────────────────┐ ┌───────────────────────────┐
+          │ Consumo do          │ │ Escalonamento para Modelo │
+          │ Resultado           │ │ de Alta Capacidade        │
+          └─────────────────────┘ └───────────────────────────┘
+```
+
+Critérios objetivos de validação:
+1. Conformidade com JSON Schema estrito;
+2. Presença de todos os campos mandatórios e referências de evidência;
+3. Ausência de contradições lógicas em relação a dados determinísticos prévios;
+4. Formatação e integridade de citações de código/símbolo.
+
+> **Diretriz**: Modelos econômicos nunca validam autonomamente a qualidade de suas próprias respostas.
+
+### 2.4 Isolamento de Contexto e Divulgação Progressiva (*Progressive Disclosure*)
+Para evitar saturação de janelas de contexto e desperdício de tokens, o envio de contexto aos modelos segue uma estrutura hierárquica por níveis de granularidade:
+
+* **Nível 0 (Perfil do Projeto)**: Metadados globais, ecossistema tecnológico, dependências primárias (`pom.xml`, `package.json`).
+* **Nível 1 (Arquivos Relevantes)**: Lista de caminhos afetados e seus propósitos imediatos.
+* **Nível 2 (Símbolos Relevantes)**: Assinaturas de classes, métodos, interfaces e anotações.
+* **Nível 3 (Código Circunvizinho)**: Implementação do bloco/função sob auditoria direta.
+* **Nível 4 (Cadeia de Dependências)**: Fluxos de chamada diretos e indiretos (call-graph relevante).
+* **Nível 5 (Fonte Integral)**: Código-fonte integral, restrito a auditorias de segurança críticas onde a cadeia completa é mandatória.
+
+### 2.5 Limite de Confiança (*Trust Boundary*) e Sanitização de Entradas
+Todos os artefatos provenientes do repositório auditado são classificados como **Dados Não Confiáveis** (*Untrusted Data*):
+* Arquivos-fonte, comentários de código, documentações (`README.md`), mensagens de commit, issues e fixtures de teste são processados exclusivamente como **dados passivos de entrada**.
+* Sob nenhuma hipótese conteúdos extraídos do código auditado devem ser concatenados em prompts como instruções de sistema ou comandos executáveis, eliminando o vetor de ataque por *Indirect Prompt Injection*.
 
 ---
 
-# 3. PROTÓTIPO ATUAL DO OMNIROUTE
+## 3. Topologia e Fluxo de Execução da Arquitetura
 
-Já construí um protótipo local de integração entre um agente Antigravity e o OmniRoute via MCP.
-
-Arquitetura atual:
+### 3.1 Diagrama de Camadas da Arquitetura
 
 ```text
-Antigravity
-    ↓
-MCP
-    ↓
-Python wrapper
-    ↓
-HTTP
-    ↓
-localhost:20128
-    ↓
-OmniRoute
+┌────────────────────────────────────────────────────────────────────────┐
+│                        AGENTE ANTIGRAVITY                              │
+│  - Recebe comandos do usuário e gerencia objetivos de alto nível        │
+│  - Decide pontos de delegação cognitiva vs. execução local             │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                  ORQUESTRADOR DE DOMÍNIO (AUDITORIA)                   │
+│  - Matriz de aplicabilidade e escopo (FULL, ONLY, EXCEPT)              │
+│  - Análise incremental Git Diff (arquivo -> símbolo -> finding)        │
+│  - Gestão de estado e histórico de findings (.audit/state/)            │
+│  - Divulgação progressiva de contexto (Nível 0 a 5)                    │
+│  - Controle de orçamento global de tokens por auditoria                │
+│  - Portões de qualidade e políticas de escalonamento                   │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│              DELEGATION GATEWAY (WRAPPER MCP / FIREWALL)               │
+│  - Interface MCP restrita: delegar_tarefa(), consultar_status()        │
+│  - Capability Firewall: bloqueio de acessos administrativos            │
+│  - Prevenção de delegação recursiva (profundidade estrita = 1)         │
+│  - Cache determinístico de aplicação (SHA-256)                         │
+│  - Normalização de entrada e validação de schema de saída              │
+│  - Registro de proveniência semântica e custos por tarefa              │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ HTTP (localhost:20128/v1)
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        OMNIROUTE (INFRAESTRUTURA)                      │
+│  - Roteamento dinâmico via políticas (auto/coding, auto/fast, etc.)    │
+│  - Resiliência: fallback, retry com backoff, circuit breakers          │
+│  - Gestão de tráfego: quotas, rate limiting, balanceamento P2C         │
+│  - Cache de infraestrutura: prompt-cache affinity, semantic cache      │
+│  - Observabilidade de rede: latência, tokens, telemetria por provedor  │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                     PROVEDORES / MODELOS FOLHA                         │
+│  - OpenAI / Anthropic / Groq / Provedores Locais (Ollama, vLLM)        │
+│  - Execução estrita do payload (sem capacidades de sub-delegação)      │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-O protótipo possui:
+### 3.2 Agente Orquestrador (*Orchestrator*)
+Camada responsável pelas decisões de negócio e integridade analítica:
+* Não executa roteamento de rede nem seleção de endpoints de LLM.
+* Formula os objetivos da tarefa, define o escopo de arquivos aplicáveis e valida a consistência conceitual dos resultados.
+
+### 3.3 Gateway de Delegação MCP (*Delegation Gateway & Capability Firewall*)
+Componente de mediação entre os agentes e o OmniRoute:
+* Expõe ferramentas estritamente controladas através do protocolo MCP (`omniroute_mcp.py` / `omniroute`).
+* Funciona como barreira de segurança (*Capability Firewall*), impedindo que modelos externos alterem rotas, quotas, provedores ou configurações internas do OmniRoute.
+* Aplica o cache determinístico da aplicação antes de despachar a requisição para a rede.
+* Inibe loops e chamadas recursivas.
+
+### 3.4 Gateway OmniRoute (`localhost:20128`)
+Servidor local de infraestrutura de inferência:
+* Expõe endpoints compatíveis com a especificação OpenAI (`/v1/chat/completions`, `/v1/models`).
+* Aplica lógica de Auto-Combo, balanceamento P2C (*Power of Two Choices*), rate-limiting preventivo e monitoramento contínuo da saúde dos provedores configurados.
+
+### 3.5 Provedores e Modelos Folha (*Leaf Models*)
+* Instâncias terminais de computação cognitiva.
+* Recebem prompts fechados e retornam saídas estruturadas. Não possuem acesso a ferramentas de delegação recursiva.
+
+---
+
+## 4. O Sistema de Auditoria Modular e Incremental
+
+### 4.1 Módulos Especializados e Contrato de Normalização
+A arquitetura de auditoria é composta por módulos analíticos independentes, onde cada módulo é especialista em uma dimensão do sistema:
 
 ```text
-omniroute_mcp.py
+├── project-audit       (perfil global, governança e conformidade)
+├── code-audit          (qualidade, acoplamento, complexidade e code smells)
+├── security-audit      (vulnerabilidades OWASP, sanitização, autenticação)
+├── database-audit      (modelagem relacional, queries, migrações, índices)
+├── test-audit          (cobertura de testes, asserções, testes ausentes)
+├── git-audit           (histórico de commits, integridade de branches, churn)
+└── documentation-audit (aderência a specs, completude técnica)
 ```
 
-que cria um servidor MCP e expõe:
+#### Contrato Canônico de Normalização (`audit-normalize`)
+* Cada auditor produz suas descobertas em formato estruturado.
+* O componente determinístico `audit-normalize` agrega, desduplica, valida schemas e gera o dataset canônico `report_data.json`.
+* `audit-normalize` é rigorosamente determinístico (não utiliza LLMs) para assegurar neutralidade e rastreabilidade dos dados auditados.
 
-```python
-delegar_tarefa(
-    prompt: str,
-    modelo_ou_rota: str = "auto/coding"
-) -> str
-```
+### 4.2 Matriz de Aplicabilidade e Escopo do Usuário
+A execução de auditorias não deve ser exaustiva por padrão, mas orientada por aplicabilidade técnica e filtros de escopo:
 
-O wrapper atualmente:
+#### 1. Verificação de Aplicabilidade (*Applicability*)
+O orquestrador inspeciona o projeto antes de instanciar auditores:
+* *Exemplo*: Um utilitário de terminal em Java puro (CLI, sem frontend, sem HTTP, sem banco de dados relacional) desativa automaticamente `database-audit` e verificações web, executando apenas `code-audit`, `security-audit` (cli/io), `test-audit` e `git-audit`.
 
-1. lê `OMNIROUTE_API_KEY`;
-2. faz POST para:
+#### 2. Escopos de Execução (*User Scopes*)
+O sistema aceita comandos determinísticos de escopo:
+* `FULL`: Todos os módulos aplicáveis são executados.
+* `FULL EXCEPT <Módulos>`: Executa todos os módulos aplicáveis exceto os especificados.
+* `ONLY <Módulos>`: Executa estritamente o subconjunto de auditores solicitado.
+
+### 4.3 Auditoria Incremental Orientada a Git Diff e Grafo de Impacto
+Em vez de reauditar todo o repositório a cada ciclo, a auditoria rastreia alterações entre commits de referência:
 
 ```text
-http://localhost:20128/v1/chat/completions
+Commit Base (A: abc123) ──▶ Commit Alvo (B: def456)
+                                   │
+                                   ▼
+                            git diff --name-status
+                                   │
+                                   ▼
+                      Grafo de Impacto de Arquivos
+                                   │
+                                   ▼
+                     Análise de Impacto por Símbolo
+                                   │
+                                   ▼
+                     Mapeamento de Dependências
+                                   │
+                                   ▼
+                  Classificação de Impacto no Finding
 ```
 
-3. utiliza payload OpenAI-compatible:
+#### Regra de Isolamento por Símbolo
+A modificação de um arquivo não invalida automaticamente todas as descobertas daquele arquivo. Se o finding `SEC-001` reside em `AuthService#validateToken()`, e uma alteração subsequente ocorre apenas em `AuthService#formatUserName()`, a evidência de `SEC-001` permanece estável, dispensando reauditoria completa.
+
+### 4.4 Ciclo de Vida e Continuidade dos Findings
+Cada finding identificado é rastreado por um identificador estável e possui transições de estado controladas:
+
+```text
+                   ┌───────────────────────────────────────┐
+                   │             NOVO FINDING              │
+                   └──────────────────┬────────────────────┘
+                                      │
+                 ┌────────────────────┴────────────────────┐
+                 │ Alteração em commit subsequente         │
+                 ▼                                         ▼
+   ┌───────────────────────────┐             ┌───────────────────────────┐
+   │ Sem impacto detectado no  │             │ Impacto detectado no      │
+   │ símbolo ou contexto       │             │ símbolo ou contexto       │
+   └─────────────┬─────────────┘             └─────────────┬─────────────┘
+                 │                                         │
+                 ▼                                         ▼
+          [ REUSE / PERSISTS ]                     [ REVALIDATE ]
+                 │                                         │
+                 │                         ┌───────────────┴───────────────┐
+                 │                         ▼                               ▼
+                 │                 Evidência mantida             Solução comprovada
+                 │                         │                               │
+                 │                         ▼                               ▼
+                 │                   [ MODIFIED ]                    [ RESOLVED ]
+                 │
+                 ▼
+         [ INVALIDATE ] (Caso arquivo ou trecho seja removido sem contrapartida)
+```
+
+* **REUSE (Reaproveitamento)**: Contexto e código permanecem inalterados; o finding é replicado para o novo relatório sem nova chamada de LLM.
+* **REVALIDATE (Revalidação)**: O código associado sofreu modificação; uma tarefa focada (escopo restrito) é despachada para verificar a procedência do finding.
+* **RESOLVED (Resolvido)**: Apenas é atribuído quando há verificação explícita e positiva de que a falha deixou de existir. **Nunca classificar como resolvido por mera ausência do finding em um diff raso.**
+* **PERSISTS (Persistente)**: O finding continua reproduzível e inalterado.
+* **MODIFIED (Modificado)**: O finding persiste, porém suas linhas, contexto ou severidade foram alterados.
+
+---
+
+## 5. Estratégia de Cache e Persistência de Estado
+
+### 5.1 Dualidade de Cache: Infraestrutura vs. Aplicação Determinística
+Para maximizar desempenho e reprodutibilidade, a arquitetura divide a responsabilidade de cache em duas camadas ortogonais:
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│               CAMADA 1: CACHE DETERMINÍSTICO DA APLICAÇÃO              │
+│  - Reside no Delegation Gateway / Orquestrador                         │
+│  - Escopo: Tarefas de domínio, idempotência semântica e auditoria      │
+│  - Chave: Hash SHA-256 exato de parâmetros de entrada normalizados     │
+│  - Armazenamento: Persistido em disco dentro de .audit/cache/          │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ Cache Miss
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│               CAMADA 2: CACHE DE INFRAESTRUTURA (OMNIROUTE)            │
+│  - Reside no motor local do OmniRoute                                  │
+│  - Escopo: Prompt caching em provedores (Anthropic/OpenAI), afinidade  │
+│  - Chave: Similaridade semântica, prefixos idênticos de prompt         │
+│  - Armazenamento: Gerenciado pelo OmniRoute / Memória volátil          │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### 5.2 Especificação da Chave de Cache Determinístico da Aplicação
+O Delegation Gateway calcula a chave de cache determinístico através do hash SHA-256 de uma estrutura canônica serializada:
+
+$$\text{CacheKey} = \text{SHA-256}\Big(\text{task\_type} \parallel \text{normalized\_input} \parallel \text{context\_hash} \parallel \text{prompt\_version} \parallel \text{tool\_version} \parallel \text{policy\_id} \parallel \text{output\_schema\_version}\Big)$$
+
+Campos componentes da chave:
+1. `task_type`: Identificador do tipo de tarefa (ex: `endpoint_extraction`, `triage_vulnerability`).
+2. `normalized_input`: Dados de entrada sem variações de formatação irrelevantes.
+3. `context_hash`: Hash SHA-256 dos arquivos de código-fonte fornecidos como contexto.
+4. `prompt_version`: Versão do template de prompt utilizado.
+5. `tool_version`: Versão do script/orquestrador que originou a chamada.
+6. `policy_id`: Identificador da política aplicada (ex: `auto/coding`, `auto/cheap`).
+7. `output_schema_version`: Versão do schema de saída esperado.
+
+Caso os arquivos e o prompt não tenham mudado, o Delegation Gateway retorna o resultado persistido imediatamente (`CACHE HIT`), sem acionar a rede ou o OmniRoute.
+
+### 5.3 Repositório Independente de Auditoria (`.audit/`) e Isolamento do Git
+Para garantir que nenhum artefato gerado pela IA seja versionado no repositório de código do projeto auditado, a arquitetura institui uma fronteira estrita de repositórios:
+
+```text
+meu-projeto/
+├── .git/               ──▶ Repositório Git Primário do Projeto de Engenharia
+├── .gitignore          ──▶ Deve conter obrigatoriamente a linha: .audit/
+├── src/
+├── pom.xml
+└── .audit/             ──▶ Diretório de Trabalho do Sistema de Auditoria
+    └── .git/           ──▶ Repositório Git Independente da Auditoria
+```
+
+#### Vantagens do Isolamento
+1. **Conformidade e Limpeza**: O código acadêmico/profissional não é contaminado por arquivos temporários, logs ou relatórios de IA.
+2. **Versionamento Próprio**: A auditoria ganha versionamento independente, permitindo rastrear o histórico de análises, mudanças de findings e métricas ao longo do tempo.
+3. **Isolamento de Segredos**: Arquivos de estado e cache não correm risco de submissão acidental a repositórios públicos de código.
+
+### 5.4 Estrutura de Diretórios Recomendada para `.audit/`
+
+```text
+.audit/
+├── .git/                  # Controle de versão independente da auditoria
+├── config.json            # Configuração local da auditoria e políticas de escopo
+├── state/                 # Estado persistente atual do projeto
+│   ├── profile.json       # Perfil tecnológico identificado (Nível 0)
+│   ├── active_findings.json # Registro canônico de findings ativos
+│   └── baseline_commit    # Commit SHA da última auditoria consolidada
+├── runs/                  # Execuções históricas
+│   └── 20260921_143000/
+│       ├── run_manifest.json # Metadados, escopo, commit alvo e estatísticas
+│       ├── raw/           # Respostas brutas por auditor
+│       └── report_data.json # Dataset normalizado gerado pelo audit-normalize
+├── cache/                 # Armazenamento persistente do cache determinístico
+│   └── tasks/             # Arquivos indexados por CacheKey (SHA-256)
+└── reports/               # Relatórios técnicos formatados (Markdown, HTML, etc.)
+```
+
+---
+
+## 6. Governança de Execução, Resiliência e Recursos
+
+### 6.1 Envelopes de Políticas do OmniRoute
+O sistema mapeia categorias operacionais em políticas de roteamento gerenciadas pelo OmniRoute:
+
+| Política | Perfil de Otimização | Cenários Típicos de Aplicação |
+| :--- | :--- | :--- |
+| `auto/cheap` | Custo mínimo absoluto | Tradução de termos, formatação, extração mecânica de strings, categorização sintática. |
+| `auto/fast` | Menor latência (TTFT) | Triagem inicial de arquivos, verificação de consistência rápida, resumos superficiais. |
+| `auto/coding` | Capacidade intermediária | Análise de métodos isolados, identificação de code smells, parsing de lógica estruturada. |
+| `auto/smart` / `quality-first` | Raciocínio de alta capacidade | Auditoria de segurança profunda, análise de autorização, correlação arquitetural cross-module. |
+| `fusion` | Consenso multi-modelo | Desempate em findings críticos ambíguos, verificação de falsos positivos de alta gravidade. |
+
+> **Nota sobre Auto-Combo**: As rotas automáticas do OmniRoute consideram sinais dinâmicos de latência, cota restante, custo por milhão de tokens e taxas de erro em tempo de execução para selecionar o melhor provedor a cada chamada.
+
+### 6.2 Prevenção Rigorosa de Delegação Recursiva
+A arquitetura proíbe terminantemente chamadas recursivas entre modelos:
+
+$$\text{Agente Principal} \xrightarrow{\text{delegação}} \text{OmniRoute} \xrightarrow{\text{inferência}} \text{Modelo Folha}$$
+
+$$\text{Modelo Folha} \centernot\xrightarrow{\text{delegação}} \text{OmniRoute}$$
+
+* O modelo de linguagem executado via OmniRoute não recebe credenciais de API, tokens MCP ou ferramentas de sub-delegação.
+* Toda decomposição de subtarefas deve ser gerenciada no nível do Agente Orquestrador em TypeScript/Python.
+
+### 6.3 Modelo de Orçamentação Hierárquica (*Budget Governance*)
+O consumo financeiro e de tokens é regulado em múltiplos níveis de contenção:
+
+```text
+[Orçamento Global da Auditoria (ex: $2.00 / 500k tokens)]
+                         │
+                         ▼
+      [Orçamento por Run de Módulo (ex: $0.30)]
+                         │
+                         ▼
+      [Orçamento por Tarefa Individual (ex: $0.02)]
+                         │
+                         ▼
+      [Orçamento por Request HTTP (Timeout / Max Tokens)]
+```
+
+#### Regra de Degradação Explícita
+Caso o orçamento atinja o limite estipulado, o sistema **não deve degradar silenciosamente** a profundidade das verificações. A execução é interrompida com status determinístico:
+* `COMPLETE`: Auditoria concluída dentro do orçamento.
+* `PARTIAL`: Conclusão parcial com lista explícita de módulos não executados por estouro de cota.
+* `BLOCKED / FAILED`: Execução bloqueada antes de atingir evidência mínima suficiente.
+
+### 6.4 Fusão e Ensembles (*Fusion*) em Casos Críticos
+O modo `fusion` dispara requisições concorrentes para múltiplos modelos distintos e consolida as respostas através de um modelo juiz:
+* **Uso Restrito**: Devido ao custo multiplicado ($N \text{ chamadas} + \text{juiz}$), o modo `fusion` deve ser acionado exclusivamente para validação de vulnerabilidades críticas de segurança onde a evidência é ambígua ou divergente.
+* Não deve ser empregado em tarefas mecânicas ou triagens rotineiras.
+
+---
+
+## 7. Observabilidade, Rastreabilidade e Proveniência
+
+### 7.1 Schema Canônico de Proveniência Semântica
+Cada tarefa executada através do Delegation Gateway produz um registro de proveniência imutável indexado em `run_manifest.json`:
 
 ```json
 {
-  "model": "auto/coding",
-  "messages": [
-    {
-      "role": "user",
-      "content": "..."
-    }
-  ]
+  "task_id": "task_audit_sec_0084_abc123",
+  "project_id": "core-banking-service",
+  "audit_run_id": "run_20260921_143000",
+  "task_type": "security_vulnerability_triage",
+  "policy_requested": "auto/coding",
+  "input_context": {
+    "target_file": "src/main/java/com/bank/auth/TokenValidator.java",
+    "git_commit": "def456789abcdef",
+    "context_hash_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "prompt_version": "v1.4.0",
+    "disclosure_level": 3
+  },
+  "execution_telemetry": {
+    "resolved_model": "deepseek-coder-v2:latest",
+    "resolved_provider": "local_ollama",
+    "effective_route": "auto/coding",
+    "latency_ms": 1420,
+    "tokens_prompt": 845,
+    "tokens_completion": 210,
+    "cost_estimated_usd": 0.0000,
+    "fallback_triggered": false,
+    "application_cache_hit": false,
+    "infrastructure_cache_hit": true
+  },
+  "validation": {
+    "schema_validation_passed": true,
+    "escalation_triggered": false,
+    "output_hash_sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+  }
 }
 ```
 
-4. retorna:
-
-```text
-choices[0].message.content
-```
-
-5. trata erros HTTP/rede de forma simples.
-
-Dependências atuais do protótipo:
-
-```text
-Python >= 3.10
-mcp
-requests
-```
-
-### Problema conhecido
-
-A API key chegou a ficar hardcoded no `mcp_config.json`.
-
-Isso é apenas estado do protótipo e deve ser corrigido antes de qualquer versão séria.
+### 7.2 Telemetria de Infraestrutura vs. Telemetria Semântica
+A observabilidade é dividida segundo os domínios:
+* **Telemetria de Infraestrutura (OmniRoute)**: Latência de rede, tempo até o primeiro token (TTFT), códigos de status HTTP, falhas de conectividade com provedores, taxas de chave de API saturada.
+* **Telemetria Semântica (Delegation Gateway / Orquestrador)**: Relação entre findings gerados por token consumido, taxa de reprovação em validações de schema, frequência de escalonamento para modelos superiores e taxa de acerto do cache da aplicação.
 
 ---
 
-# 4. O QUE O PROTÓTIPO QUER RESOLVER
+## 8. Segurança e Limites de Acesso
 
-O modelo principal do agente é relativamente caro/capaz.
-
-Grande parte das tarefas, porém, não precisa dessa capacidade.
-
-Exemplos de tarefas potencialmente delegáveis:
+### 8.1 Capability Firewall e Restrição de Escopo MCP
+O wrapper MCP que expõe o OmniRoute aos agentes implementa o princípio do menor privilégio (*Least Privilege*):
 
 ```text
-tradução
-sumarização
-parsing
-extração
-classificação
-triagem
-formatação
-normalização
-preparação de contexto
-análise simples
-categorização de arquivos
-transformações mecânicas
+Ferramentas Expostas ao Agente:
+  ✔ delegar_tarefa(prompt, politica, schema_esperado)
+  ✔ consultar_status_delegacao(tarefa_id)
+  ✔ invalidar_cache_local(filtro)
+
+Ferramentas e Rotas Bloqueadas (Acesso Administrativo Restrito):
+  ✖ Adicionar/remover provedores de modelo
+  ✖ Alterar chaves de API do sistema OmniRoute
+  ✖ Alterar rotas globais e pesos de Auto-Combo
+  ✖ Modificar limites de quotas e circuit breakers
 ```
 
-A ideia é:
+### 8.2 Isolamento de Rede Local e Gerenciamento de Credenciais
+* O gateway OmniRoute escuta estritamente na interface local de loopback (`localhost:20128` / `127.0.0.1:20128`), sendo expressamente vedada a exposição em interfaces públicas (`0.0.0.0`) sem camada de autenticação TLS/mTLS.
+* A comunicação entre o Delegation Gateway e o OmniRoute utiliza tokens de autenticação transmitidos exclusivamente por variáveis de ambiente (`OMNIROUTE_API_KEY`).
+* É vedada a inserção de chaves de API em arquivos de configuração estáticos (`mcp_config.json`, repositórios Git ou arquivos de documentação).
 
-```text
-modelo principal
-      ↓
-decide se vale delegar
-      ↓
-OmniRoute
-      ↓
-modelo adequado
-```
-
-O modelo principal continua responsável pelo raciocínio complexo.
+### 8.3 Defesa Contra Prompt Injection Indireto
+Para prevenir que instruções maliciosas contidas em códigos auditados influenciem o julgamento das LLMs:
+1. **Delimitação Estruturada**: Todo conteúdo proveniente do repositório é encapsulado em delimitadores seguros (ex: blocos Markdown com marcadores únicos e tags XML fechadas como `<untrusted_code_block>`).
+2. **Instruções Metacognitivas**: Os templates de sistema contêm diretrizes imutáveis que explicitam que conteúdos contidos nas tags de dados nunca devem ser executados, avaliados como ordens de sistema ou interpretados como alteração de comportamento do auditor.
 
 ---
 
-# 5. ARQUITETURA DE AUDITORIA QUE ESTOU DESENVOLVENDO
+## 9. Matriz Canônica de Responsabilidades (RACI / Separação de Papéis)
 
-Existe uma arquitetura modular de auditoria:
+A tabela a seguir estabelece a divisão definitiva de responsabilidades no ecossistema:
 
-```text
-project-audit
-code-audit
-security-audit
-database-audit
-test-audit
-git-audit
-documentation-audit
-...
-```
+| Responsabilidade Arquitetural | Orquestrador de Domínio | Delegation Gateway (MCP) | OmniRoute (Infra) | Modelo Folha |
+| :--- | :---: | :---: | :---: | :---: |
+| **Decisão de Auditoria & Aplicabilidade** | **R / A** | I | N/A | N/A |
+| **Seleção do Nível de Contexto (0 a 5)** | **R / A** | C | N/A | N/A |
+| **Definição da Política de Execução** | **R / A** | C | I | N/A |
+| **Cache Determinístico da Aplicação** | C | **R / A** | N/A | N/A |
+| **Seleção do Modelo e Provedor Concreto** | N/A | I | **R / A** | N/A |
+| **Resiliência (Fallback, Retries, Circuit Breaker)**| N/A | I | **R / A** | N/A |
+| **Cache de Prompt / Afinidade de Infraestrutura** | N/A | I | **R / A** | N/A |
+| **Execução da Inferência Cognitiva** | N/A | N/A | I | **R / A** |
+| **Validação Sintática e de Schemas** | C | **R / A** | N/A | N/A |
+| **Decisão de Escalonamento (*Escalation*)** | **R / A** | C | N/A | N/A |
+| **Governança do Orçamento Global da Run** | **R / A** | C | I | N/A |
+| **Gestão de Quota e Taxa por Provedor** | N/A | I | **R / A** | N/A |
+| **Controle de Acesso e Prevenção de Recursão** | I | **R / A** | C | N/A |
+| **Proveniência Semântica do Finding** | **R / A** | C | I | N/A |
+| **Versionamento e Histórico (`.audit/`)** | **R / A** | N/A | N/A | N/A |
 
-Os auditores seguem o mesmo contrato de saída.
-
-Depois:
-
-```text
-audit-normalize
-       ↓
-report_data.json
-       ├── report-publish
-       └── issue-forge
-```
-
-O `audit-normalize` é deliberadamente determinístico/conservador.
-
-Ele não deve virar um segundo auditor LLM.
+*Legenda: **R** = Responsável pela Execução; **A** = Aprovador/Dono do Domínio; **C** = Consultado; **I** = Informado; **N/A** = Não Aplicável.*
 
 ---
 
-# 6. PROBLEMA DE CUSTO DA AUDITORIA
-
-Uma auditoria completa pode consumir muitos tokens.
-
-Quero que o `project-audit` seja adaptativo.
-
-### Applicability
-
-Primeiro descobrir o que faz sentido para o projeto.
-
-Exemplo:
-
-```text
-Java
-CLI
-sem banco
-sem frontend
-sem HTTP
-JUnit
-Maven
-Git
-```
-
-Não faz sentido executar:
-
-```text
-database-audit
-frontend-audit
-web-specific checks
-```
-
-apenas porque são módulos existentes.
-
-### User scope
-
-Também quero permitir:
-
-```text
-FULL
-FULL EXCEPT X
-ONLY X,Y,Z
-```
-
-Exemplo:
-
-```text
-"Faça uma auditoria completa exceto arquitetura e banco."
-```
-
-O PA deverá rodar apenas os módulos aplicáveis restantes.
-
----
-
-# 7. AUDITORIA INCREMENTAL
-
-Cada auditoria possui um target Git commit.
-
-Exemplo:
-
-```text
-Audit A
-commit = abc123
-```
-
-Depois:
-
-```text
-abc123 → def456
-```
-
-Quero descobrir automaticamente:
-
-```text
-o que mudou?
-quais superfícies foram afetadas?
-quais findings podem ser reutilizados?
-quais precisam ser revalidados?
-quais precisam de nova auditoria?
-```
-
-Estados conceituais:
-
-```text
-REUSE
-REVALIDATE
-RUN / REAUDIT
-INVALIDATE
-```
-
-Não quero considerar um finding resolvido simplesmente porque o arquivo mudou.
-
-Idealmente:
-
-```text
-Git diff
-   ↓
-file impact
-   ↓
-symbol impact
-   ↓
-dependency impact
-   ↓
-finding impact
-```
-
-Exemplo:
-
-```text
-SEC-001
-↓
-AuthService#validateToken()
-```
-
-Se outra função do mesmo arquivo mudou, isso não implica automaticamente que SEC-001 foi afetado.
-
----
-
-# 8. HISTÓRICO DOS FINDINGS
-
-Quero manter continuidade entre auditorias.
-
-Exemplo:
-
-```text
-Audit A
-
-SEC-001
-SEC-002
-SEC-003
-```
-
-Depois:
-
-```text
-Audit B
-```
-
-O sistema deveria conseguir determinar:
-
-```text
-SEC-001 → RESOLVED
-SEC-002 → PERSISTS
-SEC-003 → MODIFIED
-```
-
-mas somente quando houver evidência suficiente.
-
-Nunca transformar ausência atual em "resolvido" sem verificar.
-
----
-
-# 9. `.audit/` COMO REPOSITÓRIO INDEPENDENTE
-
-Não quero nenhum artefato produzido pela IA entrando no Git do projeto acadêmico.
-
-O projeto deverá ignorar:
-
-```gitignore
-.audit/
-```
-
-E `.audit/` terá seu próprio Git:
-
-```text
-project/
-├── src/
-├── .git/
-├── .gitignore
-└── .audit/
-    └── .git/
-```
-
-Assim:
-
-```text
-project.git
-      ≠
-audit.git
-```
-
-O `.audit/` poderá armazenar:
-
-```text
-histórico
-cache
-contexto
-runs
-resultados
-proveniência
-metadados
-delegações
-relatórios
-```
-
-Mas secrets não devem ser versionados nem mesmo no audit repository.
-
-A independência do Git é importante porque permite ao sistema manter memória operacional sem contaminar o projeto acadêmico.
-
----
-
-# 10. POSSÍVEL ESTRUTURA DE `.audit/`
-
-Ainda não está congelada.
-
-Uma hipótese:
-
-```text
-.audit/
-├── .git/
-├── state/
-├── runs/
-├── cache/
-├── reports/
-```
-
-Podem existir conceitos adicionais:
-
-```text
-context
-history
-provenance
-delegation
-```
-
-mas não quero overengineering prematuro.
-
----
-
-# 11. HIPÓTESE ARQUITETURAL SOBRE OMNIROUTE
-
-A análise especializada que fizemos indica que o OmniRoute pode ser muito mais do que um simples proxy.
-
-A documentação pesquisada aponta capacidades como:
-
-```text
-routing
-model selection
-provider selection
-Auto-Combo
-fallback
-retry
-health
-quota
-rate limiting
-load balancing
-circuit breakers
-cache
-prompt-cache affinity
-session affinity
-streaming
-observability
-budgets
-MCP
-A2A
-```
-
-Também foram mencionadas estratégias como:
-
-```text
-auto
-auto/coding
-auto/fast
-auto/cheap
-auto/offline
-auto/smart
-cost-optimized
-context-optimized
-cache-optimized
-p2c
-fusion
-pipeline
-```
-
-IMPORTANTE:
-
-Essas capacidades foram obtidas em pesquisa anterior sobre o projeto OmniRoute e devem ser tratadas como **hipóteses/fatos externos provisórios até serem verificadas contra a versão real do OmniRoute instalado localmente**.
-
-Não assumir que minha instalação possui exatamente a versão ou os recursos citados.
-
----
-
-# 12. DESCOBERTA IMPORTANTE DA PESQUISA ANTERIOR
-
-A análise especializada indicou que:
-
-```text
-auto/coding
-```
-
-não é simplesmente:
-
-```text
-"usar modelo X"
-```
-
-mas uma política de seleção.
-
-O OmniRoute aparentemente considera múltiplos sinais para Auto-Combo, incluindo coisas relacionadas a:
-
-```text
-cost
-latency
-quota
-health
-task fit
-quality
-reliability
-context affinity
-cache affinity
-session availability
-```
-
-Portanto não quero criar prematuramente um router próprio do tipo:
-
-```text
-coding → model A
-security → model B
-translation → model C
-```
-
-Prefiro investigar se o desenho correto é:
-
-```text
-task
-↓
-policy
-↓
-OmniRoute
-↓
-concrete model/provider
-```
-
----
-
-# 13. NOVO MODELO MENTAL DE TASK ROUTER
-
-O Task Router do meu sistema não deveria necessariamente decidir:
-
-```text
-qual modelo usar?
-```
-
-Ele deveria decidir:
-
-```text
-qual política de execução usar?
-```
-
-Exemplo:
-
-```text
-translation
-→ cheap
-
-simple extraction
-→ fast
-
-coding
-→ coding
-
-large-context analysis
-→ context-optimized
-
-critical reasoning
-→ quality-first
-```
-
-Depois:
-
-```text
-policy
-↓
-OmniRoute
-↓
-modelo concreto
-```
-
-Assim o meu sistema fica desacoplado dos providers/modelos atuais.
-
----
-
-# 14. O QUE DEVE FICAR FORA DO OMNIROUTE
-
-Minha arquitetura pretende deixar no meu próprio sistema:
-
-```text
-audit applicability
-audit planning
-project profile
-dependency graph
-git impact analysis
-progressive disclosure
-finding identity
-finding lifecycle
-REUSE / REVALIDATE / RUN
-audit completeness
-semantic validation
-quality gates
-global audit budget
-cross-audit correlation
-project-specific provenance
-trust boundaries
-```
-
-Essas coisas dependem do domínio do meu sistema.
-
----
-
-# 15. O QUE OMNIROUTE DEVE ASSUMIR
-
-Idealmente o OmniRoute continua responsável por coisas de infraestrutura:
-
-```text
-model/provider selection
-routing
-fallback
-provider health
-retry
-circuit breaker
-quota
-rate limiting
-load balancing
-prompt-cache affinity
-transport
-telemetry
-provider-specific execution
-```
-
-Não quero duplicar essas funções no meu wrapper.
-
----
-
-# 16. O WRAPPER MCP
-
-Hoje ele é apenas:
-
-```text
-MCP
-↓
-HTTP request
-↓
-texto
-```
-
-No futuro poderia virar uma camada fina chamada conceitualmente:
-
-```text
-Delegation Gateway
-```
-
-Ela poderia controlar:
-
-```text
-capability restrictions
-task policy
-deterministic cache
-global budget
-provenance
-validation
-structured result
-```
-
-Mas NÃO deveria recriar:
-
-```text
-retry
-provider health
-fallback
-load balancing
-circuit breaker
-provider routing
-```
-
-porque isso duplicaria OmniRoute.
-
----
-
-# 17. MCP COMO CAPABILITY FIREWALL
-
-Não quero dar ao agente acesso indiscriminado ao MCP administrativo completo do OmniRoute.
-
-Idealmente o agente teria algo próximo de:
-
-```text
-delegate_task(...)
-```
-
-e talvez:
-
-```text
-inspect_route(...)
-get_usage(...)
-```
-
-somente se necessário.
-
-Não quero que o agente possa arbitrariamente:
-
-```text
-alterar providers
-alterar routing
-mudar budgets
-limpar cache
-alterar resilience
-```
-
-sem uma razão explícita.
-
-A camada MCP deve funcionar como uma capability boundary.
-
----
-
-# 18. NÃO QUERO DELEGAÇÃO RECURSIVA
-
-O desenho desejado é:
-
-```text
-main agent
-    ↓
-OmniRoute
-    ↓
-leaf model
-```
-
-e não:
-
-```text
-main agent
-    ↓
-model A
-    ↓
-OmniRoute
-    ↓
-model B
-    ↓
-OmniRoute
-    ↓
-...
-```
-
-Não assumir que o OmniRoute consegue garantir isso sozinho.
-
-A capability de delegação deve ser controlada pelo agente/wrapper.
-
----
-
-# 19. MODELOS FRACOS SEM PERDER QUALIDADE
-
-Quero explorar:
-
-```text
-cheap model
-        ↓
-triage / simple task
-        ↓
-quality gate
-        ↓
-accept
-ou
-escalate
-```
-
-Modelo forte deve ser reservado para:
-
-```text
-complex reasoning
-security
-authorization
-business logic
-cross-module analysis
-ambiguous cases
-critical findings
-conflicts
-```
-
-A qualidade final não deve depender de confiar cegamente no modelo barato.
-
----
-
-# 20. POSSÍVEL ESCALATION
-
-Arquitetura conceitual:
-
-```text
-TASK
- ↓
-cheap model
- ↓
-validation
- ├── PASS → RESULT
- └── FAIL/UNCERTAIN → strong model
-```
-
-O modelo barato não deve simplesmente decidir sozinho se sua própria resposta é suficiente.
-
-O sistema deve possuir critérios de validação objetivos sempre que possível.
-
-Exemplos:
-
-```text
-schema
-required fields
-provenance
-deterministic checks
-contradictions
-format
-evidence references
-```
-
----
-
-# 21. CACHE
-
-Quero distinguir dois tipos:
-
-### Cache de infraestrutura
-
-Pode existir dentro do OmniRoute:
-
-```text
-semantic cache
-prompt cache
-cache affinity
-```
-
-Isso é otimização de execução.
-
-### Cache do meu sistema
-
-Deve servir para:
-
-```text
-reprodutibilidade
-histórico
-auditoria incremental
-reuse
-```
-
-Uma possível chave:
-
-```text
-task
-+
-normalized input
-+
-context hash
-+
-prompt version
-+
-tool version
-+
-policy version
-+
-output contract
-```
-
-→ SHA-256
-
-O cache do meu sistema não deve depender cegamente do semantic cache do OmniRoute.
-
----
-
-# 22. CACHE DE DELEGAÇÃO
-
-Exemplo:
-
-```text
-"Extraia todos os endpoints deste controller."
-```
-
-Se:
-
-```text
-arquivo não mudou
-+
-contexto não mudou
-+
-prompt não mudou
-+
-ferramenta não mudou
-+
-policy não mudou
-```
-
-poderíamos ter:
-
-```text
-CACHE HIT
-```
-
-sem chamar outro LLM.
-
-Quero investigar se o OmniRoute já oferece mecanismos que podem ajudar e qual parte deve ser implementada externamente.
-
----
-
-# 23. PROVENANCE
-
-Quero registrar internamente algo próximo de:
-
-```text
-task_id
-project_id
-audit_run_id
-task_type
-policy_id
-input_hash
-context_hash
-prompt_version
-tool_version
-resolved_model
-resolved_provider
-route
-omniroute_version
-latency_ms
-tokens_in
-tokens_out
-cost
-fallback_attempts
-cache_hit
-output_hash
-validation_result
-```
-
-O OmniRoute pode fornecer parte disso.
-
-Meu sistema deve acrescentar:
-
-```text
-por que a tarefa existiu
-qual auditor
-qual finding
-qual política
-qual run
-qual versão da skill
-```
-
----
-
-# 24. OBSERVABILIDADE
-
-Quero medir:
-
-```text
-tasks
-model selected
-provider
-latency
-tokens
-cost
-errors
-fallbacks
-cache hit rate
-cache miss rate
-quality signals
-```
-
-Idealmente por:
-
-```text
-project
-run
-skill
-task
-model
-route
-```
-
-Quero separar:
-
-```text
-telemetry de infraestrutura
-```
-
-de:
-
-```text
-telemetry semântica do meu sistema
-```
-
----
-
-# 25. BUDGET
-
-Quero potencialmente ter:
-
-```text
-global audit budget
-run budget
-task budget
-request budget
-```
-
-Minha camada deveria controlar:
-
-```text
-budget global
-```
-
-Enquanto OmniRoute controla:
-
-```text
-budget específico da request
-provider quota
-routing economics
-```
-
-Exemplo:
-
-```text
-audit budget = X
-```
-
-↓
-
-```text
-task budget = Y
-```
-
-↓
-
-```text
-OmniRoute request budget = Z
-```
-
-Nunca quero degradar silenciosamente uma auditoria por falta de orçamento.
-
-Estados explícitos são preferíveis:
-
-```text
-COMPLETE
-PARTIAL
-INCOMPLETE
-FAILED
-BLOCKED
-```
-
----
-
-# 26. PROGRESSIVE DISCLOSURE
-
-Outro mecanismo que quero investigar no meu sistema:
-
-```text
-level 0
-project profile
-
-level 1
-relevant files
-
-level 2
-relevant symbols
-
-level 3
-surrounding code
-
-level 4
-dependency chain
-
-level 5
-full source
-```
-
-A intenção é nunca enviar todo o projeto ao modelo sem necessidade.
-
-O OmniRoute provavelmente não deve ser responsável por isso.
-
-O Orchestrator seleciona o contexto.
-
-OmniRoute executa a chamada.
-
----
-
-# 27. SCRIPT + LLM
-
-Princípio central:
-
-```text
-script → deterministic evidence
-LLM → interpretation
-```
-
-Exemplos de tarefas determinísticas:
-
-```text
-SHA-256
-git diff
-file inventory
-AST extraction
-dependency graph
-test execution
-schema validation
-JSON validation
-```
-
-Exemplos de tarefas cognitivas:
-
-```text
-security reasoning
-architecture reasoning
-business logic analysis
-cross-module correlation
-ambiguous interpretation
-```
-
-Quero usar o mecanismo mais barato possível para cada categoria.
-
----
-
-# 28. PARALLELISM
-
-Auditorias independentes poderão eventualmente executar em paralelo:
-
-```text
-security
-database
-testing
-git
-```
-
-Mas:
-
-```text
-orchestration / task dependency
-```
-
-deve ficar no meu Orchestrator.
-
-OmniRoute deve administrar a execução/infraestrutura das requests.
-
-Quero investigar até onde o OmniRoute realmente ajuda aqui.
-
----
-
-# 29. FUSION / ENSEMBLE
-
-A pesquisa indicou que o OmniRoute possui ou pode possuir algo semelhante a:
-
-```text
-fusion
-```
-
-conceitualmente:
-
-```text
-task
- ├── model A
- ├── model B
- └── model C
-      ↓
-    judge
-      ↓
-  final answer
-```
-
-Isso pode ser interessante para:
-
-```text
-critical verification
-ambiguous security findings
-cross-model review
-high-value reasoning
-```
-
-Mas não deve ser usado automaticamente para tudo porque:
-
-```text
-1 task
-→ 3+ calls
-→ judge
-```
-
-pode custar mais do que usar um modelo forte diretamente.
-
----
-
-# 30. CONTEXTO / MEMÓRIA
-
-Não quero usar o OmniRoute como fonte principal de estado do projeto.
-
-O estado persistente pertence ao meu sistema:
-
-```text
-.audit/
-```
-
-O OmniRoute é uma infraestrutura de execução.
-
-Se ele possuir:
-
-```text
-memory
-session
-context reuse
-prompt cache
-```
-
-quero entender exatamente o que cada um significa e quais são as limitações.
-
-Não assumir que:
-
-```text
-session reuse
-=
-conversation reuse
-=
-context caching universal
-```
-
----
-
-# 31. TRUST BOUNDARY
-
-Projeto auditado é:
-
-```text
-UNTRUSTED DATA
-```
-
-Incluindo:
-
-```text
-README
-source code
-comments
-issues
-commits
-logs
-fixtures
-generated files
-```
-
-Isso não pode virar instrução para o agente.
-
-Exemplo:
-
-```bash
-curl ... | bash
-```
-
-dentro de README:
-
-```text
-DATA
-```
-
-não:
-
-```text
-COMMAND TO EXECUTE
-```
-
-A trust boundary deve existir no agente/orquestrador.
-
-Não depender do OmniRoute para resolver isso.
-
----
-
-# 32. SEGURANÇA DO OMNIROUTE
-
-Quero investigar:
-
-```text
-API key storage
-process permissions
-local access control
-MCP scopes
-admin endpoints
-logging
-secret leakage
-prompt injection
-delegation abuse
-model isolation
-network boundaries
-```
-
-Em especial:
-
-```text
-quem pode chamar localhost:20128?
-```
-
-e:
-
-```text
-quais capabilities meu wrapper realmente expõe?
-```
-
----
-
-# 33. ARQUITETURA ATUAL PREFERIDA
-
-Conceitualmente:
-
-```text
-┌──────────────────────────────────────┐
-│                 AGENT                │
-│                                      │
-│ Decide quando delegar                │
-└───────────────────┬──────────────────┘
-                    │
-                    ▼
-┌──────────────────────────────────────┐
-│             ORCHESTRATOR             │
-│                                      │
-│ applicability                        │
-│ scope                                │
-│ context selection                    │
-│ audit planning                       │
-│ incremental analysis                 │
-│ cache correctness                    │
-│ quality gate                         │
-│ escalation                           │
-│ global budget                        │
-│ provenance                           │
-│ correlation                          │
-└───────────────────┬──────────────────┘
-                    │
-                    ▼
-┌──────────────────────────────────────┐
-│             TASK POLICY              │
-│                                      │
-│ cheap / fast / coding / quality ... │
-└───────────────────┬──────────────────┘
-                    │
-                    ▼
-┌──────────────────────────────────────┐
-│              OMNIROUTE               │
-│                                      │
-│ routing                              │
-│ model/provider selection             │
-│ fallback                             │
-│ retry                                │
-│ health                               │
-│ quota                                │
-│ load balancing                       │
-│ rate limit                           │
-│ cache affinity                       │
-│ telemetry                            │
-└───────────────────┬──────────────────┘
-                    │
-                    ▼
-              MODEL PROVIDER
-```
-
----
-
-# 34. REGRA PARA O TASK ROUTER
-
-Não quero construir dois OmniRoutes.
-
-A pergunta da minha camada deve ser:
-
-```text
-QUAL POLÍTICA DE EXECUÇÃO?
-```
-
-A pergunta do OmniRoute deve ser:
-
-```text
-QUAL CANDIDATO CONCRETO E COMO EXECUTAR?
-```
-
-Se as duas camadas começarem a decidir a mesma coisa, revisar a arquitetura.
-
----
-
-# 35. PRINCÍPIO DE EFICIÊNCIA
-
-A regra desejada para todo o ecossistema:
-
-> Use o mecanismo mais barato capaz de produzir evidência suficiente para aquela decisão.
-
-Hierarquia ideal:
-
-```text
-deterministic tool
-        ↓
-cheap model
-        ↓
-medium model
-        ↓
-strong model
-        ↓
-ensemble / verification
-```
-
-Não usar modelo forte quando uma operação determinística resolve o problema.
-
-Não usar modelo barato quando a tarefa exige raciocínio de alto risco.
-
----
-
-# 36. O QUE QUERO INVESTIGAR AGORA
-
-Quero que você continue a partir deste contexto e seja um **especialista crítico em OmniRoute**, não apenas um assistente que concorda comigo.
-
-Primeiro:
-
-1. Determine exatamente qual versão do OmniRoute está instalada.
-2. Compare a versão real com a documentação atual.
-3. Diferencie:
-
-   * capacidade realmente presente;
-   * capacidade documentada;
-   * capacidade experimental;
-   * capacidade ausente;
-   * capacidade que exige wrapper externo.
-4. Verifique as possibilidades reais de:
-
-   * Auto-Combo;
-   * routing;
-   * cost optimization;
-   * latency optimization;
-   * quality signals;
-   * fallback;
-   * retries;
-   * cache;
-   * prompt-cache affinity;
-   * context handling;
-   * session;
-   * fusion;
-   * pipelines;
-   * concurrency;
-   * MCP;
-   * observability;
-   * budgets.
-5. Identifique funcionalidades que eu ainda não considerei.
-6. Identifique ideias minhas que seriam desnecessárias porque o OmniRoute já resolve.
-7. Identifique ideias que o OmniRoute não deveria assumir.
-8. Identifique pontos em que um wrapper externo é realmente necessário.
-9. Investigue limites, trade-offs e riscos.
-10. Considere custo, qualidade, latência e confiabilidade simultaneamente.
-
----
-
-# 37. NÃO IMPLEMENTE A ARQUITETURA AINDA
-
-Neste estágio quero:
-
-```text
-pesquisa
-crítica
-arquitetura
-limites
-trade-offs
-validação de hipóteses
-```
-
-Não comece criando dezenas de arquivos ou skills.
-
-Primeiro determine a arquitetura correta.
-
-Depois poderemos especificar:
-
-```text
-delegation-mcp
-task policies
-cache
-provenance
-orchestrator
-OmniRoute configuration
-```
-
----
-
-# 38. NÃO ASSUMA QUE MINHAS IDEIAS ESTÃO CORRETAS
-
-Você deve dizer explicitamente quando uma ideia:
-
-```text
-faz sentido
-```
-
-quando:
-
-```text
-é parcialmente correta
-```
-
-quando:
-
-```text
-já existe no OmniRoute
-```
-
-quando:
-
-```text
-deve ficar no orchestrator
-```
-
-quando:
-
-```text
-deve ficar no wrapper
-```
-
-quando:
-
-```text
-deve ficar no OmniRoute
-```
-
-e quando:
-
-```text
-não vale a complexidade.
-```
-
-Quero maximizar:
-
-```text
-quality / cost
-```
-
-e não maximizar número de componentes.
-
----
-
-# 39. RESULTADO QUE QUERO OBTER
-
-Ao final da investigação, quero chegar a algo próximo de:
-
-```text
-AGENT
-  ↓
-ORCHESTRATOR
-  ↓
-TASK POLICY
-  ↓
-OMNIROUTE
-  ↓
-MODEL PROVIDER
-```
-
-com responsabilidades claramente separadas.
-
-Quero saber:
-
-```text
-who decides?
-who routes?
-who caches?
-who validates?
-who measures?
-who retries?
-who escalates?
-who enforces budgets?
-who stores provenance?
-who manages context?
-who controls permissions?
-who owns audit history?
-```
-
-E, principalmente:
-
-> Qual é a arquitetura mínima que consegue extrair o máximo de eficiência do OmniRoute sem duplicar suas funções e sem sacrificar a qualidade das decisões?
-
----
-
-# 40. CRITÉRIO FINAL
-
-Não otimize simplesmente para:
-
-```text
-menos tokens
-```
-
-Otimize para:
-
-```text
-menor custo total
-+
-menor contexto redundante
-+
-menor raciocínio redundante
-+
-maior reutilização
-+
-maior qualidade
-+
-maior rastreabilidade
-+
-maior confiabilidade
-```
-
-A meta final é:
-
-```text
-MAXIMUM QUALITY
-+
-MINIMUM COST
-+
-HIGH RELIABILITY
-+
-FULL TRACEABILITY
-```
-
-mantendo a arquitetura simples o suficiente para ser realmente mantida.
-
+## 10. Roteiro de Validação e Verificação Técnica do OmniRoute Local
+
+Antes da consolidação final de novas integrações, os seguintes passos técnicos de verificação devem ser executados contra a instância local do OmniRoute:
+
+1. **Determinação de Versão e Capacidades Reais**:
+   * Efetuar requisição a `http://localhost:20128/v1/models` e analisar endpoints administrativos disponíveis.
+   * Confrontar os modelos e rotas retornados com as políticas esperadas (`auto/coding`, `auto/fast`, `auto/cheap`).
+2. **Validação de Políticas Auto-Combo**:
+   * Enviar cargas de teste com a rota `auto/coding` e verificar nos headers ou na telemetria qual provedor foi selecionado e sob quais critérios.
+3. **Auditoria da Fronteira de Segurança do MCP**:
+   * Verificar se `omniroute_mcp.py` possui apenas as funções de interface necessárias (`delegar_tarefa`), sem vazar ferramentas de configuração administrativa.
+   * Assegurar que a variável `OMNIROUTE_API_KEY` é consumida via ambiente seguro e que nenhuma chave está em código estático.
+4. **Teste de Carga e Comportamento de Resiliência**:
+   * Simular indisponibilidade forçada de um provedor upstream para testar o chaveamento automático de *fallback* e a ativação de *circuit breakers* sem falha abrupta para o agente.
+5. **Aferição da Afinidade de Prompt Cache**:
+   * Despachar requisições sequenciais com prefixos de sistema volumosos idênticos e medir latência/consumo de tokens para confirmar se o cache de infraestrutura do OmniRoute está ativo.
+6. **Validação do Cache Determinístico da Aplicação**:
+   * Despachar a mesma requisição via Delegation Gateway duas vezes consecutivas e validar que a segunda requisição é resolvida via arquivo em `.audit/cache/tasks/` com latência inferior a 10ms.
+7. **Verificação de Isolamento do Git**:
+   * Confirmar a existência de `.audit/.git/` e validar que `git status` no repositório do projeto principal não exibe referências aos arquivos de `.audit/`.
