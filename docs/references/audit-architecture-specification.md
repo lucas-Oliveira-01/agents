@@ -84,11 +84,11 @@ Para não misturar responsabilidades, o sistema é dividido em três camadas est
 
 A implementação física do agente `project-audit` **NÃO DEVE** iniciar até que a seguinte esteira termine:
 
-1. [x] **ADR-06** (Target Identity)
-2. [x] **ADR-04** (Evidence/Incremental Semantics)
-3. [x] **ADR-05** (Trust/Execution Semantics)
-4. [x] **ADR-07** (Failure/Retry/Recovery Semantics)
-5. [x] **Canonical Data Model** (Modelagem Semântica dos Contratos Internos da Camada 2)
-6. [x] **Semantic Validators** (Regras de negócio que o schema não pode codificar sozinho)
-7. [ ] **JSON Schemas Físicos** (A representação final do modelo)
-8. [ ] **Architecture Frozen**
+1. [x] **ADR-04, 05, 06, 07** (Aprovadas)
+2. [x] **Canonical Data Model** (Aprovado)
+3. [x] **Semantic Validators** (Aprovado)
+4. [x] **Cross-model consistency check** (Revisão final de consistência estrutural e autoridade)
+5. [ ] **JSON Schemas derivados do modelo** (Representação mecânica da estrutura)
+6. [ ] **Schema validation passou**
+7. [ ] **Schema ↔ Model consistency passou**
+8. [ ] **Architecture Frozen** (Nenhuma decisão arquitetural implícita)
