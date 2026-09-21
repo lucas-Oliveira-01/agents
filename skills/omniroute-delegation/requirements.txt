@@ -1,0 +1,7 @@
+# omniroute-delegation dependencies
+# Canonical runtime dependency specification is defined in pyproject.toml [project.dependencies].
+# Development/testing optional dependencies are defined in pyproject.toml [project.optional-dependencies].
+#
+# Runtime dependencies:
+httpx>=0.24
+jsonschema>=4.18

@@ -1,0 +1,30 @@
+{
+  "snapshot_id": "sha256:59808497dc2823392caff2e9f17ef1858033ee096e1c8b9ca14cdb31b91aefd7",
+  "created_at": "2026-09-19T02:31:01.829137+00:00",
+  "sources": [
+    {
+      "file": "00_inventory_and_threat_model.md",
+      "sha256": "0f7e02ad32554b9124047551628a69dea24213e8a36447247c8610b5869bbed2",
+      "source_id": "src-001",
+      "source_role": "INVENTORY"
+    },
+    {
+      "file": "01_coverage_manifest.md",
+      "sha256": "14cdf4b69b7a994d29fd50883d293ed7067d3c3a1b3d5d1cd4334e141187c2f9",
+      "source_id": "src-002",
+      "source_role": "COVERAGE_MANIFEST"
+    },
+    {
+      "file": "02_analytical_report.md",
+      "sha256": "e0751edf24e20ef92b893114e7d8624cb57a374ba825155fe77090088c00fe27",
+      "source_id": "src-003",
+      "source_role": "ANALYTICAL_REPORT"
+    },
+    {
+      "file": "03_audit_ledger.md",
+      "sha256": "a866780e78cf61007e2c771ad32dc304a0a14137b53a63b784f26bb78ba4e54a",
+      "source_id": "src-004",
+      "source_role": "AUDIT_LEDGER"
+    }
+  ]
+}

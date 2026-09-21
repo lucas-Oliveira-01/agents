@@ -1,0 +1,1849 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://audit-pipeline.local/schema/report-data.schema.json",
+  "title": "Audit Pipeline Canonical Report Data",
+  "description": "Canonical normalized audit dataset produced by audit-normalize.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metadata",
+    "target_project",
+    "audit_snapshot",
+    "applicability",
+    "inspections",
+    "findings",
+    "controls",
+    "anomalies",
+    "conflicts",
+    "metrics",
+    "limitations",
+    "references"
+  ],
+  "properties": {
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "target_project": {
+      "$ref": "#/$defs/targetProject"
+    },
+    "audit_snapshot": {
+      "$ref": "#/$defs/auditSnapshot"
+    },
+    "applicability": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/applicability"
+      }
+    },
+    "inspections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/inspection"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "controls": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/control"
+      }
+    },
+    "anomalies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/anomaly"
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/conflict"
+      }
+    },
+    "metrics": {
+      "$ref": "#/$defs/metrics"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/limitation"
+      }
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    }
+  },
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "generator",
+        "generated_at"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "generator": {
+          "const": "audit-normalize"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "sourceId": {
+      "type": "string",
+      "pattern": "^src-[A-Za-z0-9._-]+$"
+    },
+    "findingId": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_-]*-[0-9]{3,}$"
+    },
+    "controlId": {
+      "type": "string",
+      "pattern": "^CONTROL-[0-9]{3,}$"
+    },
+    "anomalyId": {
+      "type": "string",
+      "pattern": "^ANOM-[0-9]{3,}$"
+    },
+    "conflictId": {
+      "type": "string",
+      "pattern": "^CONFLICT-[0-9]{3,}$"
+    },
+    "limitationId": {
+      "type": "string",
+      "pattern": "^LIMIT-[0-9]{3,}$"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "SECURITY",
+        "ARCHITECTURE",
+        "DOMAIN",
+        "DATABASE",
+        "BUILD",
+        "TESTING",
+        "CI_CD",
+        "INFRASTRUCTURE",
+        "CONFIGURATION",
+        "DOCUMENTATION",
+        "OPERATIONS",
+        "CODE_QUALITY"
+      ]
+    },
+    "sourceRole": {
+      "type": "string",
+      "enum": [
+        "AUDIT_LEDGER",
+        "ANALYTICAL_REPORT",
+        "INVENTORY",
+        "THREAT_MODEL",
+        "COVERAGE_MANIFEST",
+        "EXTERNAL_REVIEW",
+        "ENVIRONMENT",
+        "VCS",
+        "UNKNOWN"
+      ]
+    },
+    "findingType": {
+      "type": "string",
+      "enum": [
+        "BUG",
+        "TECHNICAL_DEFECT",
+        "VULNERABILITY",
+        "RISK",
+        "INCONSISTENCY",
+        "TECH_DEBT",
+        "OPERATIONAL_PROBLEM",
+        "ARCHITECTURAL_DEFECT",
+        "ARCHITECTURAL_IMPROVEMENT",
+        "REQUIREMENT_DEPENDENT"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/sourceId"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line_range": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "confidence_at_source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "HIGH",
+            "MEDIUM",
+            "LOW",
+            null
+          ]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "file",
+        "sha256",
+        "source_role"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/sourceId"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_role": {
+          "$ref": "#/$defs/sourceRole"
+        }
+      }
+    },
+    "auditSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "created_at",
+        "sources"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source"
+          }
+        }
+      }
+    },
+    "sourceBackedString": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "value",
+        "provenance"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "NOT_PROVIDED_BY_SOURCE",
+            "NOT_DETERMINABLE",
+            "CONFLICT"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^CONFLICT-[0-9]{3,}$"
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenance"
+          },
+          "minItems": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "PRESENT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "NOT_PROVIDED_BY_SOURCE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "NOT_DETERMINABLE"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "CONFLICT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "conflict_id"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "$ref": "#/$defs/conflictId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "targetProject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "branch",
+        "version",
+        "build_version"
+      ],
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/sourceBackedString"
+        },
+        "commit": {
+          "$ref": "#/$defs/sourceBackedString"
+        },
+        "branch": {
+          "$ref": "#/$defs/sourceBackedString"
+        },
+        "version": {
+          "$ref": "#/$defs/sourceBackedString"
+        },
+        "build_version": {
+          "$ref": "#/$defs/sourceBackedString"
+        }
+      }
+    },
+    "semanticTextField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "value"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "NOT_PROVIDED_BY_SOURCE",
+            "NOT_DETERMINABLE",
+            "CONFLICT"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^CONFLICT-[0-9]{3,}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "PRESENT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "NOT_PROVIDED_BY_SOURCE",
+                  "NOT_DETERMINABLE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "NOT_DETERMINABLE"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "CONFLICT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "conflict_id"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "$ref": "#/$defs/conflictId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "severityField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "value"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "NOT_PROVIDED_BY_SOURCE",
+            "NOT_DETERMINABLE",
+            "CONFLICT"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "P0",
+            "P1",
+            "P2",
+            "P3",
+            "INFO",
+            null
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^CONFLICT-[0-9]{3,}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "PRESENT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "enum": [
+                  "P0",
+                  "P1",
+                  "P2",
+                  "P3",
+                  "INFO"
+                ]
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "NOT_PROVIDED_BY_SOURCE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "NOT_DETERMINABLE"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "CONFLICT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "conflict_id"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "$ref": "#/$defs/conflictId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "confidenceField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "value"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "NOT_PROVIDED_BY_SOURCE",
+            "NOT_DETERMINABLE",
+            "CONFLICT"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "HIGH",
+            "MEDIUM",
+            "LOW",
+            null
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^CONFLICT-[0-9]{3,}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "PRESENT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "enum": [
+                  "HIGH",
+                  "MEDIUM",
+                  "LOW"
+                ]
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "NOT_PROVIDED_BY_SOURCE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "NOT_DETERMINABLE"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "CONFLICT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "conflict_id"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "$ref": "#/$defs/conflictId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "findingTypeField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "value"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "NOT_PROVIDED_BY_SOURCE",
+            "NOT_DETERMINABLE",
+            "CONFLICT"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "BUG",
+            "TECHNICAL_DEFECT",
+            "VULNERABILITY",
+            "RISK",
+            "INCONSISTENCY",
+            "TECH_DEBT",
+            "OPERATIONAL_PROBLEM",
+            "ARCHITECTURAL_DEFECT",
+            "ARCHITECTURAL_IMPROVEMENT",
+            "REQUIREMENT_DEPENDENT",
+            null
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^CONFLICT-[0-9]{3,}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "PRESENT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "enum": [
+                  "BUG",
+                  "TECHNICAL_DEFECT",
+                  "VULNERABILITY",
+                  "RISK",
+                  "INCONSISTENCY",
+                  "TECH_DEBT",
+                  "OPERATIONAL_PROBLEM",
+                  "ARCHITECTURAL_DEFECT",
+                  "ARCHITECTURAL_IMPROVEMENT",
+                  "REQUIREMENT_DEPENDENT"
+                ]
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "NOT_PROVIDED_BY_SOURCE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "NOT_DETERMINABLE"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "CONFLICT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "conflict_id"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "$ref": "#/$defs/conflictId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "statusField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "value"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "NOT_PROVIDED_BY_SOURCE",
+            "NOT_DETERMINABLE",
+            "CONFLICT"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "CONFIRMED",
+            "PROBABLE",
+            "NOT_DETERMINABLE",
+            null
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^CONFLICT-[0-9]{3,}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "PRESENT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string",
+                "enum": [
+                  "CONFIRMED",
+                  "PROBABLE",
+                  "NOT_DETERMINABLE"
+                ]
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "NOT_PROVIDED_BY_SOURCE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "NOT_DETERMINABLE"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "CONFLICT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "conflict_id"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "$ref": "#/$defs/conflictId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "locationFileOnly": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "locationWithLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "line"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "locationWithRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "line_start",
+        "line_end"
+      ],
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1
+        },
+        "line_start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "line_end": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "locationField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "PRESENT",
+            "NOT_PROVIDED_BY_SOURCE",
+            "NOT_DETERMINABLE",
+            "CONFLICT"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/locationFileOnly"
+            },
+            {
+              "$ref": "#/$defs/locationWithLine"
+            },
+            {
+              "$ref": "#/$defs/locationWithRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "conflict_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^CONFLICT-[0-9]{3,}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "PRESENT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "value"
+            ],
+            "properties": {
+              "value": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/locationFileOnly"
+                  },
+                  {
+                    "$ref": "#/$defs/locationWithLine"
+                  },
+                  {
+                    "$ref": "#/$defs/locationWithRange"
+                  }
+                ]
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "NOT_PROVIDED_BY_SOURCE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "NOT_DETERMINABLE"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "conflict_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "CONFLICT"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "conflict_id"
+            ],
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "conflict_id": {
+                "$ref": "#/$defs/conflictId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "subcategory",
+        "state",
+        "provenance"
+      ],
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/category"
+        },
+        "subcategory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "APPLICABLE",
+            "NOT_APPLICABLE",
+            "NOT_DETERMINABLE"
+          ]
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenance"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "inspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "subcategory",
+        "state",
+        "result",
+        "provenance"
+      ],
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/category"
+        },
+        "subcategory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "INSPECTED",
+            "PARTIALLY_INSPECTED",
+            "NOT_INSPECTED",
+            "NOT_DETERMINABLE"
+          ]
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "FINDINGS_PRESENT",
+            "NOT_FOUND",
+            "NOT_DETERMINABLE"
+          ]
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenance"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "category",
+        "type",
+        "status",
+        "severity",
+        "confidence",
+        "location",
+        "evidence",
+        "description",
+        "cause",
+        "impact",
+        "exploitability",
+        "recommendation",
+        "provenance"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/findingId"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "$ref": "#/$defs/category"
+        },
+        "subcategory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "type": {
+          "$ref": "#/$defs/findingTypeField"
+        },
+        "status": {
+          "$ref": "#/$defs/statusField"
+        },
+        "severity": {
+          "$ref": "#/$defs/severityField"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidenceField"
+        },
+        "location": {
+          "$ref": "#/$defs/locationField"
+        },
+        "evidence": {
+          "$ref": "#/$defs/semanticTextField"
+        },
+        "description": {
+          "$ref": "#/$defs/semanticTextField"
+        },
+        "cause": {
+          "$ref": "#/$defs/semanticTextField"
+        },
+        "impact": {
+          "$ref": "#/$defs/semanticTextField"
+        },
+        "exploitability": {
+          "$ref": "#/$defs/semanticTextField"
+        },
+        "recommendation": {
+          "$ref": "#/$defs/semanticTextField"
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenance"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "category",
+        "title",
+        "status",
+        "description",
+        "provenance"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/controlId"
+        },
+        "category": {
+          "$ref": "#/$defs/category"
+        },
+        "subcategory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "CONFIRMED",
+            "PROBABLE",
+            "NOT_DETERMINABLE"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenance"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "anomaly": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "severity",
+        "description",
+        "provenance"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/anomalyId"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "TECHNICAL_INCONSISTENCY",
+            "SOURCE_FORMAT_ANOMALY",
+            "CONTRADICTORY_STATEMENT",
+            "POSSIBLE_TRANSCRIPTION_ERROR",
+            "UNEXPECTED_CONFIGURATION_REFERENCE",
+            "ID_COLLISION",
+            "UNMAPPED_TAXONOMY",
+            "OTHER"
+          ]
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "WARNING",
+            "ERROR"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenance"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "conflictValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "value"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/sourceId"
+        },
+        "value": {}
+      }
+    },
+    "conflictResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "policy_applied",
+        "selected_source"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "RESOLVED",
+            "UNRESOLVED"
+          ]
+        },
+        "policy_applied": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selected_source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sourceId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "RESOLVED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "policy_applied": {
+                "type": "string",
+                "minLength": 1
+              },
+              "selected_source": {
+                "$ref": "#/$defs/sourceId"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "UNRESOLVED"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "selected_source": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "field",
+        "resolution",
+        "values"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/conflictId"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "SEVERITY_CONFLICT",
+            "STATUS_CONFLICT",
+            "CONFIDENCE_CONFLICT",
+            "TYPE_CONFLICT",
+            "LOCATION_CONFLICT",
+            "FIELD_VALUE_CONFLICT",
+            "IDENTITY_CONFLICT",
+            "TARGET_PROJECT_CONFLICT"
+          ]
+        },
+        "finding_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Z][A-Z0-9_-]*-[0-9]{3,}$"
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolution": {
+          "$ref": "#/$defs/conflictResolution"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/conflictValue"
+          },
+          "minItems": 2
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "findings_total",
+        "severity",
+        "controls_total",
+        "inspections_total"
+      ],
+      "properties": {
+        "findings_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "severity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "P0",
+            "P1",
+            "P2",
+            "P3",
+            "INFO"
+          ],
+          "properties": {
+            "P0": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "P1": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "P2": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "P3": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "INFO": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "controls_total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inspections_total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "limitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "description",
+        "provenance"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/limitationId"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenance"
+          },
+          "minItems": 1
+        }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "value",
+        "provenance"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "SOURCE_DOCUMENT",
+            "REPOSITORY",
+            "COMMIT",
+            "REQUIREMENT",
+            "STANDARD",
+            "EXTERNAL_REFERENCE",
+            "OTHER"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/provenance"
+          },
+          "minItems": 1
+        }
+      }
+    }
+  }
+}

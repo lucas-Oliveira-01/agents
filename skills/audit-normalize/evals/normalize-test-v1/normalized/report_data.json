@@ -1,0 +1,720 @@
+{
+  "metadata": {
+    "schema_version": "1.0",
+    "generator": "audit-normalize",
+    "generated_at": "2026-09-19T02:20:22.010596+00:00"
+  },
+  "target_project": {
+    "repository": {
+      "state": "NOT_PROVIDED_BY_SOURCE",
+      "value": null,
+      "provenance": [
+        {
+          "source_id": "src-001",
+          "file": "00_inventory_and_threat_model_1.md"
+        }
+      ],
+      "conflict_id": null
+    },
+    "commit": {
+      "state": "PRESENT",
+      "value": "f7798ca700166e618389c1d1a9037a1ab2c32e7e",
+      "provenance": [
+        {
+          "source_id": "src-001",
+          "file": "00_inventory_and_threat_model_1.md"
+        }
+      ],
+      "conflict_id": null
+    },
+    "branch": {
+      "state": "NOT_PROVIDED_BY_SOURCE",
+      "value": null,
+      "provenance": [
+        {
+          "source_id": "src-001",
+          "file": "00_inventory_and_threat_model_1.md"
+        }
+      ],
+      "conflict_id": null
+    },
+    "version": {
+      "state": "NOT_PROVIDED_BY_SOURCE",
+      "value": null,
+      "provenance": [
+        {
+          "source_id": "src-001",
+          "file": "00_inventory_and_threat_model_1.md"
+        }
+      ],
+      "conflict_id": null
+    },
+    "build_version": {
+      "state": "NOT_PROVIDED_BY_SOURCE",
+      "value": null,
+      "provenance": [
+        {
+          "source_id": "src-001",
+          "file": "00_inventory_and_threat_model_1.md"
+        }
+      ],
+      "conflict_id": null
+    }
+  },
+  "audit_snapshot": {
+    "snapshot_id": "sha256:a7005e303349c48df9d1e831e661e15e1a111432248d6290976521cce82d9e50",
+    "created_at": "2026-09-19T02:20:21.919115+00:00",
+    "sources": [
+      {
+        "file": "00_inventory_and_threat_model_1.md",
+        "sha256": "4221ac46eeb642d0aebea747a6ecf234a8031c14e08ced63ffb5ddd59b59adf0",
+        "source_id": "src-001",
+        "source_role": "INVENTORY"
+      },
+      {
+        "file": "01_coverage_manifest.md",
+        "sha256": "dac08cca495081a7367caf1082d20fbb5443573032b80caa2c2ed70cc64c90a4",
+        "source_id": "src-002",
+        "source_role": "COVERAGE_MANIFEST"
+      },
+      {
+        "file": "02_analytical_report.md",
+        "sha256": "29c4f0fd7dee9705d02d30e5adc43e99524b6c2def162cd605b5e2b58df8327f",
+        "source_id": "src-003",
+        "source_role": "ANALYTICAL_REPORT"
+      },
+      {
+        "file": "03_audit_ledger.md",
+        "sha256": "974bce9255839c5c884776483b187eeceef0c408bc533cd8e132742802ff975f",
+        "source_id": "src-004",
+        "source_role": "AUDIT_LEDGER"
+      }
+    ]
+  },
+  "applicability": [
+    {
+      "category": "SECURITY",
+      "subcategory": "AUTHENTICATION",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "SECURITY",
+      "subcategory": "AUTHORIZATION",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "SECURITY",
+      "subcategory": "SQL_INJECTION",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "SECURITY",
+      "subcategory": "CORS",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "SECURITY",
+      "subcategory": "SECRETS",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "ARCHITECTURE",
+      "subcategory": "TRANSACTION_MANAGEMENT",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "ARCHITECTURE",
+      "subcategory": "DEPENDENCY_INJECTION",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "TESTING",
+      "subcategory": "UNIT_TESTS",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "TESTING",
+      "subcategory": "INTEGRATION_TESTS",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "CI_CD",
+      "subcategory": "PIPELINE",
+      "state": "NOT_APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "DATABASE",
+      "subcategory": "MIGRATIONS",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "DOCUMENTATION",
+      "subcategory": "README",
+      "state": "APPLICABLE",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    }
+  ],
+  "inspections": [
+    {
+      "category": "SECURITY",
+      "subcategory": "SQL_INJECTION",
+      "state": "INSPECTED",
+      "result": "NOT_FOUND",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "SECURITY",
+      "subcategory": "AUTHENTICATION",
+      "state": "INSPECTED",
+      "result": "FINDINGS_PRESENT",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "SECURITY",
+      "subcategory": "AUTHORIZATION",
+      "state": "INSPECTED",
+      "result": "FINDINGS_PRESENT",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "SECURITY",
+      "subcategory": "CORS",
+      "state": "INSPECTED",
+      "result": "FINDINGS_PRESENT",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "ARCHITECTURE",
+      "subcategory": "TRANSACTION_MANAGEMENT",
+      "state": "INSPECTED",
+      "result": "FINDINGS_PRESENT",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "TESTING",
+      "subcategory": "UNIT_TESTS",
+      "state": "INSPECTED",
+      "result": "FINDINGS_PRESENT",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "DATABASE",
+      "subcategory": "MIGRATIONS",
+      "state": "INSPECTED",
+      "result": "NOT_FOUND",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    },
+    {
+      "category": "DOCUMENTATION",
+      "subcategory": "README",
+      "state": "INSPECTED",
+      "result": "FINDINGS_PRESENT",
+      "provenance": [
+        {
+          "source_id": "src-002",
+          "file": "01_coverage_manifest.md"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "ARCH-001",
+      "title": "Missing transaction boundaries for multi-statement operations",
+      "category": "ARCHITECTURE",
+      "subcategory": "TRANSACTION_MANAGEMENT",
+      "type": {
+        "state": "PRESENT",
+        "value": "ARCHITECTURAL_DEFECT",
+        "conflict_id": null
+      },
+      "status": {
+        "state": "PRESENT",
+        "value": "CONFIRMED",
+        "conflict_id": null
+      },
+      "severity": {
+        "state": "PRESENT",
+        "value": "P2",
+        "conflict_id": null
+      },
+      "confidence": {
+        "state": "PRESENT",
+        "value": "HIGH",
+        "conflict_id": null
+      },
+      "location": {
+        "state": "PRESENT",
+        "value": {
+          "file": "backend/src/main/java/br/com/debuggers/smartserv/service/PedidoService.java"
+        },
+        "conflict_id": null
+      },
+      "evidence": {
+        "state": "PRESENT",
+        "value": "- O `PedidoService` executa operações DB sucessivas como `itemPedidoDAO.insert` seguido de `pedidoDAO.updateValorTotal` (linha 303-307) sem envolver em um bloco de transação (commit/rollback).\n- A classe `JdbcTransactionManager` existe mas não é invocada em nenhum `Service`.",
+        "conflict_id": null
+      },
+      "description": {
+        "state": "PRESENT",
+        "value": "- [Observation]: Múltiplas mutações em diferentes tabelas ocorrem sequencialmente com auto-commit verdadeiro por padrão na Connection.\n- [Inference]: Uma falha, exceção ou queda do banco de dados na operação subsequente deixará a operação prévia isolada no banco.\n- [Hypothesis]: A equipe planejou gerenciar transações (daí a presença de `TransactionManager`) mas não concluiu a integração via IoC.",
+        "conflict_id": null
+      },
+      "cause": {
+        "state": "PRESENT",
+        "value": "- A injeção de dependências (`IoCContainer`) não forneceu os gerenciadores de transação para as classes de serviço.",
+        "conflict_id": null
+      },
+      "impact": {
+        "state": "PRESENT",
+        "value": "- Inconsistência na base de dados (ex: Item criado no pedido, mas o valor total do pedido não ser atualizado).",
+        "conflict_id": null
+      },
+      "exploitability": {
+        "state": "PRESENT",
+        "value": "- Não aplicável via ator malicioso, mas ocorrerá naturalmente sob uso ou em falhas de rede.",
+        "conflict_id": null
+      },
+      "recommendation": {
+        "state": "PRESENT",
+        "value": "- Injetar o `TransactionManager` nos serviços e aplicar o padrão `begin`, `commit`, e `rollback` em operações como `criarPedido`, `adicionarItem` e `removerItem`.",
+        "conflict_id": null
+      },
+      "provenance": [
+        {
+          "source_id": "src-004",
+          "file": "03_audit_ledger.md"
+        }
+      ]
+    },
+    {
+      "id": "DOC-001",
+      "title": "Inconsistency in documented database initialization scripts",
+      "category": "DOCUMENTATION",
+      "subcategory": "README",
+      "type": {
+        "state": "PRESENT",
+        "value": "INCONSISTENCY",
+        "conflict_id": null
+      },
+      "status": {
+        "state": "PRESENT",
+        "value": "CONFIRMED",
+        "conflict_id": null
+      },
+      "severity": {
+        "state": "PRESENT",
+        "value": "INFO",
+        "conflict_id": null
+      },
+      "confidence": {
+        "state": "PRESENT",
+        "value": "HIGH",
+        "conflict_id": null
+      },
+      "location": {
+        "state": "PRESENT",
+        "value": {
+          "file": "README.md"
+        },
+        "conflict_id": null
+      },
+      "evidence": {
+        "state": "PRESENT",
+        "value": "- O README cita 6 arquivos SQL (01 a 06).\n- O diretório `database/` possui 8 arquivos SQL (01 a 08), abrangendo a entidade `item_pedido` que não está documentada.",
+        "conflict_id": null
+      },
+      "description": {
+        "state": "PRESENT",
+        "value": "- [Observation]: Existe divergência material entre a documentação de instruções e o estado real.\n- [Inference]: O desenvolvedor de BD adicionou novas migrações e esqueceu de atualizar o `README.md`.",
+        "conflict_id": null
+      },
+      "cause": {
+        "state": "PRESENT",
+        "value": "- Falta de sincronização entre README e código fonte.",
+        "conflict_id": null
+      },
+      "impact": {
+        "state": "PRESENT",
+        "value": "- Confusão no _onboarding_ ou setup local para novos desenvolvedores, embora o Docker trate silenciosamente lendo a pasta.",
+        "conflict_id": null
+      },
+      "exploitability": {
+        "state": "NOT_PROVIDED_BY_SOURCE",
+        "value": null,
+        "conflict_id": null
+      },
+      "recommendation": {
+        "state": "PRESENT",
+        "value": "- Atualizar a listagem no README.md.",
+        "conflict_id": null
+      },
+      "provenance": [
+        {
+          "source_id": "src-004",
+          "file": "03_audit_ledger.md"
+        }
+      ]
+    },
+    {
+      "id": "SEC-001",
+      "title": "Permissive wildcard CORS configuration",
+      "category": "SECURITY",
+      "subcategory": "CORS",
+      "type": {
+        "state": "PRESENT",
+        "value": "RISK",
+        "conflict_id": null
+      },
+      "status": {
+        "state": "PRESENT",
+        "value": "CONFIRMED",
+        "conflict_id": null
+      },
+      "severity": {
+        "state": "PRESENT",
+        "value": "P3",
+        "conflict_id": null
+      },
+      "confidence": {
+        "state": "PRESENT",
+        "value": "HIGH",
+        "conflict_id": null
+      },
+      "location": {
+        "state": "PRESENT",
+        "value": {
+          "file": "backend/src/main/java/br/com/debuggers/smartserv/config/CorsConfig.java",
+          "line": 12
+        },
+        "conflict_id": null
+      },
+      "evidence": {
+        "state": "PRESENT",
+        "value": "- `it.anyHost();` é configurado globalmente nas opções do Javalin.",
+        "conflict_id": null
+      },
+      "description": {
+        "state": "PRESENT",
+        "value": "- [Observation]: O servidor aceita requisições originadas de qualquer host/domínio.\n- [Inference]: A configuração atual foi definida para facilitar o desenvolvimento (como documentado no próprio código fonte).\n- [Limitation]: Como não há variáveis de ambiente separando o CORS por ambiente (`development` vs `production`), presume-se que será a mesma configuração a menos que alterada.",
+        "conflict_id": null
+      },
+      "cause": {
+        "state": "PRESENT",
+        "value": "- Conveniência de desenvolvimento sem carregamento baseado em `appEnv`.",
+        "conflict_id": null
+      },
+      "impact": {
+        "state": "PRESENT",
+        "value": "- Se a aplicação web armazenar tokens (ex: cookies) sem proteções `SameSite`, atacantes poderão realizar chamadas autenticadas Cross-Origin.",
+        "conflict_id": null
+      },
+      "exploitability": {
+        "state": "PRESENT",
+        "value": "- O caminho de ataque (Attack path) depende de condições não demonstradas no ambiente atual (como o armazenamento explícito de tokens de sessão em cookies vulneráveis e a ausência de controles `SameSite` no frontend). Sem essas evidências complementares, permanece classificado como um risco latente (RISK).",
+        "conflict_id": null
+      },
+      "recommendation": {
+        "state": "PRESENT",
+        "value": "- Ler a variável `APP_ENV`. Caso seja `production`, restringir o CORS ao host do domínio real da aplicação.",
+        "conflict_id": null
+      },
+      "provenance": [
+        {
+          "source_id": "src-004",
+          "file": "03_audit_ledger.md"
+        }
+      ]
+    },
+    {
+      "id": "TEST-001",
+      "title": "Complete absence of automated tests",
+      "category": "TESTING",
+      "subcategory": "UNIT_TESTS",
+      "type": {
+        "state": "PRESENT",
+        "value": "TECH_DEBT",
+        "conflict_id": null
+      },
+      "status": {
+        "state": "PRESENT",
+        "value": "CONFIRMED",
+        "conflict_id": null
+      },
+      "severity": {
+        "state": "PRESENT",
+        "value": "P3",
+        "conflict_id": null
+      },
+      "confidence": {
+        "state": "PRESENT",
+        "value": "HIGH",
+        "conflict_id": null
+      },
+      "location": {
+        "state": "PRESENT",
+        "value": {
+          "file": "backend/src/test"
+        },
+        "conflict_id": null
+      },
+      "evidence": {
+        "state": "PRESENT",
+        "value": "- Nenhuma dependência `junit`, `mockito` ou frameworks equivalentes está declarada no `pom.xml`.\n- Diretório `src/test` não existe no projeto de backend. Nenhuma ferramenta de teste no frontend.",
+        "conflict_id": null
+      },
+      "description": {
+        "state": "PRESENT",
+        "value": "- [Observation]: Nenhuma linha de teste ou configuração foi identificada.\n- [Inference]: A garantia de qualidade foi feita puramente por testes manuais na interface Swagger/Front.",
+        "conflict_id": null
+      },
+      "cause": {
+        "state": "PRESENT",
+        "value": "- Priorização de requisitos funcionais em detrimento de cobertura de testes.",
+        "conflict_id": null
+      },
+      "impact": {
+        "state": "PRESENT",
+        "value": "- Regressões indetectáveis de forma automatizada ao se adicionar novas funcionalidades.",
+        "conflict_id": null
+      },
+      "exploitability": {
+        "state": "NOT_PROVIDED_BY_SOURCE",
+        "value": null,
+        "conflict_id": null
+      },
+      "recommendation": {
+        "state": "PRESENT",
+        "value": "- Introduzir configuração básica de JUnit e implementar testes nos Validadores e Mappers, antes de prosseguir com Mocks de Banco de Dados.",
+        "conflict_id": null
+      },
+      "provenance": [
+        {
+          "source_id": "src-004",
+          "file": "03_audit_ledger.md"
+        }
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "id": "CONTROL-001",
+      "category": "SECURITY",
+      "subcategory": "SQL_INJECTION",
+      "title": "Protection against SQL Injection using PreparedStatement",
+      "status": "CONFIRMED",
+      "description": "- A camada DAO (`JdbcPedidoDAO`, `JdbcFuncionarioDAO`, `JdbcCardapioDAO`, `JdbcItemPedidoDAO`) constrói todas as queries usando blocos de concatenação fixos e injeta parâmetros de usuário por meio do `PreparedStatement`.\n- Verificado em múltiplas invocações durante a inspeção. Nenhuma query bruta em string contendo variáveis não tratadas foi observada.\n- Isso barra de forma eficaz a injeção SQL no trânsito das variáveis aos endpoints HTTP até a base de dados.",
+      "provenance": [
+        {
+          "source_id": "src-004",
+          "file": "03_audit_ledger.md"
+        }
+      ]
+    },
+    {
+      "id": "CONTROL-002",
+      "category": "SECURITY",
+      "subcategory": "PASSWORD_STORAGE",
+      "title": "Secure Password Hashing",
+      "status": "CONFIRMED",
+      "description": "- Senhas salvas em banco (funcionários) são hasheadas via pacote BCrypt `at.favre.lib:bcrypt:0.10.2`.\n- Evidenciado na classe `BCryptPasswordHasher.java` usando custo algorítmico 12.\n- A aplicação jamais trafega senhas em texto puro de volta ou armazena dessa forma (confirmado via `FuncionarioService`).",
+      "provenance": [
+        {
+          "source_id": "src-004",
+          "file": "03_audit_ledger.md"
+        }
+      ]
+    },
+    {
+      "id": "CONTROL-003",
+      "category": "SECURITY",
+      "subcategory": "AUTHENTICATION",
+      "title": "Authentication Enforcement via Middleware",
+      "status": "CONFIRMED",
+      "description": "- Um middleware `AuthMiddleware.java` é interceptado para todas as rotas da API em `RoutesConfig.java`, exceto para endpoints de documentação Swagger, Redoc e Login.\n- Bloqueia acessos sem cabeçalho Authorization válido (Bearer JWT).\n- Assinatura validada via HMAC256 de `envConfig.getJwtSecret()`.",
+      "provenance": [
+        {
+          "source_id": "src-004",
+          "file": "03_audit_ledger.md"
+        }
+      ]
+    },
+    {
+      "id": "CONTROL-004",
+      "category": "SECURITY",
+      "subcategory": "AUTHORIZATION",
+      "title": "Role-based Access Control Configuration",
+      "status": "CONFIRMED",
+      "description": "- Endpoints administrativos possuem verificação forte por papéis definidos (`FuncionarioFuncoes.GERENTE`).\n- Rotas declaradas com roles específicas forçam validação dentro de `AuthorizationMiddleware.java`.\n- Além disso, verificações intra-recurso (`validarAcessoAoFuncionario` e `verificarGarcom`) validam _Ownership_, impedindo o IDOR cruzado entre diferentes Garçons para pedidos de outras mesas.",
+      "provenance": [
+        {
+          "source_id": "src-004",
+          "file": "03_audit_ledger.md"
+        }
+      ]
+    }
+  ],
+  "conflicts": [],
+  "anomalies": [],
+  "limitations": [
+    {
+      "id": "LIMIT-001",
+      "description": "Testing: Nenhuma suíte de testes (unitários, de integração ou e2e) foi detectada no repositório. Runtime tests not executed.",
+      "provenance": [
+        {
+          "source_id": "src-001",
+          "file": "00_inventory_and_threat_model_1.md"
+        }
+      ]
+    },
+    {
+      "id": "LIMIT-002",
+      "description": "Production Configuration: A configuração de produção não está disponível; a análise baseia-se em docker-compose.yml e configuração de ambiente local.",
+      "provenance": [
+        {
+          "source_id": "src-001",
+          "file": "00_inventory_and_threat_model_1.md"
+        }
+      ]
+    },
+    {
+      "id": "LIMIT-003",
+      "description": "Dependency CVE Analysis: Dependency CVE analysis not executed.",
+      "provenance": [
+        {
+          "source_id": "src-001",
+          "file": "00_inventory_and_threat_model_1.md"
+        }
+      ]
+    },
+    {
+      "id": "LIMIT-004",
+      "description": "A auditoria foi limitada pela falta de um ambiente de homologação ou produção e pela total ausência de suíte de testes. Não foi realizada validação dinâmica automatizada de endpoints de segurança (Pentest ou DAST).",
+      "provenance": [
+        {
+          "source_id": "src-003",
+          "file": "02_analytical_report.md"
+        }
+      ]
+    }
+  ],
+  "references": [],
+  "metrics": {
+    "findings_total": 4,
+    "severity": {
+      "P0": 0,
+      "P1": 0,
+      "P2": 1,
+      "P3": 2,
+      "INFO": 1
+    },
+    "controls_total": 4,
+    "inspections_total": 8
+  }
+}

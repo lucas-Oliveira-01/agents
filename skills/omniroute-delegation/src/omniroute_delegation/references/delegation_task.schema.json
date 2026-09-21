@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "omniroute-delegation-task.schema.json",
+  "title": "OmniRoute Delegation Task Schema",
+  "description": "Schema for validating delegation task payloads sent to the OmniRoute MCP gateway. This schema defines the structure of the 'tarefa' parameter for the 'delegar_tarefa' tool.",
+  "type": "object",
+  "properties": {
+    "tarefa": {"type": "string", "minLength": 1},
+    "perfil": {"type": "string"},
+    "contexto": {"type": "string"},
+    "task_id": {"type": "string"},
+    "session_id": {"type": "string"},
+    "cache_mode": {"type": "string", "enum": ["native", "bypass", "deterministic"]},
+    "cache_key": {"type": "string"},
+    "max_tokens": {"type": "integer", "minimum": 1},
+    "temperature": {"type": "number", "minimum": 0, "maximum": 2}
+  },
+  "required": ["tarefa"],
+  "if": {
+    "properties": {"cache_mode": {"const": "deterministic"}},
+    "required": ["cache_mode"]
+  },
+  "then": {"required": ["cache_key"]},
+  "additionalProperties": false
+}

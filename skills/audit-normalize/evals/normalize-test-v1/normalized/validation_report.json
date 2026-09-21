@@ -1,0 +1,51 @@
+{
+  "overall_status": "VALID",
+  "validations": {
+    "schema_validation": {
+      "status": "PASS",
+      "errors": []
+    },
+    "semantic_validation": {
+      "status": "PASS",
+      "errors": [],
+      "warnings": []
+    },
+    "referential_validation": {
+      "status": "PASS",
+      "errors": []
+    },
+    "integrity_validation": {
+      "status": "PASS",
+      "errors": []
+    }
+  },
+  "errors": [],
+  "warnings": [],
+  "metrics_summary": {
+    "findings_total": 4,
+    "severity": {
+      "P0": 0,
+      "P1": 0,
+      "P2": 1,
+      "P3": 2,
+      "INFO": 1
+    },
+    "controls_total": 4,
+    "inspections_total": 8
+  },
+  "sources_processed": 4,
+  "snapshot_id": "sha256:a7005e303349c48df9d1e831e661e15e1a111432248d6290976521cce82d9e50",
+  "schema_version": "1.0",
+  "counts": {
+    "findings": 4,
+    "controls": 4,
+    "anomalies": 0,
+    "conflicts": 0
+  },
+  "artifacts": {
+    "report_data": "audit-v1/normalized/report_data.json",
+    "validation_report": "audit-v1/normalized/validation_report.json",
+    "source_manifest": "audit-v1/normalized/source_manifest.json",
+    "report_data_schema": "audit-v1/normalized/report_data.schema.json"
+  }
+}
