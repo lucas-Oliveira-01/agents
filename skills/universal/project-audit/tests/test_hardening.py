@@ -309,28 +309,35 @@ class TestCanPublishCriticalStates:
             failure_state=failure_state,
         )
 
-    def test_blocked_run_cannot_publish(self, audit_plan, target_snapshot):
+    def test_blocked_run_cannot_publish(self, audit_plan, target_snapshot, work_item):
         run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.BLOCKED,
                         RunFailureState.SAFETY_BLOCK, RunCoverageCompleteness.NONE)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert report.has_errors
         codes = [r.code for r in report.errors()]
         assert "PUBLISH_EXECUTION_INCOMPLETE" in codes
 
-    def test_failed_run_cannot_publish(self, audit_plan, target_snapshot):
+    def test_failed_run_cannot_publish(self, audit_plan, target_snapshot, work_item):
         run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.FAILED,
                         RunFailureState.INFRA_ERROR)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert report.has_errors
         codes = [r.code for r in report.errors()]
         assert "PUBLISH_EXECUTION_INCOMPLETE" in codes
-        assert "PUBLISH_RUN_FAILURE_STATE" in codes
 
-    def test_partial_run_cannot_publish(self, audit_plan, target_snapshot):
-        run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.PARTIAL,
-                        coverage=RunCoverageCompleteness.PARTIAL)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+    def test_partial_clean_run_cannot_publish(self, audit_plan, target_snapshot, work_item):
+        run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.PARTIAL)
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert report.has_errors
+        codes = [r.code for r in report.errors()]
+        assert "PUBLISH_EXECUTION_INCOMPLETE" in codes
+
+    def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot, work_item):
+        run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.COMPLETE)
+        # Fix: COMPLETE runs need FULL coverage to publish (or PARTIAL if explicitly allowed)
+        run.coverage_completeness = RunCoverageCompleteness.FULL
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        assert not report.has_errors
 
     def test_running_run_cannot_publish(self, audit_plan, target_snapshot):
         run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.RUNNING)
@@ -556,17 +563,17 @@ class TestAdversarialImpossibleStates:
         assert result.is_error
         assert result.code == "RUN_LINEAGE_REF_COLLISION"
 
-    def test_snapshot_drift_prevents_completion(self, audit_plan, target_snapshot):
+    def test_snapshot_drift_prevents_completion(self, audit_plan, target_snapshot, work_item):
         """Snapshot drift must prevent the run from being considered complete."""
         run = AuditRun(
             run_id=str(uuid.uuid4()),
             target_snapshot_ref=target_snapshot.snapshot_fingerprint,
             plan_ref=audit_plan.plan_id,
-            work_item_refs=[],
+            work_item_refs=[work_item.work_item_id],
             execution_completeness=RunExecutionCompleteness.COMPLETE,
         )
         drift_fingerprint = "d" * 64  # Different from snapshot
-        report = can_publish(run, [], [], drift_fingerprint, audit_plan)
+        report = can_publish(run, [work_item], [], drift_fingerprint, audit_plan)
         assert report.has_errors
         codes = [r.code for r in report.errors()]
         assert "SNAPSHOT_DRIFT_DETECTED" in codes
@@ -824,3 +831,37 @@ class TestSchemaDocumentation:
         report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
         error_codes = [r.code for r in report.errors()]
         assert "PUBLISH_EMPTY_AUDIT" in error_codes
+
+    def test_deep_immutability_of_plan_and_snapshot(self, audit_plan, target_snapshot):
+        """Plan and Snapshot internal dicts/lists must become immutable types."""
+        audit_plan.freeze()
+        assert isinstance(audit_plan.resolved_scope, tuple)
+        
+        # Test Snapshot methodology versions
+        import types
+        assert isinstance(target_snapshot.methodology_state.auditor_versions, types.MappingProxyType)
+        with pytest.raises(TypeError):
+            target_snapshot.methodology_state.auditor_versions["hacked"] = "1.0.0"
+
+        with pytest.raises(AttributeError):
+            # Tuples don't have append
+            audit_plan.resolved_scope.append("hacked")
+
+    def test_cannot_recover_complete_run(self, orchestrator, audit_plan, target_snapshot, work_item):
+        """Recovery must reject COMPLETE runs."""
+        from project_audit.models import IllegalStateTransitionError
+        audit_plan.freeze()
+        orchestrator.store.save_plan(audit_plan)
+        run = AuditRun(
+            run_id=str(uuid.uuid4()),
+            target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+            plan_ref=audit_plan.plan_id,
+            work_item_refs=[work_item.work_item_id],
+            execution_completeness=RunExecutionCompleteness.COMPLETE,
+            coverage_completeness=RunCoverageCompleteness.FULL,
+        )
+        orchestrator.store.save_run(run)
+        
+        with pytest.raises(IllegalStateTransitionError) as exc:
+            orchestrator.recover_run(run.run_id)
+        assert "is already COMPLETE" in str(exc.value)

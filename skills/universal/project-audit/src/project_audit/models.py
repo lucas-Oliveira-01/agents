@@ -257,6 +257,11 @@ class MethodologyState:
     auditor_versions: dict  # frozen — convert from Dict[str, str]
     policy_version: str
 
+    def __post_init__(self):
+        import types
+        if not isinstance(self.auditor_versions, types.MappingProxyType):
+            object.__setattr__(self, "auditor_versions", types.MappingProxyType(dict(self.auditor_versions)))
+
 
 @dataclass(frozen=True)
 class TargetSnapshot:
@@ -680,6 +685,15 @@ class AuditPlan:
                 f"AuditPlan {self.plan_id} is already frozen at {self.frozen_at.isoformat()}."
             )
         self.frozen_at = at or datetime.now(timezone.utc)
+        # Deep immutability: convert mutable collections to tuples
+        if hasattr(self, "requested_scope"):
+            self.requested_scope = tuple(self.requested_scope)  # type: ignore
+        if hasattr(self, "applicability_decisions"):
+            self.applicability_decisions = tuple(self.applicability_decisions)  # type: ignore
+        if hasattr(self, "resolved_scope"):
+            self.resolved_scope = tuple(self.resolved_scope)  # type: ignore
+        if hasattr(self, "work_items"):
+            self.work_items = tuple(self.work_items)  # type: ignore
 
     def _assert_mutable(self, operation: str) -> None:
         if self.is_frozen:

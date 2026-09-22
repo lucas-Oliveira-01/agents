@@ -257,6 +257,14 @@ class Orchestrator:
                 f"Recovery failed: run {interrupted_run_id} not found in store."
             )
         interrupted_run = self.store.load_run(interrupted_run_id)
+        
+        from project_audit.models import RunExecutionCompleteness, IllegalStateTransitionError
+        if interrupted_run.execution_completeness == RunExecutionCompleteness.COMPLETE:
+            raise IllegalStateTransitionError(
+                f"Cannot recover run {interrupted_run_id} because it is already COMPLETE. "
+                "Recovery is only for interrupted runs (e.g. PARTIAL or RUNNING)."
+            )
+
         logger.info(
             "Recovery: loaded interrupted run %s (completeness=%s)",
             interrupted_run_id,
