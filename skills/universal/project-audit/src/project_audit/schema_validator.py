@@ -88,13 +88,14 @@ def validate_dict(entity_dict: dict, schema_name: str, schema_dir: Optional[Path
 
     errors: List[str] = []
     try:
+        format_checker = jsonschema.draft202012_format_checker
         if registry is not None:
             validator_cls = validator_for(schema)
-            validator = validator_cls(schema, registry=registry)
+            validator = validator_cls(schema, registry=registry, format_checker=format_checker)
             for error in validator.iter_errors(entity_dict):
                 errors.append(f"{error.json_path}: {error.message}")
         else:
-            _validate(instance=entity_dict, schema=schema)
+            _validate(instance=entity_dict, schema=schema, format_checker=format_checker)
     except JVError as e:
         errors.append(str(e.message))
     return errors

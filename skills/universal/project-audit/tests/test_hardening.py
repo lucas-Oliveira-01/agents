@@ -805,7 +805,7 @@ class TestSchemaDocumentation:
         """can_publish must reject an audit with no work_items."""
         from project_audit.validators import can_publish
         run = AuditRun(
-            run_id="run-1",
+            run_id=str(uuid.uuid4()),
             target_snapshot_ref=target_snapshot.snapshot_fingerprint,
             plan_ref=audit_plan.plan_id,
             work_item_refs=[],
