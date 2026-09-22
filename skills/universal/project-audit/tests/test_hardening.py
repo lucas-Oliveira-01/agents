@@ -809,3 +809,18 @@ class TestSchemaDocumentation:
             assert False, "Should have raised StateStoreError or returned None"
         except StateStoreError:
             pass
+
+    def test_can_publish_rejects_empty_audit(self, audit_plan, target_snapshot):
+        """can_publish must reject an audit with no work_items."""
+        from project_audit.validators import can_publish
+        run = AuditRun(
+            run_id="run-1",
+            target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+            plan_ref=audit_plan.plan_id,
+            work_item_refs=[],
+            execution_completeness=RunExecutionCompleteness.COMPLETE,
+            coverage_completeness=RunCoverageCompleteness.NONE,
+        )
+        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        error_codes = [r.code for r in report.errors()]
+        assert "PUBLISH_EMPTY_AUDIT" in error_codes

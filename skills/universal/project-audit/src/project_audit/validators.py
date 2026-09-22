@@ -618,6 +618,14 @@ def can_publish(
     """
     results: List[ValidationResult] = []
 
+    if len(work_items) == 0:
+        results.append(_error("PUBLISH_EMPTY_AUDIT", "Cannot publish an audit with no work items."))
+        # Early return because other checks don't make sense on empty
+        return ValidationReport(results)
+    
+    if run.coverage_completeness == RunCoverageCompleteness.NONE:
+        results.append(_error("PUBLISH_EMPTY_COVERAGE", "Cannot publish an audit with NONE coverage."))
+
     # 1. Snapshot integrity
     drift = validate_snapshot_drift(run, current_snapshot_fingerprint)
     results.append(drift)
