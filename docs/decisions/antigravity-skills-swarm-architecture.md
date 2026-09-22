@@ -180,3 +180,35 @@ Skill definitions (`SKILL.md`) must act as **runtime routers**, remaining compac
 
 ### Rule 5: Non-Contamination of User Codebases
 Auxiliary operational states, raw audit artifacts, and internal LLM traces must never pollute the primary project repository. Machine-generated states and audit records must be isolated within independent sub-repositories or designated directory trees (e.g., `.audit/`).
+
+---
+
+## 6. Skill Lifecycle, Directory Anatomy & Deployment Architecture
+
+### 6.1 Canonical Skill Directory Anatomy
+Every skill packaged within the swarm architecture follows a strict layout separating runtime instructions, maintenance specifications, deterministic scripts, and verification schemas:
+
+```text
+skills/<category>/<skill-name>/
+├── SKILL.md                 # Runtime router and entry point (< 500 lines)
+├── SPEC.md                  # Maintenance contract, behavioral invariants, and evaluation targets
+├── SOURCES.md               # Provenance, architectural decisions, and upstream citations
+├── pyproject.toml           # Deterministic dependencies and packaging configuration
+├── src/                     # Core deterministic engine (zero LLM hallucination risk)
+├── schemas/                 # Canonical JSON schemas for work items, plans, and output artifacts
+├── references/              # On-demand reference documentation loaded via progressive disclosure
+├── scripts/                 # Deterministic CLI utilities and automation scripts
+└── tests/                   # Verification suite (unit, integration, and invariant tests)
+```
+
+### 6.2 Deployment & Symlink Standard
+The repository `projects/skills` serves as the sole authoritative source of truth for skill development. Agent runtimes must consume skills via symbolic links rather than divergent copies:
+
+```text
+projects/skills/<skill-name>
+         ↓ (symbolic link)
+~/.gemini/config/skills/<skill-name>
+```
+
+- **Zero Duplication:** Skills must never be cloned or copied into agent configuration roots.
+- **Snapshot Isolation:** In production environments requiring release isolation, symlinks point to validated release snapshots rather than active worktrees.
