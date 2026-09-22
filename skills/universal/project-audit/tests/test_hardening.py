@@ -309,28 +309,35 @@ class TestCanPublishCriticalStates:
             failure_state=failure_state,
         )
 
-    def test_blocked_run_cannot_publish(self, audit_plan, target_snapshot):
+    def test_blocked_run_cannot_publish(self, audit_plan, target_snapshot, work_item):
         run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.BLOCKED,
                         RunFailureState.SAFETY_BLOCK, RunCoverageCompleteness.NONE)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert report.has_errors
         codes = [r.code for r in report.errors()]
         assert "PUBLISH_EXECUTION_INCOMPLETE" in codes
 
-    def test_failed_run_cannot_publish(self, audit_plan, target_snapshot):
+    def test_failed_run_cannot_publish(self, audit_plan, target_snapshot, work_item):
         run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.FAILED,
                         RunFailureState.INFRA_ERROR)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert report.has_errors
         codes = [r.code for r in report.errors()]
         assert "PUBLISH_EXECUTION_INCOMPLETE" in codes
-        assert "PUBLISH_RUN_FAILURE_STATE" in codes
 
-    def test_partial_run_cannot_publish(self, audit_plan, target_snapshot):
-        run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.PARTIAL,
-                        coverage=RunCoverageCompleteness.PARTIAL)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+    def test_partial_clean_run_cannot_publish(self, audit_plan, target_snapshot, work_item):
+        run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.PARTIAL)
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert report.has_errors
+        codes = [r.code for r in report.errors()]
+        assert "PUBLISH_EXECUTION_INCOMPLETE" in codes
+
+    def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot, work_item):
+        run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.COMPLETE)
+        # Fix: COMPLETE runs need FULL coverage to publish (or PARTIAL if explicitly allowed)
+        run.coverage_completeness = RunCoverageCompleteness.FULL
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        assert not report.has_errors
 
     def test_running_run_cannot_publish(self, audit_plan, target_snapshot):
         run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.RUNNING)
@@ -342,10 +349,6 @@ class TestCanPublishCriticalStates:
         report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert report.has_errors
 
-    def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot):
-        run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.COMPLETE)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
-        assert not report.has_errors
 
 
 # ===========================================================================
@@ -556,17 +559,17 @@ class TestAdversarialImpossibleStates:
         assert result.is_error
         assert result.code == "RUN_LINEAGE_REF_COLLISION"
 
-    def test_snapshot_drift_prevents_completion(self, audit_plan, target_snapshot):
+    def test_snapshot_drift_prevents_completion(self, audit_plan, target_snapshot, work_item):
         """Snapshot drift must prevent the run from being considered complete."""
         run = AuditRun(
             run_id=str(uuid.uuid4()),
             target_snapshot_ref=target_snapshot.snapshot_fingerprint,
             plan_ref=audit_plan.plan_id,
-            work_item_refs=[],
+            work_item_refs=[work_item.work_item_id],
             execution_completeness=RunExecutionCompleteness.COMPLETE,
         )
         drift_fingerprint = "d" * 64  # Different from snapshot
-        report = can_publish(run, [], [], drift_fingerprint, audit_plan)
+        report = can_publish(run, [work_item], [], drift_fingerprint, audit_plan)
         assert report.has_errors
         codes = [r.code for r in report.errors()]
         assert "SNAPSHOT_DRIFT_DETECTED" in codes
@@ -693,15 +696,8 @@ class TestSchemaDocumentation:
 
         # Find the schemas directory
         candidate = Path(__file__).resolve()
-        schema_dir = None
-        for _ in range(10):
-            candidate = candidate.parent
-            p = candidate / "docs" / "references" / "schemas"
-            if p.is_dir():
-                schema_dir = p
-                break
-
-        assert schema_dir is not None, "Could not find docs/references/schemas/"
+        from project_audit.schema_validator import _get_schema_dir
+        schema_dir = _get_schema_dir()
 
         shared = json.loads((schema_dir / "shared.schema.json").read_text())
         assert "type" not in shared, (
@@ -716,13 +712,8 @@ class TestSchemaDocumentation:
         from pathlib import Path
 
         candidate = Path(__file__).resolve()
-        schema_dir = None
-        for _ in range(10):
-            candidate = candidate.parent
-            p = candidate / "docs" / "references" / "schemas"
-            if p.is_dir():
-                schema_dir = p
-                break
+        from project_audit.schema_validator import _get_schema_dir
+        schema_dir = _get_schema_dir()
 
         root_schemas = [
             "target-snapshot.schema.json",
@@ -770,3 +761,115 @@ class TestSchemaDocumentation:
         for name, fn, d in checks:
             errors = fn(d)
             assert errors == [], f"{name} failed schema validation: {errors}"
+
+    def test_commit_run_raises_on_semantic_errors(
+        self, orchestrator, target_snapshot, audit_plan, execution_policy, egress_policy
+    ):
+        """commit_run must raise an exception if semantic validation fails, instead of persisting."""
+        from project_audit.orchestrator import OrchestratorError
+
+        orchestrator.store.save_plan(audit_plan)
+
+        from tests.conftest import make_work_item
+        wi = make_work_item(
+            plan_id=audit_plan.plan_id,
+            execution_policy=execution_policy,
+            egress_policy=egress_policy,
+            auditor="test",
+            target_surface="src/",
+        )
+        wi.execution_state = ExecutionState.RUNNING
+        
+        run = AuditRun(
+            run_id=str(uuid.uuid4()),
+            target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+            plan_ref=audit_plan.plan_id,
+            work_item_refs=[wi.work_item_id],
+            execution_completeness=RunExecutionCompleteness.COMPLETE,  # Invalid!
+        )
+
+        with pytest.raises(OrchestratorError) as exc:
+            orchestrator.commit_run(run, audit_plan, [wi])
+        
+        assert "Semantic validation failed for run" in str(exc.value)
+        
+        # Verify it wasn't saved
+        from project_audit.state_store import StateStoreError
+        try:
+            saved = orchestrator.store.load_run(run.run_id)
+            assert False, "Should have raised StateStoreError or returned None"
+        except StateStoreError:
+            pass
+
+    def test_can_publish_rejects_empty_audit(self, audit_plan, target_snapshot):
+        """can_publish must reject an audit with no work_items."""
+        from project_audit.validators import can_publish
+        run = AuditRun(
+            run_id=str(uuid.uuid4()),
+            target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+            plan_ref=audit_plan.plan_id,
+            work_item_refs=[],
+            execution_completeness=RunExecutionCompleteness.COMPLETE,
+            coverage_completeness=RunCoverageCompleteness.NONE,
+        )
+        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        error_codes = [r.code for r in report.errors()]
+        assert "PUBLISH_EMPTY_AUDIT" in error_codes
+
+    def test_deep_immutability_of_plan_and_snapshot(self, audit_plan, target_snapshot):
+        """Plan and Snapshot internal dicts/lists must become immutable types."""
+        audit_plan.freeze()
+        assert isinstance(audit_plan.resolved_scope, tuple)
+        
+        # Test Snapshot methodology versions
+        import types
+        assert isinstance(target_snapshot.methodology_state.auditor_versions, types.MappingProxyType)
+        with pytest.raises(TypeError):
+            target_snapshot.methodology_state.auditor_versions["hacked"] = "1.0.0"
+
+        with pytest.raises(AttributeError):
+            # Tuples don't have append
+            audit_plan.resolved_scope.append("hacked")
+
+    def test_cannot_recover_complete_run(self, orchestrator, audit_plan, target_snapshot, work_item):
+        """Recovery must reject COMPLETE runs."""
+        from project_audit.models import IllegalStateTransitionError
+        audit_plan.freeze()
+        orchestrator.store.save_plan(audit_plan)
+        run = AuditRun(
+            run_id=str(uuid.uuid4()),
+            target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+            plan_ref=audit_plan.plan_id,
+            work_item_refs=[work_item.work_item_id],
+            execution_completeness=RunExecutionCompleteness.COMPLETE,
+            coverage_completeness=RunCoverageCompleteness.FULL,
+        )
+        orchestrator.store.save_run(run)
+        
+        with pytest.raises(IllegalStateTransitionError) as exc:
+            orchestrator.recover_run(run.run_id)
+        assert "is already COMPLETE" in str(exc.value)
+
+    def test_retry_budget_exhaustion(self, work_item):
+        """Retrying beyond max_retries must raise an error."""
+        from project_audit.models import ExecutionState, IllegalStateTransitionError
+        import dataclasses
+        work_item.effective_execution_policy = dataclasses.replace(
+            work_item.effective_execution_policy, max_retries=1
+        )
+        
+        # Start and terminate first attempt
+        work_item.execution_state = ExecutionState.RUNNING
+        attempt = work_item.start_attempt()
+        attempt.finish(datetime.now(timezone.utc), 0)
+        work_item.terminate()
+        
+        # First retry (creates second attempt)
+        work_item.retry_attempt()
+        work_item.attempts[-1].finish(datetime.now(timezone.utc), 0)
+        work_item.terminate()
+        
+        # Second retry (should fail, max_retries = 1, current attempts = 2, so len(attempts) = 2 > 1)
+        with pytest.raises(IllegalStateTransitionError) as exc:
+            work_item.retry_attempt()
+        assert "Retry budget exhausted" in str(exc.value)

@@ -5,7 +5,7 @@ All types are derived directly from the Canonical Data Model:
   docs/references/canonical-data-model.md
 
 And physically validated against:
-  docs/references/schemas/
+  src/project_audit/schemas/
 
 Immutability contract:
   - TargetSnapshot: frozen dataclass — immutable after creation (ADR-06)
@@ -164,12 +164,14 @@ class ExecutionPolicy:
     network: NetworkAccess = NetworkAccess.DISABLED
     credentials: CredentialAccess = CredentialAccess.NONE
     timeout_ms: Optional[int] = None
+    max_retries: int = 3
 
     def to_dict(self) -> dict:
         d: dict = {
             "filesystem": self.filesystem.value,
             "network": self.network.value,
             "credentials": self.credentials.value,
+            "max_retries": self.max_retries,
         }
         if self.timeout_ms is not None:
             d["timeout_ms"] = self.timeout_ms
@@ -257,6 +259,11 @@ class MethodologyState:
     auditor_versions: dict  # frozen — convert from Dict[str, str]
     policy_version: str
 
+    def __post_init__(self):
+        import types
+        if not isinstance(self.auditor_versions, types.MappingProxyType):
+            object.__setattr__(self, "auditor_versions", types.MappingProxyType(dict(self.auditor_versions)))
+
 
 @dataclass(frozen=True)
 class TargetSnapshot:
@@ -265,7 +272,7 @@ class TargetSnapshot:
     Answers: "What exactly is being audited, and under what rules?"
 
     canonical-data-model.md §1, ADR-06.
-    Schema: docs/references/schemas/target-snapshot.schema.json
+    Schema: src/project_audit/schemas/target-snapshot.schema.json
     """
 
     target_mode: TargetMode
@@ -454,7 +461,7 @@ class Evidence:
     presumed cause, or arbitrary severity. (canonical-data-model.md §4)
 
     INVALID evidence ≠ FIXED finding. (ADR-04, semantic-validators.md §5)
-    Schema: docs/references/schemas/evidence.schema.json
+    Schema: src/project_audit/schemas/evidence.schema.json
     """
 
     evidence_id: str  # uuid
@@ -506,7 +513,7 @@ class AuditWorkItem:
     Back-transition to RUNNING after TERMINATED requires explicit retry/recovery.
     (semantic-validators.md §3)
 
-    Schema: docs/references/schemas/audit-work-item.schema.json
+    Schema: src/project_audit/schemas/audit-work-item.schema.json
     """
 
     work_item_id: str  # uuid
@@ -578,6 +585,14 @@ class AuditWorkItem:
                 f"retry_attempt() requires TERMINATED state, "
                 f"got {self.execution_state.value}"
             )
+            
+        # Check budget
+        max_retries = self.effective_execution_policy.max_retries
+        if len(self.attempts) > max_retries:
+            raise IllegalStateTransitionError(
+                f"Retry budget exhausted: maximum {max_retries} retries allowed."
+            )
+
         # Transition back to RUNNING for retry
         self.execution_state = ExecutionState.RUNNING
         self.failure_state = WorkItemFailureState.NONE
@@ -655,7 +670,7 @@ class AuditPlan:
     A new plan version must be created instead of mutating a frozen plan.
     (canonical-data-model.md §2, ADR-04)
 
-    Schema: docs/references/schemas/audit-plan.schema.json
+    Schema: src/project_audit/schemas/audit-plan.schema.json
     """
 
     plan_id: str  # uuid
@@ -680,6 +695,15 @@ class AuditPlan:
                 f"AuditPlan {self.plan_id} is already frozen at {self.frozen_at.isoformat()}."
             )
         self.frozen_at = at or datetime.now(timezone.utc)
+        # Deep immutability: convert mutable collections to tuples
+        if hasattr(self, "requested_scope"):
+            self.requested_scope = tuple(self.requested_scope)  # type: ignore
+        if hasattr(self, "applicability_decisions"):
+            self.applicability_decisions = tuple(self.applicability_decisions)  # type: ignore
+        if hasattr(self, "resolved_scope"):
+            self.resolved_scope = tuple(self.resolved_scope)  # type: ignore
+        if hasattr(self, "work_items"):
+            self.work_items = tuple(self.work_items)  # type: ignore
 
     def _assert_mutable(self, operation: str) -> None:
         if self.is_frozen:
@@ -729,7 +753,7 @@ class AuditRun:
       - coverage_completeness: full requested_scope covered?
     These CANNOT be derived from one another (canonical §5, semantic-validators §6).
 
-    Schema: docs/references/schemas/audit-run.schema.json
+    Schema: src/project_audit/schemas/audit-run.schema.json
     """
 
     run_id: str  # uuid

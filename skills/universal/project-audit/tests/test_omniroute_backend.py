@@ -1,3 +1,4 @@
+import uuid
 """
 test_omniroute_backend.py — Tests for OmniRoute Integration
 
@@ -31,7 +32,7 @@ def test_omniroute_backend_success_with_json_output():
     
     req = DelegationRequest(
         request_id="test-req",
-        work_item_ref="wi-1",
+        work_item_ref=str(uuid.uuid4()),
         target_surface="login.py",
         auditor_name="security-auditor",
         context_payload={"source": "print('hello')"},
@@ -58,7 +59,7 @@ def test_omniroute_backend_handles_mcp_error():
     backend = MCPOmniRouteBackend(mcp_client_callable=mock_mcp_error)
     req = DelegationRequest(
         request_id="test-req",
-        work_item_ref="wi-1",
+        work_item_ref=str(uuid.uuid4()),
         target_surface="x",
         auditor_name="auditor",
         context_payload={},
@@ -80,7 +81,7 @@ def test_omniroute_backend_handles_exceptions_gracefully():
     backend = MCPOmniRouteBackend(mcp_client_callable=mock_mcp_crash)
     req = DelegationRequest(
         request_id="test-req",
-        work_item_ref="wi-1",
+        work_item_ref=str(uuid.uuid4()),
         target_surface="x",
         auditor_name="auditor",
         context_payload={},

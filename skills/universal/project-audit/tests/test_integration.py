@@ -264,6 +264,11 @@ class TestRecovery:
             work_items=work_items,
             auditor=fake_auditor,
         )
+        # Simulate interruption by forcing it to RUNNING and saving
+        from project_audit.models import RunExecutionCompleteness
+        run.execution_completeness = RunExecutionCompleteness.RUNNING
+        orchestrator.store.save_run(run)
+        
         # Reload — simulates recovery from disk
         interrupted = orchestrator.recover_run(run.run_id)
         assert interrupted.run_id == run.run_id

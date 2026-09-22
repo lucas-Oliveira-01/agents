@@ -6,3 +6,5 @@ build/
 egg-info/
 *.egg-info/
 dist/
+configs/antigravity/mcp/mcp_config.json
+configs/antigravity/hooks/hooks.json

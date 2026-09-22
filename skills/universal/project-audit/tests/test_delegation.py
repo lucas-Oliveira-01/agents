@@ -1,3 +1,4 @@
+import uuid
 """
 test_delegation.py — Tests for Delegation Boundary
 
@@ -17,6 +18,7 @@ from project_audit.delegation import (
     DelegationStatus,
     WorkerPort,
 )
+from project_audit.models import EgressDestination, EgressPolicy
 from tests.conftest import make_work_item
 
 
@@ -34,7 +36,8 @@ class FakeDelegationBackend(DelegationBackend):
 
 def test_worker_port_success_translation():
     """WorkerPort translates a successful DelegationResult into Receipt + Evidence."""
-    wi = make_work_item(plan_id="plan-1", auditor="test-auditor")
+    egress = EgressPolicy(destination=EgressDestination.APPROVED_EXTERNAL, allow_sensitive=True)
+    wi = make_work_item(plan_id=str(uuid.uuid4()), auditor="test-auditor", egress_policy=egress)
     context = {"test_key": "test_value"}
     started_at = datetime.now(timezone.utc)
 
@@ -77,7 +80,8 @@ def test_worker_port_success_translation():
 
 def test_worker_port_blocked_translation():
     """WorkerPort translates a BLOCKED result into exit_code=126 and NO Evidence."""
-    wi = make_work_item(plan_id="plan-1")
+    egress = EgressPolicy(destination=EgressDestination.APPROVED_EXTERNAL, allow_sensitive=True)
+    wi = make_work_item(plan_id=str(uuid.uuid4()), egress_policy=egress)
     
     mock_result = DelegationResult(
         request_id="req-2",
@@ -100,7 +104,8 @@ def test_worker_port_blocked_translation():
 
 def test_worker_port_failed_translation():
     """WorkerPort translates a FAILED result into exit_code=1 and NO Evidence."""
-    wi = make_work_item(plan_id="plan-1")
+    egress = EgressPolicy(destination=EgressDestination.APPROVED_EXTERNAL, allow_sensitive=True)
+    wi = make_work_item(plan_id=str(uuid.uuid4()), egress_policy=egress)
     
     mock_result = DelegationResult(
         request_id="req-3",
@@ -117,4 +122,23 @@ def test_worker_port_failed_translation():
 
     assert receipt.exit_code == 1
     assert "Provider timeout" in str(receipt.environment_summary)
+    assert evidence is None
+
+
+def test_worker_port_blocks_sensitive_egress_before_dispatch():
+    """Validates that WorkerPort blocks egress BEFORE dispatching if policy fails."""
+    # Strict egress policy (allow_sensitive=False)
+    egress = EgressPolicy(destination=EgressDestination.LOCAL_ONLY, allow_sensitive=False)
+    wi = make_work_item(plan_id=str(uuid.uuid4()), egress_policy=egress)
+    
+    # We set up a mock backend that asserts it is NEVER CALLED
+    class CrashBackend(DelegationBackend):
+        def delegate(self, request: DelegationRequest) -> DelegationResult:
+            raise RuntimeError("Backend should not be reached for blocked egress")
+
+    port = WorkerPort(backend=CrashBackend(), actor_identity="test-actor")
+    receipt, evidence = port.execute_delegation(wi, {}, datetime.now(timezone.utc))
+
+    assert receipt.exit_code == 126
+    assert "DO NOT SEND" in str(receipt.environment_summary)
     assert evidence is None

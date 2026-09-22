@@ -443,20 +443,20 @@ class TestPublicationEligibility:
             failure_state=RunFailureState.NONE,
         )
 
-    def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot):
+    def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot, work_item):
         run = self._make_run(audit_plan, target_snapshot)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert not report.has_errors
 
-    def test_snapshot_drift_blocks_publication(self, audit_plan, target_snapshot):
+    def test_snapshot_drift_blocks_publication(self, audit_plan, target_snapshot, work_item):
         run = self._make_run(audit_plan, target_snapshot)
-        report = can_publish(run, [], [], "d" * 64, audit_plan)
+        report = can_publish(run, [work_item], [], "d" * 64, audit_plan)
         error_codes = [r.code for r in report.errors()]
         assert "SNAPSHOT_DRIFT_DETECTED" in error_codes
 
-    def test_incomplete_execution_blocks_publication(self, audit_plan, target_snapshot):
+    def test_incomplete_execution_blocks_publication(self, audit_plan, target_snapshot, work_item):
         run = self._make_run(audit_plan, target_snapshot, RunExecutionCompleteness.PARTIAL)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         error_codes = [r.code for r in report.errors()]
         assert "PUBLISH_EXECUTION_INCOMPLETE" in error_codes
 
@@ -468,9 +468,9 @@ class TestPublicationEligibility:
         error_codes = [r.code for r in report.errors()]
         assert "PUBLISH_HAS_FAILED_ITEMS" in error_codes
 
-    def test_run_with_failure_state_blocks_publication(self, audit_plan, target_snapshot):
+    def test_run_with_failure_state_blocks_publication(self, audit_plan, target_snapshot, work_item):
         run = self._make_run(audit_plan, target_snapshot)
         run.failure_state = RunFailureState.SNAPSHOT_DRIFT
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         error_codes = [r.code for r in report.errors()]
         assert "PUBLISH_RUN_FAILURE_STATE" in error_codes

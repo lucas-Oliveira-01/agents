@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "omnirouter": {
+      "serverUrl": "http://127.0.0.1:20130/mcp"
+    },
+    "ai-memory": {
+      "serverUrl": "http://127.0.0.1:49374/mcp",
+      "timeout": 5000
+    },
+    "stitch": {
+      "serverUrl": "https://stitch.googleapis.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "YOUR_GCP_API_KEY_HERE"
+      }
+    }
+  }
+}

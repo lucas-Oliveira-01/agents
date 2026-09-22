@@ -1,0 +1,38 @@
+{
+  "ai-memory": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event pre-tool-use --agent antigravity-cli --server-url http://127.0.0.1:49374"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event post-tool-use --agent antigravity-cli --server-url http://127.0.0.1:49374"
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event session-start --agent antigravity-cli --server-url http://127.0.0.1:49374"
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event stop --agent antigravity-cli --server-url http://127.0.0.1:49374"
+      }
+    ]
+  }
+}
