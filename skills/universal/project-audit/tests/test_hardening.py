@@ -865,3 +865,27 @@ class TestSchemaDocumentation:
         with pytest.raises(IllegalStateTransitionError) as exc:
             orchestrator.recover_run(run.run_id)
         assert "is already COMPLETE" in str(exc.value)
+
+    def test_retry_budget_exhaustion(self, work_item):
+        """Retrying beyond max_retries must raise an error."""
+        from project_audit.models import ExecutionState, IllegalStateTransitionError
+        import dataclasses
+        work_item.effective_execution_policy = dataclasses.replace(
+            work_item.effective_execution_policy, max_retries=1
+        )
+        
+        # Start and terminate first attempt
+        work_item.execution_state = ExecutionState.RUNNING
+        attempt = work_item.start_attempt()
+        attempt.finish(datetime.now(timezone.utc), 0)
+        work_item.terminate()
+        
+        # First retry (creates second attempt)
+        work_item.retry_attempt()
+        work_item.attempts[-1].finish(datetime.now(timezone.utc), 0)
+        work_item.terminate()
+        
+        # Second retry (should fail, max_retries = 1, current attempts = 2, so len(attempts) = 2 > 1)
+        with pytest.raises(IllegalStateTransitionError) as exc:
+            work_item.retry_attempt()
+        assert "Retry budget exhausted" in str(exc.value)

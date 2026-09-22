@@ -164,12 +164,14 @@ class ExecutionPolicy:
     network: NetworkAccess = NetworkAccess.DISABLED
     credentials: CredentialAccess = CredentialAccess.NONE
     timeout_ms: Optional[int] = None
+    max_retries: int = 3
 
     def to_dict(self) -> dict:
         d: dict = {
             "filesystem": self.filesystem.value,
             "network": self.network.value,
             "credentials": self.credentials.value,
+            "max_retries": self.max_retries,
         }
         if self.timeout_ms is not None:
             d["timeout_ms"] = self.timeout_ms
@@ -583,6 +585,14 @@ class AuditWorkItem:
                 f"retry_attempt() requires TERMINATED state, "
                 f"got {self.execution_state.value}"
             )
+            
+        # Check budget
+        max_retries = self.effective_execution_policy.max_retries
+        if len(self.attempts) > max_retries:
+            raise IllegalStateTransitionError(
+                f"Retry budget exhausted: maximum {max_retries} retries allowed."
+            )
+
         # Transition back to RUNNING for retry
         self.execution_state = ExecutionState.RUNNING
         self.failure_state = WorkItemFailureState.NONE
