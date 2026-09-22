@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from .models import AuditWorkItem, Evidence, ExecutionReceipt, ExecutionPolicy, Provenance
+from .validators import validate_egress_policy
 
 
 class DelegationStatus(str, Enum):
@@ -93,6 +94,26 @@ class WorkerPort:
         """
         request = DelegationRequest.from_work_item(work_item, context_payload)
         
+        # Security Egress Check
+        # Sensitivity classification V1.1 is missing, so we default to UNKNOWN (None).
+        # This triggers fail-closed evaluation per ADR-05.
+        egress_check = validate_egress_policy(work_item, data_is_sensitive=None)
+        if egress_check.is_error:
+            finished_at = datetime.now(timezone.utc)
+            receipt = ExecutionReceipt(
+                receipt_id=str(uuid.uuid4()),
+                work_item_ref=work_item.work_item_id,
+                command="omniroute-delegation",
+                arguments=[request.request_id],
+                policy_snapshot=work_item.effective_execution_policy,
+                started_at=started_at,
+                finished_at=finished_at,
+                exit_code=126,
+                artifact_refs=[],
+                environment_summary=f"WorkerPort: {self.actor_identity} | error: {egress_check.message}",
+            )
+            return receipt, None
+
         result = self.backend.delegate(request)
         finished_at = datetime.now(timezone.utc)
 
