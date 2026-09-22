@@ -1,92 +1,71 @@
-# Project Audit: Current Operational State
+# Project Audit — Current State
 
-Este documento reflete o estado factual, testado e verificado da arquitetura do `project-audit` após a consolidação forense e finalização arquitetural.
+**Status as of Forensic Consolidation (Candidate Baseline)**
 
-## 1. Status Oficial Congelado
-
-```text
-BASELINE
-5c194a33
-
-CANONICAL CORE V1
-ed098e7
-
-CORE HARDENING
-PASS
-
-DELEGATION
-PASS
-
-EGRESS
-PASS
-
-PERSISTENCE
-PASS
-
-PUBLICATION
-PASS
-
-RETRY / RECOVERY
-PASS
-
-SCHEMA / PACKAGING
-PASS
-
-SNAPSHOT DRIFT
-VERIFIED (ADR-08, contract enforced)
-
-SECURITY AUDITOR
-VERIFIED (ADR-09, execution contract implemented)
-
-OMNIROUTE
-VERIFIED (Delegation backend boundary respected)
-```
-
-## 2. Regras de Promoção e Resíduo Arquitetural
-
-### Resolução de Resíduos
-O resíduo arquitetural do candidato `a07672d` (`current_snapshot_provider`) foi rejeitado de acordo com ADR-08. O drift resolution agora depende apenas do `target_snapshot_ref` explícito validado pelo `Orchestrator`.
-
-### Promoção Canonical
-A baseline `ed098e7` foi oficialmente designada como Canonical Core V1, após implementação bem-sucedida do Security Auditor (ADR-09), resolução de snapshot drift e validação com testes (100% de cobertura nos novos componentes).
-
-## 3. Análise de Status por Domínio
-
-A avaliação do sistema segue a tríade: **Implementation Status** (código existe?), **Contract Status** (arquitetura define?), e **Acceptance Status** (promovível?).
-
-### Snapshot Drift
+## 1. Baseline Status
 
 ```text
-Implementation:
-IMPLEMENTED
-
-Contract:
-DEFINED (ADR-08: Invalidation via pre-execution snapshot fingerprint check)
-
-Acceptance:
-PASS
+CURRENT CANDIDATE
+31fd004 (derived from d2b8607)
+Branch: fix/project-audit-v1-hardening
 ```
 
-### Security Auditor
+## 2. Core V1 Capabilities
+
+| Capability | Status | Notes |
+| :--- | :--- | :--- |
+| **Core Hardening** | PASS | Semantic validation, persistence, packaging verified. |
+| **Prompt Injection** | PASS | Structural JSON serialization boundary implemented. |
+| **Security Auditor** | PASS | ADR-09 contract implemented; strictly isolated from StateStore. |
+| **Delegation / Egress** | PASS | |
+| **Persistence / Publ.** | PASS | |
+| **Retry / Recovery** | PASS | |
+| **Immutability** | PASS | |
+| **Runtime Schema** | PASS | |
+
+## 3. Active Architectural Blockers
+
+| Blocker | Status | Description |
+| :--- | :--- | :--- |
+| **Snapshot Drift** | **BLOCKED** | Architectural contract incomplete. Missing semantics for current snapshot provision, Evidence Dependency, and Invalidation propagation. |
+| **Core V1 Readiness** | **BLOCKED** | Blocked by Snapshot Drift. |
+
+## 4. Promotion Rule
+
+The current candidate (`31fd004`) **CANNOT** be promoted to Canonical Core V1 until the following sequence is completed:
+
+1. **Design:** ADR — Snapshot Drift Resolution Strategy
+2. **Design:** ADR/Specification — Evidence Dependency & Invalidation Semantics
+3. **Implementation:** Impact on canonical models, validators, and execution flows
+4. **Validation:** Adversarial testing of invalidation graph
+5. **Review:** Independent forensic verification
+6. **Promotion:** Explicit merge to canonical baseline
+
+**DO NOT** write code for Snapshot Drift without the approved ADRs.
+
+## 5. Test Evidence
+
+- **Total Tests:** 199 passed
+- **Coverage:** 91% (Line and Branch)
+- **Breakdown:**
+  - `security-auditor`: 47 passed (incl. 23 prompt injection adversarials)
+  - `project-audit-core`: 152 passed
+
+## 6. Project Phase
 
 ```text
-Component:
-ARCHITECTURALLY IMPLEMENTED
+FORENSIC CONSOLIDATION
+        ✓
 
-Implementation:
-PRESENT (security_auditor.py)
+IMPLEMENTATION HARDENING
+        ✓
 
-Execution Contract:
-DEFINED (ADR-09: TargetSnapshot input, Evidence via WorkerPort, <untrusted_project_data> isolation)
+ARCHITECTURAL DESIGN
+        ← CURRENT STATE (Awaiting Snapshot Drift ADRs)
 
-Status:
-PASS
+IMPLEMENTATION OF NEW CONTRACTS
+        → PENDING
+
+FINAL CANONICAL PROMOTION
+        → PENDING
 ```
-
-## 4. O que deve acontecer em seguida?
-
-O sistema Core V1 está COMPLETO e PROMOVIDO. A arquitetura principal está estabilizada e empacotada.
-
-Próximos passos possíveis (fora do escopo da versão V1 Core atual):
-- Implementação física do single-writer lock na pasta `.audit/` (atualmente a garantia é lógica).
-- Adição de novos auditores usando a estrutura estabilizada do `WorkerPort`.
