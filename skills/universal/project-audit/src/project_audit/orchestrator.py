@@ -208,11 +208,14 @@ class Orchestrator:
             )
         report = validate_run(run, plan, work_items, known_run_ids, interrupted_run_ids)
         if report.has_errors:
-            logger.warning(
+            error_codes = [r.code for r in report.errors()]
+            logger.error(
                 "AuditRun %s has semantic validation errors: %s",
                 run.run_id,
-                [r.code for r in report.errors()],
+                error_codes,
             )
+            raise OrchestratorError(f"Semantic validation failed for run {run.run_id}: {error_codes}")
+
         self.store.save_run(run)
         logger.info("AuditRun committed: %s (%s)", run.run_id, run.execution_completeness.value)
         return report

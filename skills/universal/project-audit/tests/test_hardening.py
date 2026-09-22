@@ -770,3 +770,42 @@ class TestSchemaDocumentation:
         for name, fn, d in checks:
             errors = fn(d)
             assert errors == [], f"{name} failed schema validation: {errors}"
+
+    def test_commit_run_raises_on_semantic_errors(
+        self, orchestrator, target_snapshot, audit_plan, execution_policy, egress_policy
+    ):
+        """commit_run must raise an exception if semantic validation fails, instead of persisting."""
+        from project_audit.orchestrator import OrchestratorError
+
+        orchestrator.store.save_plan(audit_plan)
+
+        from tests.conftest import make_work_item
+        wi = make_work_item(
+            plan_id=audit_plan.plan_id,
+            execution_policy=execution_policy,
+            egress_policy=egress_policy,
+            auditor="test",
+            target_surface="src/",
+        )
+        wi.execution_state = ExecutionState.RUNNING
+        
+        run = AuditRun(
+            run_id=str(uuid.uuid4()),
+            target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+            plan_ref=audit_plan.plan_id,
+            work_item_refs=[wi.work_item_id],
+            execution_completeness=RunExecutionCompleteness.COMPLETE,  # Invalid!
+        )
+
+        with pytest.raises(OrchestratorError) as exc:
+            orchestrator.commit_run(run, audit_plan, [wi])
+        
+        assert "Semantic validation failed for run" in str(exc.value)
+        
+        # Verify it wasn't saved
+        from project_audit.state_store import StateStoreError
+        try:
+            saved = orchestrator.store.load_run(run.run_id)
+            assert False, "Should have raised StateStoreError or returned None"
+        except StateStoreError:
+            pass
