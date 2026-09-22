@@ -212,3 +212,45 @@ projects/skills/<skill-name>
 
 - **Zero Duplication:** Skills must never be cloned or copied into agent configuration roots.
 - **Snapshot Isolation:** In production environments requiring release isolation, symlinks point to validated release snapshots rather than active worktrees.
+
+## 7. Centralized Agent Configuration Management
+
+To ensure uniformity across the swarm of local agents (Antigravity, Claude, OpenCode, Kimi, etc.), all underlying configurations, behavioral rules, and persistent context connectors have been migrated directly into this repository.
+
+### Directory Structure
+
+```text
+SKILLS/
+├── configs/
+│   ├── universal/
+│   │   └── rules/       # Global cognitive rules (e.g., 07-ai-memory.md, 08-cognitive-protocol.md)
+│   └── antigravity/     
+│       ├── rules/       # Antigravity-specific overrides (Terminal UI, Diagrams)
+│       ├── mcp/         # Antigravity MCP Server configs
+│       └── hooks/       # Pre/Post Invocation lifecycle hooks
+├── skills/
+│   ├── universal/       # Shared skills (ai-memory suite, audit-normalize, etc.)
+│   └── antigravity/     # Antigravity-specific tools (model-routing)
+```
+
+### Symlink Mechanism
+All agents must create symlinks from their local home-directory configuration paths pointing to this repository. For example:
+- `~/.gemini/config/rules/` -> `SKILLS/configs/universal/rules/`
+- `~/.gemini/config/skills/` -> `SKILLS/skills/universal/`
+
+This guarantees that any architectural decision or cognitive shift committed to this repository propagates instantly to every active agent in the swarm without requiring manual `ai-memory` updates for structural agent behaviors.
+
+### Installation & Snapshot Isolation
+
+To prevent active development from breaking running agents (Snapshot Isolation principle), a dynamic provisioning script is provided at `scripts/setup-agent-configs.sh`.
+
+**Live Development Mode (Tracks HEAD):**
+```bash
+./scripts/setup-agent-configs.sh --target ~/.gemini/config
+```
+
+**Production Snapshot Mode (Immutable):**
+Extracts a specific tag/commit into a `.snapshots/` directory and points symlinks there. This guarantees the agent's cognitive boundary remains completely stable regardless of active edits in the working tree.
+```bash
+./scripts/setup-agent-configs.sh --target ~/.claude/config --snapshot v1.0.0
+```
