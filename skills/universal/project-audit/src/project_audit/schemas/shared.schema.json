@@ -49,9 +49,10 @@
         "filesystem": { "type": "string", "enum": ["read-only", "temporary-write", "none"] },
         "network": { "type": "string", "enum": ["disabled", "restricted", "full"] },
         "credentials": { "type": "string", "enum": ["none", "explicit-only"] },
-        "timeout_ms": { "type": "integer" }
+        "timeout_ms": { "type": "integer" },
+        "max_retries": { "type": "integer", "default": 3 }
       },
-      "required": ["filesystem", "network", "credentials"],
+      "required": ["filesystem", "network", "credentials", "max_retries"],
       "additionalProperties": false
     },
     "egress_policy": {

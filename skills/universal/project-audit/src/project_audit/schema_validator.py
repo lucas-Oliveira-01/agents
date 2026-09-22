@@ -2,7 +2,7 @@
 schema_validator.py — JSON Schema structural gate for project-audit
 
 Validates entity dicts against the physical JSON Schemas located at:
-  docs/references/schemas/
+  src/project_audit/schemas/
 
 This is the STRUCTURAL gate. It complements (but does not replace) the
 Semantic Validators in validators.py.
@@ -38,20 +38,13 @@ _SCHEMA_DIR: Optional[Path] = None
 
 
 def _find_schema_dir() -> Path:
-    """Locate docs/references/schemas/ by walking up from this file."""
-    candidate = Path(__file__).resolve()
-    for _ in range(10):
-        candidate = candidate.parent
-        schemas = candidate / "docs" / "references" / "schemas"
-        if schemas.is_dir():
-            return schemas
-        # Also check skills/universal/project-audit relative paths
-        skills_schemas = candidate / "skills" / "universal" / "project-audit" / "schemas"
-        if skills_schemas.is_dir():
-            return skills_schemas
+    """Locate schemas/ next to this file."""
+    schemas = Path(__file__).resolve().parent / "schemas"
+    if schemas.is_dir():
+        return schemas
     raise FileNotFoundError(
-        "Cannot locate docs/references/schemas/. "
-        "Ensure the store is instantiated from within the SKILLS repo."
+        f"Cannot locate {schemas}. "
+        "Ensure the package is properly installed."
     )
 
 

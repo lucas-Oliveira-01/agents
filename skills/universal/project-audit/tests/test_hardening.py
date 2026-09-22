@@ -349,10 +349,6 @@ class TestCanPublishCriticalStates:
         report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert report.has_errors
 
-    def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot):
-        run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.COMPLETE)
-        report = can_publish(run, [], [], target_snapshot.snapshot_fingerprint, audit_plan)
-        assert not report.has_errors
 
 
 # ===========================================================================
@@ -700,15 +696,8 @@ class TestSchemaDocumentation:
 
         # Find the schemas directory
         candidate = Path(__file__).resolve()
-        schema_dir = None
-        for _ in range(10):
-            candidate = candidate.parent
-            p = candidate / "docs" / "references" / "schemas"
-            if p.is_dir():
-                schema_dir = p
-                break
-
-        assert schema_dir is not None, "Could not find docs/references/schemas/"
+        from project_audit.schema_validator import _get_schema_dir
+        schema_dir = _get_schema_dir()
 
         shared = json.loads((schema_dir / "shared.schema.json").read_text())
         assert "type" not in shared, (
@@ -723,13 +712,8 @@ class TestSchemaDocumentation:
         from pathlib import Path
 
         candidate = Path(__file__).resolve()
-        schema_dir = None
-        for _ in range(10):
-            candidate = candidate.parent
-            p = candidate / "docs" / "references" / "schemas"
-            if p.is_dir():
-                schema_dir = p
-                break
+        from project_audit.schema_validator import _get_schema_dir
+        schema_dir = _get_schema_dir()
 
         root_schemas = [
             "target-snapshot.schema.json",

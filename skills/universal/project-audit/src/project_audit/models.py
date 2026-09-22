@@ -5,7 +5,7 @@ All types are derived directly from the Canonical Data Model:
   docs/references/canonical-data-model.md
 
 And physically validated against:
-  docs/references/schemas/
+  src/project_audit/schemas/
 
 Immutability contract:
   - TargetSnapshot: frozen dataclass — immutable after creation (ADR-06)
@@ -272,7 +272,7 @@ class TargetSnapshot:
     Answers: "What exactly is being audited, and under what rules?"
 
     canonical-data-model.md §1, ADR-06.
-    Schema: docs/references/schemas/target-snapshot.schema.json
+    Schema: src/project_audit/schemas/target-snapshot.schema.json
     """
 
     target_mode: TargetMode
@@ -461,7 +461,7 @@ class Evidence:
     presumed cause, or arbitrary severity. (canonical-data-model.md §4)
 
     INVALID evidence ≠ FIXED finding. (ADR-04, semantic-validators.md §5)
-    Schema: docs/references/schemas/evidence.schema.json
+    Schema: src/project_audit/schemas/evidence.schema.json
     """
 
     evidence_id: str  # uuid
@@ -513,7 +513,7 @@ class AuditWorkItem:
     Back-transition to RUNNING after TERMINATED requires explicit retry/recovery.
     (semantic-validators.md §3)
 
-    Schema: docs/references/schemas/audit-work-item.schema.json
+    Schema: src/project_audit/schemas/audit-work-item.schema.json
     """
 
     work_item_id: str  # uuid
@@ -670,7 +670,7 @@ class AuditPlan:
     A new plan version must be created instead of mutating a frozen plan.
     (canonical-data-model.md §2, ADR-04)
 
-    Schema: docs/references/schemas/audit-plan.schema.json
+    Schema: src/project_audit/schemas/audit-plan.schema.json
     """
 
     plan_id: str  # uuid
@@ -753,7 +753,7 @@ class AuditRun:
       - coverage_completeness: full requested_scope covered?
     These CANNOT be derived from one another (canonical §5, semantic-validators §6).
 
-    Schema: docs/references/schemas/audit-run.schema.json
+    Schema: src/project_audit/schemas/audit-run.schema.json
     """
 
     run_id: str  # uuid
