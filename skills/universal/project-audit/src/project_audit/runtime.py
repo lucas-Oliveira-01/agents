@@ -13,7 +13,7 @@ from .orchestrator import Orchestrator
 from .planner import PreparedAudit, prepare_audit
 from .report_writer import write_audit_artifacts
 from .security_runner import SecurityPassResult, execute_security_pass
-from .semantic_auditor import SemanticAuditor
+from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 from .state_store import StateStore
 
 
@@ -25,6 +25,7 @@ class FullAuditResult:
     security: SecurityPassResult
     artifacts: Tuple[str, ...]
     normalization: Optional[NormalizationResult]
+    semantic_reviews: Tuple[SemanticReviewResult, ...] = ()
 
 
 def run_full_audit(
@@ -81,12 +82,14 @@ def run_full_audit(
     )
 
     resolved_output_dir = output_dir or str(discovery.root / "docs" / "audit")
+    semantic_reviews = tuple(engineering.semantic_reviews) + tuple(security.semantic_reviews)
     artifact_map = write_audit_artifacts(
         resolved_output_dir,
         prepared,
         discovery,
         engineering,
         security,
+        semantic_reviews=semantic_reviews,
         overwrite=overwrite_artifacts,
     )
     engineering.run.artifact_refs = list(artifact_map.values())
@@ -127,4 +130,5 @@ def run_full_audit(
         security=security,
         artifacts=tuple(artifact_map.values()),
         normalization=normalization,
+        semantic_reviews=semantic_reviews,
     )
