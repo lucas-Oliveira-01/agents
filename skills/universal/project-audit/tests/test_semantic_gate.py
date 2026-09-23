@@ -140,6 +140,7 @@ def test_semantic_auditor_accepts_structured_output_when_policy_explicitly_allow
                 "severity": "P2",
                 "confidence": "MEDIUM",
                 "location": {"file": "src/app.py", "line": 1},
+                "evidence": "The relevant source line exhibits the behavior described.",
                 "description": "The semantic worker identified a candidate requiring confirmation.",
                 "cause": "Example cause",
                 "impact": "Example impact",
