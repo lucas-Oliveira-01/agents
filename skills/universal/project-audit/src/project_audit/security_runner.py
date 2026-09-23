@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from .discovery import DiscoverySnapshot
 from .models import (
     AuditPlan, AuditRun, AuditWorkItem, Evidence, EvidenceValidity,
-    ExecutionReceipt, ExecutionState, Provenance, RunBudgetState,
+    ExecutionReceipt, ExecutionState, Provenance,
     RunCoverageCompleteness, RunExecutionCompleteness, RunFailureState,
     RunPublicationState, WorkItemFailureState,
 )
@@ -21,7 +21,7 @@ def execute_security_pass(
     plan: AuditPlan,
     work_items: List[AuditWorkItem],
     run: AuditRun,
-    auditor: DeterministicSecurityAuditor = None,
+    auditor: Optional[DeterministicSecurityAuditor] = None,
 ) -> AuditRun:
     """Execute the reserved SECURITY/* WorkItems in the existing AuditRun."""
     auditor = auditor or DeterministicSecurityAuditor()
