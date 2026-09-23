@@ -118,7 +118,6 @@ def execute_engineering_pass(
             receipt_ref=receipt.receipt_id,
         )
         orchestrator.commit_evidence(evidence, item)
-        item.artifact_refs.append("inspection/" + item.work_item_id)
         item.terminate(failure_state=WorkItemFailureState.NONE)
         orchestrator.commit_work_item(item)
 
