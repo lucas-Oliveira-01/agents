@@ -438,7 +438,7 @@ def write_audit_artifacts(
     rendered = {
         "inventory": render_inventory(prepared, discovery),
         "coverage": render_coverage(prepared, engineering, security),
-        "report": render_report(prepared, discovery, engineering, security),
+        "report": render_report(prepared, discovery, engineering, security, semantic_reviews),
         "ledger": render_ledger(engineering, security, semantic_reviews),
     }
     for key in ("inventory", "coverage", "report", "ledger"):
