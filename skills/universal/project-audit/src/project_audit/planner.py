@@ -48,13 +48,13 @@ def _working_tree_state(snapshot: DiscoverySnapshot) -> WorkingTreeState:
     return WorkingTreeState.CLEAN
 
 
-def _tracked_inputs(snapshot: DiscoverySnapshot) -> tuple[TrackedInputFingerprint, ...]:
+def _tracked_inputs(snapshot: DiscoverySnapshot) -> Tuple[TrackedInputFingerprint, ...]:
     interesting = {
         "pyproject.toml", "pom.xml", "build.gradle", "build.gradle.kts", "package.json",
         "requirements.txt", "cargo.toml", "go.mod", "dockerfile", "docker-compose.yml",
         "docker-compose.yaml", "compose.yml", "compose.yaml", ".gitignore",
     }
-    rows: list[TrackedInputFingerprint] = []
+    rows = []
     tracked = set(snapshot.git.tracked_paths)
     for item in snapshot.files:
         path_name = item.path.rsplit("/", 1)[-1].lower()
@@ -67,7 +67,7 @@ def _tracked_inputs(snapshot: DiscoverySnapshot) -> tuple[TrackedInputFingerprin
     return tuple(sorted(rows, key=lambda item: item.path))
 
 
-def _default_policies() -> tuple[ExecutionPolicy, EgressPolicy]:
+def _default_policies() -> Tuple[ExecutionPolicy, EgressPolicy]:
     execution = ExecutionPolicy(
         filesystem=FilesystemAccess.READ_ONLY,
         network=NetworkAccess.DISABLED,
@@ -95,7 +95,7 @@ def build_target_snapshot(snapshot: DiscoverySnapshot, target_mode: TargetMode =
     return TargetSnapshot.create(target_mode, project_state, methodology)
 
 
-def build_plan(snapshot: TargetSnapshot, applicability: Iterable[ClassifiedApplicability]) -> tuple[AuditPlan, tuple[AuditWorkItem, ...]]:
+def build_plan(snapshot: TargetSnapshot, applicability: Iterable[ClassifiedApplicability]) -> Tuple[AuditPlan, Tuple[AuditWorkItem, ...]]:
     execution_policy, egress_policy = _default_policies()
     plan_id = str(uuid.uuid4())
     decisions = tuple(applicability)
@@ -104,7 +104,7 @@ def build_plan(snapshot: TargetSnapshot, applicability: Iterable[ClassifiedAppli
     resolved = sorted({d.category for d in applicable} | {d.category for d in uncertain})
     requested_scope = ["FULL"]
 
-    work_items: list[AuditWorkItem] = []
+    work_items = []
     for decision in sorted(decisions, key=lambda item: (item.category, item.subcategory)):
         if decision.state == ApplicabilityState.NOT_APPLICABLE:
             continue
