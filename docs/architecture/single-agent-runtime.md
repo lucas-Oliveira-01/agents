@@ -1,6 +1,6 @@
 # Project-Audit Single-Agent Runtime — Phase 1
 
-**Status:** IMPLEMENTATION IN PROGRESS
+**Status:** PHASE 2 IMPLEMENTED — SEMANTIC/FINDING PHASE PENDING
 
 ## Scope
 
@@ -71,3 +71,20 @@ Not implemented yet:
 ## Validation boundary
 
 The implementation was syntax-checked in isolation. Full repository tests were not executed in the development container because outbound DNS/network access was unavailable. No successful test run is claimed by this document.
+
+
+## Current implementation boundary
+
+The executable single-agent path now reaches:
+
+1. deterministic discovery;
+2. deterministic classification;
+3. applicability and planning;
+4. Engineering PASS 1;
+5. Security PASS 2;
+6. four Markdown audit artifacts;
+7. optional downstream `audit-normalize` invocation over exactly those four artifacts.
+
+The remaining product gap is semantic audit interpretation: confirming observations, formalizing findings/controls, and producing the final audit semantics required by the canonical Markdown contract.
+
+No multi-agent runtime was introduced.
