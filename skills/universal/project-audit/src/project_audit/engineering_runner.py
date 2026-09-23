@@ -24,6 +24,8 @@ from .models import (
 )
 from .orchestrator import Orchestrator
 from .planner import build_target_snapshot
+from .semantic_auditor import SemanticAuditor, SemanticReviewResult
+from .semantic_runner import execute_semantic_review
 
 
 class EngineeringPassResult:
@@ -32,10 +34,12 @@ class EngineeringPassResult:
         run: AuditRun,
         inspections: Tuple[EngineeringInspectionResult, ...],
         evidence: Tuple[Evidence, ...],
+        semantic_reviews: Tuple[SemanticReviewResult, ...] = (),
     ) -> None:
         self.run = run
         self.inspections = inspections
         self.evidence = evidence
+        self.semantic_reviews = semantic_reviews
 
 
 def execute_engineering_pass(
@@ -44,6 +48,7 @@ def execute_engineering_pass(
     plan: AuditPlan,
     work_items: List[AuditWorkItem],
     auditor: Optional[EngineeringAuditor] = None,
+    semantic_worker: Optional[SemanticAuditor] = None,
 ) -> EngineeringPassResult:
     """Execute only non-security WorkItems as PASS 1 of the single-agent audit."""
     auditor = auditor or EngineeringAuditor()
@@ -71,6 +76,7 @@ def execute_engineering_pass(
 
     inspections = []
     evidences = []
+    semantic_reviews = []
 
     for item in work_items:
         if item.target_surface.startswith("SECURITY/"):
@@ -118,8 +124,30 @@ def execute_engineering_pass(
             receipt_ref=receipt.receipt_id,
         )
         orchestrator.commit_evidence(evidence, item)
-        item.terminate(failure_state=WorkItemFailureState.NONE)
-        orchestrator.commit_work_item(item)
+
+        needs_semantic = any(
+            getattr(observation, "state", None) == "NOT_DETERMINABLE"
+            for observation in result.observations
+        )
+        if semantic_worker is not None and needs_semantic:
+            semantic_result = execute_semantic_review(
+                orchestrator,
+                discovery,
+                run,
+                item,
+                semantic_worker,
+            )
+            semantic_reviews.append(semantic_result)
+            if semantic_result.evidence is not None:
+                evidences.append(semantic_result.evidence)
+            if semantic_result.status != "COMPLETED":
+                inspections.append(result)
+                evidences.append(evidence)
+                continue
+
+        if item.execution_state != ExecutionState.TERMINATED:
+            item.terminate(failure_state=WorkItemFailureState.NONE)
+            orchestrator.commit_work_item(item)
 
         inspections.append(result)
         evidences.append(evidence)
@@ -154,4 +182,4 @@ def execute_engineering_pass(
         known_run_ids=orchestrator.store.list_run_ids(),
     )
 
-    return EngineeringPassResult(run, tuple(inspections), tuple(evidences))
+    return EngineeringPassResult(run, tuple(inspections), tuple(evidences), tuple(semantic_reviews))
