@@ -141,6 +141,40 @@ def _parse_output(payload: Any) -> Tuple[SemanticFindingCandidate, ...]:
     return tuple(_parse_candidate(item) for item in findings)
 
 
+def _validate_candidates_against_context(
+    candidates: Tuple[SemanticFindingCandidate, ...],
+    context: ContextBundle,
+) -> None:
+    context_files = {
+        item.path: item.content
+        for item in context.items
+    }
+    for candidate in candidates:
+        if candidate.location is None:
+            continue
+        file_path = candidate.location.get("file")
+        if not isinstance(file_path, str) or not file_path:
+            raise SemanticOutputError("location.file must identify a supplied context file")
+        if file_path not in context_files:
+            raise SemanticOutputError(
+                "finding location references a file outside the supplied context: "
+                + file_path
+            )
+        content_lines = context_files[file_path].splitlines()
+        if isinstance(candidate.location.get("line"), int):
+            if candidate.location["line"] > len(content_lines):
+                raise SemanticOutputError(
+                    "finding location line exceeds the supplied context for " + file_path
+                )
+        if isinstance(candidate.location.get("line_start"), int) and isinstance(
+            candidate.location.get("line_end"), int
+        ):
+            if candidate.location["line_start"] > len(content_lines) or candidate.location["line_end"] > len(content_lines):
+                raise SemanticOutputError(
+                    "finding location range exceeds the supplied context for " + file_path
+                )
+
+
 def _build_prompt(context: ContextBundle) -> str:
     serialized = json.dumps(
         {
@@ -248,6 +282,7 @@ class SemanticAuditor:
             if delegated_result is None or delegated_result.output_payload is None:
                 raise SemanticOutputError("semantic worker returned no output payload")
             candidates = _parse_output(delegated_result.output_payload)
+            _validate_candidates_against_context(candidates, context)
         except SemanticOutputError:
             return SemanticReviewResult(
                 work_item.work_item_id,
