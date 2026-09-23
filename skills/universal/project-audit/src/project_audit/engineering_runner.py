@@ -152,28 +152,41 @@ def execute_engineering_pass(
         inspections.append(result)
         evidences.append(evidence)
 
+    executed_items = [
+        item for item in work_items
+        if not item.target_surface.startswith("SECURITY/")
+    ]
+    blocked = [item for item in executed_items if item.failure_state == WorkItemFailureState.SAFETY_BLOCK]
+    failed = [
+        item for item in executed_items
+        if item.failure_state not in {WorkItemFailureState.NONE, WorkItemFailureState.SAFETY_BLOCK}
+    ]
+    succeeded = [
+        item for item in executed_items
+        if item.execution_state == ExecutionState.TERMINATED
+        and item.failure_state == WorkItemFailureState.NONE
+    ]
     security_pending = any(
         item.target_surface.startswith("SECURITY/")
         and item.execution_state != ExecutionState.TERMINATED
         for item in work_items
     )
 
-    completed_engineering = any(
-        not item.target_surface.startswith("SECURITY/")
-        and item.execution_state == ExecutionState.TERMINATED
-        and item.failure_state == WorkItemFailureState.NONE
-        for item in work_items
-    )
-
-    if security_pending:
+    if blocked or failed:
+        if not succeeded and blocked and not failed:
+            run.execution_completeness = RunExecutionCompleteness.BLOCKED
+            run.coverage_completeness = RunCoverageCompleteness.NONE
+        else:
+            run.execution_completeness = RunExecutionCompleteness.PARTIAL
+            run.coverage_completeness = RunCoverageCompleteness.PARTIAL
+        run.failure_state = RunFailureState.INFRA_ERROR if failed else RunFailureState.SAFETY_BLOCK
+    elif security_pending:
         run.execution_completeness = RunExecutionCompleteness.PARTIAL
         run.coverage_completeness = RunCoverageCompleteness.PARTIAL
-    elif completed_engineering:
+    elif succeeded or not executed_items:
         run.execution_completeness = RunExecutionCompleteness.COMPLETE
-        run.coverage_completeness = RunCoverageCompleteness.FULL
-    else:
-        run.execution_completeness = RunExecutionCompleteness.COMPLETE
-        run.coverage_completeness = RunCoverageCompleteness.NONE
+        run.coverage_completeness = RunCoverageCompleteness.FULL if succeeded else RunCoverageCompleteness.NONE
+        run.failure_state = RunFailureState.NONE
 
     orchestrator.commit_run(
         run,
