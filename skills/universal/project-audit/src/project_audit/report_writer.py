@@ -86,7 +86,6 @@ def render_inventory(prepared: PreparedAudit, discovery: DiscoverySnapshot) -> s
 
 def render_coverage(
     prepared: PreparedAudit,
-    discovery: DiscoverySnapshot,
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
 ) -> str:
@@ -148,6 +147,7 @@ def render_coverage(
 
 def render_report(
     prepared: PreparedAudit,
+    discovery: DiscoverySnapshot,
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
 ) -> str:
