@@ -49,21 +49,14 @@ def _working_tree_state(snapshot: DiscoverySnapshot) -> WorkingTreeState:
 
 
 def _tracked_inputs(snapshot: DiscoverySnapshot) -> Tuple[TrackedInputFingerprint, ...]:
-    interesting = {
-        "pyproject.toml", "pom.xml", "build.gradle", "build.gradle.kts", "package.json",
-        "requirements.txt", "cargo.toml", "go.mod", "dockerfile", "docker-compose.yml",
-        "docker-compose.yaml", "compose.yml", "compose.yaml", ".gitignore",
-    }
-    rows = []
     tracked = set(snapshot.git.tracked_paths)
+    rows = []
     for item in snapshot.files:
-        path_name = item.path.rsplit("/", 1)[-1].lower()
-        if path_name not in interesting and not item.path.startswith(".github/workflows/"):
-            continue
         if snapshot.git.is_repository and item.path not in tracked:
             continue
-        if item.sha256:
-            rows.append(TrackedInputFingerprint(item.path, item.sha256))
+        if item.binary or not item.sha256:
+            continue
+        rows.append(TrackedInputFingerprint(item.path, item.sha256))
     return tuple(sorted(rows, key=lambda item: item.path))
 
 
@@ -81,7 +74,7 @@ def _default_policies() -> Tuple[ExecutionPolicy, EgressPolicy]:
 
 def build_target_snapshot(snapshot: DiscoverySnapshot, target_mode: TargetMode = TargetMode.WORKTREE) -> TargetSnapshot:
     project_state = ProjectState(
-        repository_identity=str(snapshot.root),
+        repository_identity=snapshot.git.remote_url or str(snapshot.root),
         revision_identity=snapshot.git.revision or "NOT_AVAILABLE",
         working_tree_state=_working_tree_state(snapshot),
         submodules_state=(),
