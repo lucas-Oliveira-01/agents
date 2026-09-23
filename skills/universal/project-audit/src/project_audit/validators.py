@@ -595,6 +595,28 @@ def validate_snapshot_drift(
 # ---------------------------------------------------------------------------
 
 
+def validate_publication_artifacts_registered(run: AuditRun) -> ValidationResult:
+    """A complete audit must register the four required Markdown artifact outputs."""
+    required = {
+        "00_inventory_and_threat_model.md",
+        "01_coverage_manifest.md",
+        "02_analytical_report.md",
+        "03_audit_ledger.md",
+    }
+    registered = {ref.rsplit("/", 1)[-1] for ref in run.artifact_refs}
+    missing = sorted(required - registered)
+    if missing:
+        return _error(
+            "PUBLISH_ARTIFACTS_MISSING",
+            f"Run {run.run_id}: required audit artifacts are not fully registered.",
+            {"missing_artifacts": missing, "registered_artifacts": sorted(registered)},
+        )
+    return _pass(
+        "PUBLISH_ARTIFACTS_REGISTERED",
+        "All four required audit Markdown artifacts are registered.",
+    )
+
+
 def can_publish(
     run: AuditRun,
     work_items: List[AuditWorkItem],
@@ -679,7 +701,10 @@ def can_publish(
     else:
         results.append(_pass("PUBLISH_EVIDENCE_VALID", "No INVALID evidence in REUSE items."))
 
-    # 5. Run failure state
+    # 5. Required audit artifacts
+    results.append(validate_publication_artifacts_registered(run))
+
+    # 6. Run failure state
     if run.failure_state != RunFailureState.NONE:
         results.append(
             _error(
