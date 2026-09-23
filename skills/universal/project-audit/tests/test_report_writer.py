@@ -87,3 +87,55 @@ def test_report_writer_preflights_existing_artifact_set(tmp_path: Path) -> None:
     assert not (out / "01_coverage_manifest.md").exists()
     assert not (out / "02_analytical_report.md").exists()
     assert not (out / "03_audit_ledger.md").exists()
+
+
+def test_report_writer_renders_semantic_finding_with_required_fields(tmp_path: Path) -> None:
+    from project_audit.semantic_auditor import SemanticFindingCandidate, SemanticReviewResult
+    from project_audit.sensitivity import SensitivityState, SensitivityAssessment
+
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    discovery = discover(tmp_path)
+    prepared = prepare_audit(
+        discovery,
+        classify_files(discovery),
+        classify_applicability(discovery, classify_stack(discovery)),
+    )
+
+    finding = SemanticFindingCandidate(
+        title="Example defect",
+        category="CODE_QUALITY",
+        subcategory="STATIC_REVIEW",
+        finding_type="TECHNICAL_DEFECT",
+        status="PROBABLE",
+        severity="P2",
+        confidence="MEDIUM",
+        location={"file": "src/app.py", "line": 1},
+        evidence="The implementation uses a deterministic example.",
+        description="A semantic review produced a candidate.",
+        cause="Example cause",
+        impact="Example impact",
+        exploitability=None,
+        recommendation="Confirm against requirements.",
+    )
+    review = SemanticReviewResult(
+        work_item_ref="work-1",
+        target_surface="CODE_QUALITY/STATIC_REVIEW",
+        status="COMPLETED",
+        sensitivity=SensitivityAssessment(
+            SensitivityState.PUBLIC,
+            tuple(),
+            "test",
+        ),
+        candidates=(finding,),
+        raw_output_fingerprint="a" * 64,
+        receipt=object(),
+        evidence=None,
+    )
+
+    from project_audit.report_writer import render_semantic_findings
+
+    rendered = render_semantic_findings((review,))
+    assert "SEM-001" in rendered
+    assert "Evidence:" in rendered
+    assert "Severity: P2" in rendered
+    assert "Location: src/app.py:1" in rendered
