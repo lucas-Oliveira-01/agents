@@ -19,6 +19,7 @@ from .engineering_runner import EngineeringPassResult, execute_engineering_pass
 from .security_pass import DeterministicSecurityAuditor, SecurityInspectionResult, SecurityObservation
 from .security_runner import SecurityPassResult, execute_security_pass
 from .report_writer import write_audit_artifacts
+from .normalization_runner import NormalizationResult, run_audit_normalize
 from .models import (
     TargetSnapshot, AuditPlan, AuditWorkItem, Attempt, ExecutionReceipt, Evidence, AuditRun,
     WorkItemAction, ExecutionState, WorkItemFailureState, RunExecutionCompleteness,
@@ -34,7 +35,7 @@ __all__ = [
     "DiscoverySnapshot", "FileRecord", "GitMetadata", "discover",
     "EngineeringAuditor", "EngineeringInspectionResult", "Observation",
     "EngineeringPassResult", "execute_engineering_pass",
-    "DeterministicSecurityAuditor", "SecurityInspectionResult", "SecurityObservation", "SecurityPassResult", "execute_security_pass", "write_audit_artifacts",
+    "DeterministicSecurityAuditor", "SecurityInspectionResult", "SecurityObservation", "SecurityPassResult", "execute_security_pass", "write_audit_artifacts", "NormalizationResult", "run_audit_normalize",
     "TargetSnapshot", "AuditPlan", "AuditWorkItem", "Attempt", "ExecutionReceipt", "Evidence", "AuditRun",
     "WorkItemAction", "ExecutionState", "WorkItemFailureState", "RunExecutionCompleteness",
     "RunCoverageCompleteness", "RunFailureState", "RunBudgetState", "RunPublicationState",
