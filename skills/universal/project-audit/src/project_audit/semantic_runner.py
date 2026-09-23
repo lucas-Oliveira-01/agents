@@ -6,7 +6,6 @@ from typing import List
 from .context_builder import build_context
 from .discovery import DiscoverySnapshot
 from .models import (
-    AuditPlan,
     AuditRun,
     AuditWorkItem,
     ExecutionState,
@@ -83,12 +82,7 @@ def execute_semantic_review(
         run.coverage_completeness = RunCoverageCompleteness.PARTIAL
         run.failure_state = RunFailureState.INFRA_ERROR
         orchestrator.commit_work_item(work_item)
-        orchestrator.commit_run(
-            run,
-            orchestrator.store.load_plan(run.plan_ref, work_items=[work_item]),
-            [work_item],
-            known_run_ids=orchestrator.store.list_run_ids(),
-        )
+        _persist_run_state(orchestrator, run)
         return result
 
     if result.status == "INVALID_OUTPUT":
@@ -122,7 +116,10 @@ def execute_semantic_review(
     work_item.terminate(failure_state=WorkItemFailureState.NONE)
     orchestrator.commit_work_item(work_item)
 
-    current_items = _persist_run_state(orchestrator, run)
+    current_items = [
+        orchestrator.store.load_work_item(work_item_id)
+        for work_item_id in run.work_item_refs
+    ]
     all_terminal = bool(current_items) and all(
         item.execution_state == ExecutionState.TERMINATED
         for item in current_items
