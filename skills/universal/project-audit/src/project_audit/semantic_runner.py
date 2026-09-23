@@ -54,6 +54,7 @@ def execute_semantic_review(
 
     context = build_context(discovery, work_item.target_surface)
     result = worker.review(work_item, run, context)
+    orchestrator.commit_receipt(result.receipt)
 
     finished = datetime.now(timezone.utc)
 
