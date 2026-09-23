@@ -29,6 +29,7 @@ def main() -> int:
     )
     parser.add_argument("--no-persist", action="store_true", help="Do not persist state during prepare phase")
     parser.add_argument("--output-dir", default=None, help="Audit Markdown output directory (default: <target>/docs/audit)")
+    parser.add_argument("--overwrite-audit", action="store_true", help="Explicitly allow replacing existing audit artifacts")
     args = parser.parse_args()
 
     discovery = discover(args.target)
@@ -64,7 +65,7 @@ def main() -> int:
             )
             final_run = security.run
             output_dir = args.output_dir or str(discovery.root / "docs" / "audit")
-            artifacts = write_audit_artifacts(output_dir, prepared, discovery, result, security)
+            artifacts = write_audit_artifacts(output_dir, prepared, discovery, result, security, overwrite=args.overwrite_audit)
             print("security_pass=complete")
             print(f"execution={final_run.execution_completeness.value}")
             print(f"coverage={final_run.coverage_completeness.value}")
