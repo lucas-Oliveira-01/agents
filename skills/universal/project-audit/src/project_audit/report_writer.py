@@ -154,6 +154,7 @@ def render_report(
     discovery: DiscoverySnapshot,
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
+    semantic_reviews: Iterable[SemanticReviewResult] = (),
 ) -> str:
     identity = _identity(prepared, discovery)
     engineering_obs = [o for r in engineering.inspections for o in r.observations]
