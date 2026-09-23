@@ -85,7 +85,7 @@ def main() -> int:
             if args.normalize:
                 normalized_dir = str(Path(output_dir) / "normalized")
                 normalization = run_audit_normalize(
-                    output_dir,
+                    list(artifacts.values()),
                     normalized_dir,
                     base_dir=str(discovery.root),
                     command=args.normalize_command,
