@@ -76,6 +76,7 @@ def build_context(
     *,
     max_files: int = 12,
     max_bytes_per_file: int = 24_000,
+    max_total_bytes: int = 96_000,
 ) -> ContextBundle:
     category, _, subcategory = target_surface.partition("/")
     classifications = classify_files(snapshot)
@@ -92,6 +93,7 @@ def build_context(
     )
 
     items: List[ContextItem] = []
+    total_bytes = 0
     for classification in ranked[:max_files]:
         record = snapshot.file(classification.path)
         if record is None or record.sha256 is None:
@@ -99,6 +101,12 @@ def build_context(
         content = _read(snapshot, classification.path, max_bytes_per_file)
         if not content:
             continue
+        encoded_size = len(content.encode("utf-8"))
+        if total_bytes + encoded_size > max_total_bytes:
+            remaining = max_total_bytes - total_bytes
+            if remaining <= 0:
+                break
+            content = content.encode("utf-8")[:remaining].decode("utf-8", errors="ignore")
         items.append(
             ContextItem(
                 path=classification.path,
@@ -106,6 +114,7 @@ def build_context(
                 sha256=record.sha256,
             )
         )
+        total_bytes += len(content.encode("utf-8"))
 
     canonical = {
         "target_surface": target_surface,
