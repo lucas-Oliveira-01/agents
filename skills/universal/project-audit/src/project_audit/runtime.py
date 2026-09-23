@@ -7,12 +7,13 @@ from typing import Optional, Tuple
 from .classifiers import classify_applicability, classify_files, classify_stack
 from .discovery import DiscoverySnapshot, discover
 from .engineering_runner import EngineeringPassResult, execute_engineering_pass
-from .models import TargetMode
+from .models import EgressPolicy, TargetMode
 from .normalization_runner import NormalizationResult, run_audit_normalize
 from .orchestrator import Orchestrator
 from .planner import PreparedAudit, prepare_audit
 from .report_writer import write_audit_artifacts
 from .security_runner import SecurityPassResult, execute_security_pass
+from .semantic_auditor import SemanticAuditor
 from .state_store import StateStore
 
 
@@ -35,6 +36,8 @@ def run_full_audit(
     overwrite_artifacts: bool = False,
     normalize: bool = False,
     normalize_command: str = "audit-normalize",
+    semantic_worker: Optional[SemanticAuditor] = None,
+    semantic_egress_policy: Optional[EgressPolicy] = None,
 ) -> FullAuditResult:
     """Execute the complete currently implemented single-agent two-pass runtime."""
     discovery = discover(target)
@@ -48,6 +51,15 @@ def run_full_audit(
         target_mode=target_mode,
     )
 
+    if semantic_worker is not None:
+        if semantic_egress_policy is None:
+            raise ValueError(
+                "semantic_worker requires an explicit semantic_egress_policy."
+            )
+        prepared.plan.egress_policy = semantic_egress_policy
+        for item in prepared.work_items:
+            item.data_egress_policy = semantic_egress_policy
+
     resolved_state_dir = Path(state_dir) if state_dir else discovery.root / ".audit" / "runs"
     orchestrator = Orchestrator(StateStore(resolved_state_dir))
 
@@ -56,6 +68,8 @@ def run_full_audit(
         discovery,
         prepared.plan,
         list(prepared.work_items),
+        target_snapshot=prepared.snapshot,
+        semantic_worker=semantic_worker,
     )
     security = execute_security_pass(
         orchestrator,
@@ -63,6 +77,7 @@ def run_full_audit(
         prepared.plan,
         list(prepared.work_items),
         engineering.run,
+        semantic_worker=semantic_worker,
     )
 
     resolved_output_dir = output_dir or str(discovery.root / "docs" / "audit")
