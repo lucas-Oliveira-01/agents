@@ -1,0 +1,81 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event session-start --agent codex --server-url http://127.0.0.1:49374"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event user-prompt-submit --agent codex --server-url http://127.0.0.1:49374"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event pre-tool-use --agent codex --server-url http://127.0.0.1:49374"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event post-tool-use --agent codex --server-url http://127.0.0.1:49374"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event pre-compact --agent codex --server-url http://127.0.0.1:49374"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event stop --agent codex --server-url http://127.0.0.1:49374"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ai-memory --data-dir /home/oliveira/.local/share/ai-memory hook --event session-end --agent codex --server-url http://127.0.0.1:49374"
+          }
+        ]
+      }
+    ]
+  }
+}
