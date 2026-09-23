@@ -6,6 +6,7 @@ from pathlib import Path
 from .classifiers import classify_applicability, classify_files, classify_stack
 from .discovery import discover
 from .engineering_runner import execute_engineering_pass
+from .security_runner import execute_security_pass
 from .orchestrator import Orchestrator
 from .planner import prepare_audit
 from .state_store import StateStore
@@ -21,7 +22,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--phase",
-        choices=("prepare", "engineering"),
+        choices=("prepare", "engineering", "full"),
         default="prepare",
         help="Prepare the plan or execute Engineering PASS 1",
     )
@@ -37,7 +38,7 @@ def main() -> int:
     state_dir = Path(args.state_dir) if args.state_dir else discovery.root / ".audit" / "runs"
     orchestrator = Orchestrator(StateStore(state_dir))
 
-    if args.phase == "engineering":
+    if args.phase in ("engineering", "full"):
         result = execute_engineering_pass(
             orchestrator,
             discovery,
@@ -51,6 +52,18 @@ def main() -> int:
         print(f"evidence={len(result.evidence)}")
         print(f"run={result.run.run_id}")
         print(f"snapshot={result.run.target_snapshot_ref}")
+        if args.phase == "full":
+            final_run = execute_security_pass(
+                orchestrator,
+                discovery,
+                prepared.plan,
+                list(prepared.work_items),
+                result.run,
+            )
+            print("security_pass=complete")
+            print(f"execution={final_run.execution_completeness.value}")
+            print(f"coverage={final_run.coverage_completeness.value}")
+            print(f"run={final_run.run_id}")
         return 0
 
     if not args.no_persist:
