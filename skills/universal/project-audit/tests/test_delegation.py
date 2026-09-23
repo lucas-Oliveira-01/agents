@@ -1,10 +1,11 @@
-import uuid
 """
 test_delegation.py — Tests for Delegation Boundary
 
 Tests the WorkerPort and DelegationBackend abstractions to ensure the Core Engine
 can delegate execution without coupling to OmniRoute or concrete models.
 """
+
+import uuid
 
 from datetime import datetime, timezone
 from typing import Any, Dict
