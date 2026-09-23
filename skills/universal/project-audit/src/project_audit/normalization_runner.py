@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import subprocess
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -16,13 +17,13 @@ class NormalizationResult:
 
 
 def run_audit_normalize(
-    input_dir: str,
+    input_paths: List[str],
     output_dir: str,
     base_dir: Optional[str] = None,
     command: str = "audit-normalize",
 ) -> NormalizationResult:
-    """Invoke audit-normalize as a downstream process without importing its implementation."""
-    argv = [command, "-i", input_dir, "-o", output_dir]
+    """Invoke audit-normalize only on the Markdown artifacts from this audit run."""
+    argv = [command, "-i"] + list(input_paths) + ["-o", output_dir]
     if base_dir is not None:
         argv.extend(["--base-dir", base_dir])
 
@@ -52,12 +53,19 @@ def run_audit_normalize(
             stderr=str(exc),
         )
 
-    if completed.returncode == 0:
-        status = "COMPLETED"
-    elif completed.returncode == 2:
-        status = "COMPLETED_WITH_WARNINGS"
-    else:
-        status = "FAILED"
+    status = "COMPLETED" if completed.returncode == 0 else (
+        "COMPLETED_WITH_WARNINGS" if completed.returncode == 2 else "FAILED"
+    )
+
+    if status.startswith("COMPLETED"):
+        expected = (
+            Path(output_dir) / "report_data.json",
+            Path(output_dir) / "validation_report.json",
+            Path(output_dir) / "source_manifest.json",
+            Path(output_dir) / "report_data.schema.json",
+        )
+        if not all(path.is_file() for path in expected):
+            status = "FAILED"
 
     return NormalizationResult(
         status=status,
