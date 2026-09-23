@@ -25,6 +25,7 @@ def main() -> int:
         default="prepare",
         help="Prepare the plan or execute Engineering PASS 1",
     )
+    parser.add_argument("--no-persist", action="store_true", help="Do not persist state during prepare phase")
     args = parser.parse_args()
 
     discovery = discover(args.target)
@@ -52,7 +53,7 @@ def main() -> int:
         print(f"snapshot={result.run.target_snapshot_ref}")
         return 0
 
-    if not args.state_dir:
+    if not args.no_persist:
         orchestrator.commit_snapshot(prepared.snapshot)
         orchestrator.freeze_and_commit_plan(prepared.plan)
         for work_item in prepared.work_items:
@@ -66,7 +67,7 @@ def main() -> int:
     print(f"work_items={len(prepared.work_items)}")
     print(f"snapshot={prepared.snapshot.snapshot_fingerprint}")
     print("phase=prepare")
-    print(f"persisted={not args.no_persist if hasattr(args, 'no_persist') else not bool(args.state_dir)}")
+    print(f"persisted={not args.no_persist}")
     return 0
 
 
