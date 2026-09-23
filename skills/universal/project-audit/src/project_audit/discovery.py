@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 
 
 _SKIP_DIRS = {".git", ".audit", "node_modules", "__pycache__", ".pytest_cache"}
+_SKIP_PATH_PREFIXES = ("docs/audit",)
 _BINARY_PROBE = 8192
 
 @dataclass(frozen=True)
@@ -81,7 +82,14 @@ def _sha256(path: Path) -> Optional[str]:
 def _discover_files(root: Path) -> Tuple[FileRecord, ...]:
     records = []
     for current_root, dirs, filenames in os.walk(root, followlinks=False):
-        dirs[:] = sorted(d for d in dirs if d not in _SKIP_DIRS)
+        relative_root = Path(current_root).relative_to(root).as_posix()
+        if relative_root != "." and any(relative_root == prefix or relative_root.startswith(prefix + "/") for prefix in _SKIP_PATH_PREFIXES):
+            dirs[:] = []
+            continue
+        dirs[:] = sorted(d for d in dirs if d not in _SKIP_DIRS and not any(
+            (Path(relative_root) / d).as_posix() == prefix or (Path(relative_root) / d).as_posix().startswith(prefix + "/")
+            for prefix in _SKIP_PATH_PREFIXES
+        ))
         for filename in sorted(filenames):
             path = Path(current_root) / filename
             try:
