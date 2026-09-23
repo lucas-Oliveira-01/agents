@@ -58,9 +58,9 @@ Not implemented yet:
 
 - semantic Engineering escalation;
 - independent Security PASS 2 execution;
-- final four-file Markdown audit output;
+- final four-file Markdown audit output writer;
 - correlation between PASS 1 and PASS 2;
-- `audit-normalize` end-to-end integration;
+- `audit-normalize` end-to-end invocation from the CLI (boundary remains downstream);
 - advanced incremental reuse/cache;
 - Evidence Dependency Graph;
 - multi-agent audit runtime.
