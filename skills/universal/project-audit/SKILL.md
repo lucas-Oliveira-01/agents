@@ -60,7 +60,7 @@ Not implemented yet:
 - independent Security PASS 2 execution;
 - final four-file Markdown audit output writer;
 - correlation between PASS 1 and PASS 2;
-- `audit-normalize` end-to-end invocation from the CLI (boundary remains downstream);
+- optional `audit-normalize` downstream handoff from the CLI; the normalizer remains a separate skill;
 - advanced incremental reuse/cache;
 - Evidence Dependency Graph;
 - multi-agent audit runtime.
