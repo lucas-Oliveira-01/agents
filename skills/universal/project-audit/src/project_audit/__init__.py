@@ -18,8 +18,13 @@ from .engineering_auditor import EngineeringAuditor, EngineeringInspectionResult
 from .engineering_runner import EngineeringPassResult, execute_engineering_pass
 from .security_pass import DeterministicSecurityAuditor, SecurityInspectionResult, SecurityObservation
 from .security_runner import SecurityPassResult, execute_security_pass
+from .semantic_auditor import SemanticAuditor, SemanticFindingCandidate, SemanticReviewResult
+from .semantic_runner import execute_semantic_review
+from .context_builder import ContextBundle, ContextItem, build_context
+from .sensitivity import SensitivityAssessment, SensitivityState, aggregate_assessments, assess_text
 from .report_writer import write_audit_artifacts
 from .normalization_runner import NormalizationResult, run_audit_normalize
+from .delegation import WorkerExecution
 from .models import (
     TargetSnapshot, AuditPlan, AuditWorkItem, Attempt, ExecutionReceipt, Evidence, AuditRun,
     WorkItemAction, ExecutionState, WorkItemFailureState, RunExecutionCompleteness,
