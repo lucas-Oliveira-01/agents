@@ -7,6 +7,7 @@ from .engineering_runner import EngineeringPassResult
 from .planner import PreparedAudit
 from .discovery import DiscoverySnapshot
 from .security_runner import SecurityPassResult
+from .semantic_auditor import SemanticFindingCandidate, SemanticReviewResult
 
 
 def _write(path: Path, content: str, overwrite: bool) -> None:
@@ -297,16 +298,91 @@ def render_report(
     return "\n".join(lines)
 
 
+
+
+def _format_location(location: object) -> str:
+    if not isinstance(location, dict):
+        return "NOT_DETERMINABLE"
+    file_path = location.get("file")
+    if not isinstance(file_path, str) or not file_path:
+        return "NOT_DETERMINABLE"
+    if isinstance(location.get("line"), int):
+        return "{}:{}".format(file_path, location["line"])
+    if isinstance(location.get("line_start"), int) and isinstance(location.get("line_end"), int):
+        return "{}:{}-{}".format(file_path, location["line_start"], location["line_end"])
+    return file_path
+
+
+def _semantic_finding_id(candidate: SemanticFindingCandidate, sequence: int) -> str:
+    # Stable within one generated artifact set; ordering is canonicalized by the caller.
+    return "SEM-{:03d}".format(sequence)
+
+
+def render_semantic_findings(
+    reviews: Iterable[SemanticReviewResult],
+) -> str:
+    candidates = []
+    for review in reviews:
+        for candidate in review.candidates:
+            candidates.append((review.work_item_ref, candidate))
+    candidates.sort(
+        key=lambda pair: (
+            pair[0],
+            pair[1].category,
+            pair[1].subcategory or "",
+            pair[1].title,
+            pair[1].evidence,
+        )
+    )
+
+    if not candidates:
+        return ""
+
+    lines = ["## SEMANTIC FINDINGS", ""]
+    for index, (work_item_ref, candidate) in enumerate(candidates, start=1):
+        lines.extend([
+            "### {} — {}".format(_semantic_finding_id(candidate, index), candidate.title),
+            "",
+            "Title: {}".format(candidate.title),
+            "Category: {}".format(candidate.category),
+            "Subcategory: {}".format(candidate.subcategory or "NOT_DETERMINABLE"),
+            "Type: {}".format(candidate.finding_type),
+            "Status: {}".format(candidate.status),
+            "Severity: {}".format(candidate.severity),
+            "Confidence: {}".format(candidate.confidence),
+            "Location: {}".format(_format_location(candidate.location)),
+            "Evidence:",
+            candidate.evidence,
+            "Description:",
+            candidate.description,
+            "Cause:",
+            candidate.cause or "NOT_DETERMINABLE",
+            "Impact:",
+            candidate.impact or "NOT_DETERMINABLE",
+            "Exploitability:",
+            candidate.exploitability or "NOT_DETERMINABLE",
+            "Recommendation:",
+            candidate.recommendation or "NOT_DETERMINABLE",
+            "",
+            "Provenance:",
+            "Semantic WorkItem: {}".format(work_item_ref),
+            "",
+        ])
+    return "\n".join(lines)
+
+
+
 def render_ledger(
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
+    semantic_reviews: Iterable[SemanticReviewResult] = (),
 ) -> str:
     lines = [
         "# AUDIT LEDGER",
         "",
         "## Findings",
         "",
-        "No formal finding was emitted automatically by deterministic inspection.",
+        "Formal findings from semantic review are emitted below; deterministic observations are not promoted automatically.",
         "",
         "## Controls",
         "",
@@ -315,6 +391,10 @@ def render_ledger(
         "## Inspection Observations",
         "",
     ]
+    semantic_markdown = render_semantic_findings(semantic_reviews)
+    if semantic_markdown:
+        lines.extend([semantic_markdown.rstrip(), ""])
+
     for result in list(engineering.inspections) + list(security.inspections):
         lines.append("### {}".format(result.target_surface))
         for obs in result.observations:
@@ -338,6 +418,7 @@ def write_audit_artifacts(
     discovery: DiscoverySnapshot,
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
+    semantic_reviews: Iterable[SemanticReviewResult] = (),
     overwrite: bool = False,
 ) -> Dict[str, str]:
     root = Path(output_dir)
@@ -359,7 +440,7 @@ def write_audit_artifacts(
         "inventory": render_inventory(prepared, discovery),
         "coverage": render_coverage(prepared, engineering, security),
         "report": render_report(prepared, discovery, engineering, security),
-        "ledger": render_ledger(engineering, security),
+        "ledger": render_ledger(engineering, security, semantic_reviews),
     }
     for key in ("inventory", "coverage", "report", "ledger"):
         _write(Path(paths[key]), rendered[key], overwrite)
