@@ -17,8 +17,13 @@ class MCPOmniRouteBackend(DelegationBackend):
     policy and bounded context to the gateway; OmniRoute owns routing.
     """
 
-    def __init__(self, mcp_client_callable: Callable[[str, str, Dict[str, Any]], Any]):
+    def __init__(
+        self,
+        mcp_client_callable: Callable[[str, str, Dict[str, Any]], Any],
+        task_builder_factory: Optional[Callable[[], Any]] = None,
+    ):
         self.mcp_client_callable = mcp_client_callable
+        self._task_builder_factory = task_builder_factory
 
     def delegate(self, request: DelegationRequest) -> DelegationResult:
         try:
@@ -60,7 +65,10 @@ class MCPOmniRouteBackend(DelegationBackend):
     @staticmethod
     def _build_arguments(request: DelegationRequest) -> Dict[str, Any]:
         try:
-            from omniroute_delegation.task_builder import TaskBuilder
+            if self._task_builder_factory is not None:
+                TaskBuilder = self._task_builder_factory
+            else:
+                from omniroute_delegation.task_builder import TaskBuilder
         except ImportError as exc:
             raise OmniRouteBackendConfigurationError(
                 "omniroute-delegation is not installed in the runtime."
