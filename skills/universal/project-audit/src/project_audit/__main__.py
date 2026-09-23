@@ -5,16 +5,26 @@ from pathlib import Path
 
 from .classifiers import classify_applicability, classify_files, classify_stack
 from .discovery import discover
-from .planner import prepare_audit
+from .engineering_runner import execute_engineering_pass
 from .orchestrator import Orchestrator
+from .planner import prepare_audit
 from .state_store import StateStore
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Prepare a project-audit single-agent run")
+    parser = argparse.ArgumentParser(description="Run or prepare a project-audit single-agent audit")
     parser.add_argument("--target", default=".", help="Repository/worktree to inspect")
-    parser.add_argument("--state-dir", default=None, help="Audit state directory (default: <target>/.audit/runs)")
-    parser.add_argument("--no-persist", action="store_true", help="Do not persist the discovered snapshot/plan")
+    parser.add_argument(
+        "--state-dir",
+        default=None,
+        help="Audit state directory (default: <target>/.audit/runs)",
+    )
+    parser.add_argument(
+        "--phase",
+        choices=("prepare", "engineering"),
+        default="prepare",
+        help="Prepare the plan or execute Engineering PASS 1",
+    )
     args = parser.parse_args()
 
     discovery = discover(args.target)
@@ -23,9 +33,26 @@ def main() -> int:
     applicability = classify_applicability(discovery, stack)
     prepared = prepare_audit(discovery, files, applicability)
 
-    if not args.no_persist:
-        state_dir = Path(args.state_dir) if args.state_dir else discovery.root / ".audit" / "runs"
-        orchestrator = Orchestrator(StateStore(state_dir))
+    state_dir = Path(args.state_dir) if args.state_dir else discovery.root / ".audit" / "runs"
+    orchestrator = Orchestrator(StateStore(state_dir))
+
+    if args.phase == "engineering":
+        result = execute_engineering_pass(
+            orchestrator,
+            discovery,
+            prepared.plan,
+            list(prepared.work_items),
+        )
+        print(f"phase=engineering")
+        print(f"execution={result.run.execution_completeness.value}")
+        print(f"coverage={result.run.coverage_completeness.value}")
+        print(f"inspections={len(result.inspections)}")
+        print(f"evidence={len(result.evidence)}")
+        print(f"run={result.run.run_id}")
+        print(f"snapshot={result.run.target_snapshot_ref}")
+        return 0
+
+    if not args.state_dir:
         orchestrator.commit_snapshot(prepared.snapshot)
         orchestrator.freeze_and_commit_plan(prepared.plan)
         for work_item in prepared.work_items:
@@ -38,7 +65,8 @@ def main() -> int:
     print(f"stack={','.join(stack) if stack else 'UNKNOWN'}")
     print(f"work_items={len(prepared.work_items)}")
     print(f"snapshot={prepared.snapshot.snapshot_fingerprint}")
-    print(f"persisted={not args.no_persist}")
+    print("phase=prepare")
+    print(f"persisted={not args.no_persist if hasattr(args, 'no_persist') else not bool(args.state_dir)}")
     return 0
 
 
