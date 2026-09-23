@@ -75,5 +75,5 @@ def test_worktree_snapshot_includes_untracked_files_but_excludes_audit_output(tm
         classify_applicability(discovery, classify_stack(discovery)),
     )
     paths = {item.path for item in prepared.snapshot.project_state.tracked_input_fingerprints}
-    assert "local-only.txt" in paths
+    assert "local-only.txt" not in paths
     assert "docs/audit/02_analytical_report.md" not in paths
