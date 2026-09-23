@@ -13,13 +13,22 @@ from .models import (
 )
 from .orchestrator import Orchestrator
 from .security_pass import DeterministicSecurityAuditor, SecurityInspectionResult
+from .semantic_auditor import SemanticAuditor, SemanticReviewResult
+from .semantic_runner import execute_semantic_review
 
 
 class SecurityPassResult:
-    def __init__(self, run: AuditRun, inspections: tuple[SecurityInspectionResult, ...], evidence: tuple[Evidence, ...]) -> None:
+    def __init__(
+        self,
+        run: AuditRun,
+        inspections: tuple[SecurityInspectionResult, ...],
+        evidence: tuple[Evidence, ...],
+        semantic_reviews: tuple[SemanticReviewResult, ...] = (),
+    ) -> None:
         self.run = run
         self.inspections = inspections
         self.evidence = evidence
+        self.semantic_reviews = semantic_reviews
 
 
 def execute_security_pass(
@@ -29,12 +38,14 @@ def execute_security_pass(
     work_items: List[AuditWorkItem],
     run: AuditRun,
     auditor: Optional[DeterministicSecurityAuditor] = None,
+    semantic_worker: Optional[SemanticAuditor] = None,
 ) -> SecurityPassResult:
     """Execute the reserved SECURITY/* WorkItems in the existing AuditRun."""
     auditor = auditor or DeterministicSecurityAuditor()
 
     inspections = []
     evidences = []
+    semantic_reviews = []
 
     for item in work_items:
         if not item.target_surface.startswith("SECURITY/"):
@@ -83,8 +94,31 @@ def execute_security_pass(
             receipt_ref=receipt.receipt_id,
         )
         orchestrator.commit_evidence(evidence, item)
-        item.terminate(failure_state=WorkItemFailureState.NONE)
-        orchestrator.commit_work_item(item)
+
+        needs_semantic = any(
+            getattr(observation, "state", None) in {"OBSERVED", "NOT_DETERMINABLE"}
+            for observation in result.observations
+        )
+        if semantic_worker is not None and needs_semantic:
+            semantic_result = execute_semantic_review(
+                orchestrator,
+                discovery,
+                run,
+                item,
+                semantic_worker,
+            )
+            semantic_reviews.append(semantic_result)
+            if semantic_result.evidence is not None:
+                evidences.append(semantic_result.evidence)
+            if semantic_result.status != "COMPLETED":
+                inspections.append(result)
+                evidences.append(evidence)
+                continue
+
+        if item.execution_state != ExecutionState.TERMINATED:
+            item.terminate(failure_state=WorkItemFailureState.NONE)
+            orchestrator.commit_work_item(item)
+
         inspections.append(result)
         evidences.append(evidence)
 
@@ -119,4 +153,4 @@ def execute_security_pass(
         work_items,
         known_run_ids=orchestrator.store.list_run_ids(),
     )
-    return SecurityPassResult(run, tuple(inspections), tuple(evidences))
+    return SecurityPassResult(run, tuple(inspections), tuple(evidences), tuple(semantic_reviews))
