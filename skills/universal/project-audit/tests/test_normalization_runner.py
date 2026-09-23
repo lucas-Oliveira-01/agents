@@ -21,7 +21,7 @@ def test_normalization_runner_builds_downstream_command(monkeypatch) -> None:
     monkeypatch.setattr("project_audit.normalization_runner.subprocess.run", fake_run)
 
     result = run_audit_normalize(
-        "docs/audit",
+        ["docs/audit/00_inventory_and_threat_model.md", "docs/audit/01_coverage_manifest.md", "docs/audit/02_analytical_report.md", "docs/audit/03_audit_ledger.md"],
         "docs/audit/normalized",
         base_dir="/repo",
         command="audit-normalize",
@@ -32,7 +32,10 @@ def test_normalization_runner_builds_downstream_command(monkeypatch) -> None:
     assert calls["argv"] == [
         "audit-normalize",
         "-i",
-        "docs/audit",
+        "docs/audit/00_inventory_and_threat_model.md",
+        "docs/audit/01_coverage_manifest.md",
+        "docs/audit/02_analytical_report.md",
+        "docs/audit/03_audit_ledger.md",
         "-o",
         "docs/audit/normalized",
         "--base-dir",
@@ -46,7 +49,7 @@ def test_normalization_runner_does_not_claim_execution_when_command_is_missing(m
 
     monkeypatch.setattr("project_audit.normalization_runner.subprocess.run", fake_run)
 
-    result = run_audit_normalize("docs/audit", "docs/audit/normalized")
+    result = run_audit_normalize(["docs/audit/00_inventory_and_threat_model.md"], "docs/audit/normalized")
 
     assert result.status == "NOT_EXECUTED"
     assert result.return_code is None
