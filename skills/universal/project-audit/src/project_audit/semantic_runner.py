@@ -68,16 +68,7 @@ def execute_semantic_review(
             receipt_ref=result.receipt.receipt_id,
         )
         work_item.terminate(failure_state=WorkItemFailureState.SCHEMA_VIOLATION)
-        run.execution_completeness = RunExecutionCompleteness.PARTIAL
-        run.coverage_completeness = RunCoverageCompleteness.PARTIAL
-        run.failure_state = RunFailureState.INFRA_ERROR
         orchestrator.commit_work_item(work_item)
-        orchestrator.commit_run(
-            run,
-            orchestrator.store.load_plan(run.plan_ref, work_items=[work_item]),
-            [work_item],
-            known_run_ids=orchestrator.store.list_run_ids(),
-        )
         return result
 
     if result.status != "COMPLETED" or result.evidence is None:
