@@ -96,6 +96,20 @@ def main() -> int:
                     print(normalization.stdout.rstrip())
                 if normalization.stderr:
                     print(normalization.stderr.rstrip())
+                if normalization.status.startswith("COMPLETED"):
+                    normalized_artifacts = [
+                        str(Path(normalized_dir) / "report_data.json"),
+                        str(Path(normalized_dir) / "validation_report.json"),
+                        str(Path(normalized_dir) / "source_manifest.json"),
+                        str(Path(normalized_dir) / "report_data.schema.json"),
+                    ]
+                    final_run.artifact_refs.extend(normalized_artifacts)
+                    orchestrator.commit_run(
+                        final_run,
+                        prepared.plan,
+                        list(prepared.work_items),
+                        known_run_ids=orchestrator.store.list_run_ids(),
+                    )
                 if normalization.status == "FAILED":
                     return 3
                 if normalization.status == "NOT_EXECUTED":
