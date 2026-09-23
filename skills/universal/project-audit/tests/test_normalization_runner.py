@@ -3,7 +3,7 @@ from __future__ import annotations
 from project_audit.normalization_runner import run_audit_normalize
 
 
-def test_normalization_runner_builds_downstream_command(monkeypatch) -> None:
+def test_normalization_runner_builds_downstream_command(monkeypatch, tmp_path) -> None:
     calls = {}
 
     class Completed:
@@ -16,13 +16,17 @@ def test_normalization_runner_builds_downstream_command(monkeypatch) -> None:
         calls["check"] = check
         calls["capture_output"] = capture_output
         calls["text"] = text
+        output_dir = tmp_path / "normalized"
+        output_dir.mkdir(parents=True)
+        for name in ("report_data.json", "validation_report.json", "source_manifest.json", "report_data.schema.json"):
+            (output_dir / name).write_text("{}\n", encoding="utf-8")
         return Completed()
 
     monkeypatch.setattr("project_audit.normalization_runner.subprocess.run", fake_run)
 
     result = run_audit_normalize(
         ["docs/audit/00_inventory_and_threat_model.md", "docs/audit/01_coverage_manifest.md", "docs/audit/02_analytical_report.md", "docs/audit/03_audit_ledger.md"],
-        "docs/audit/normalized",
+        str(tmp_path / "normalized"),
         base_dir="/repo",
         command="audit-normalize",
     )
@@ -37,7 +41,7 @@ def test_normalization_runner_builds_downstream_command(monkeypatch) -> None:
         "docs/audit/02_analytical_report.md",
         "docs/audit/03_audit_ledger.md",
         "-o",
-        "docs/audit/normalized",
+        str(tmp_path / "normalized"),
         "--base-dir",
         "/repo",
     ]
