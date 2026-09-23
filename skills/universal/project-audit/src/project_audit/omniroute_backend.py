@@ -140,3 +140,50 @@ class MCPOmniRouteBackend(DelegationBackend):
             if isinstance(route, str) and route:
                 return route
         return "omniroute/dynamic"
+
+
+
+def create_backend_from_mcp_client(client: Any) -> MCPOmniRouteBackend:
+    """Create an OmniRoute backend from an already constructed MCPClient.
+
+    The caller owns the client's lifecycle. The adapter performs no model
+    selection and relies on the client's discovered tool schema.
+    """
+    if not hasattr(client, "call_tool") or not hasattr(client, "filter_optional_params"):
+        raise OmniRouteBackendConfigurationError(
+            "The supplied MCP client does not expose the required contract."
+        )
+
+    def invoke(_server: str, tool: str, arguments: Dict[str, Any]) -> Any:
+        filtered = client.filter_optional_params(tool, arguments)
+        return client.call_tool(tool, filtered)
+
+    return MCPOmniRouteBackend(invoke)
+
+
+def create_local_omniroute_backend(
+    *,
+    mcp_url: Optional[str] = None,
+    timeout: float = 30.0,
+) -> tuple[MCPOmniRouteBackend, Any]:
+    """Optionally construct and contract-discover the repository's MCP client.
+
+    This function imports omniroute-delegation lazily. The dependency remains
+    optional for project-audit installation.
+    """
+    try:
+        from omniroute_delegation.mcp_client import MCPClient
+    except ImportError as exc:
+        raise OmniRouteBackendConfigurationError(
+            "omniroute-delegation is not installed in the runtime."
+        ) from exc
+
+    client = MCPClient(mcp_url=mcp_url, timeout=timeout)
+    client.initialize()
+    client.discover_tools()
+    if not client.session.has_tool("delegar_tarefa"):
+        client.close()
+        raise OmniRouteBackendConfigurationError(
+            "OmniRoute MCP does not expose the discovered 'delegar_tarefa' tool."
+        )
+    return create_backend_from_mcp_client(client), client
