@@ -50,3 +50,30 @@ def test_prepare_audit_creates_consistent_snapshot_and_work_items(tmp_path: Path
     assert all(item.plan_ref == prepared.plan.plan_id for item in prepared.work_items)
     assert all(item.target_surface for item in prepared.work_items)
     assert prepared.plan.work_items
+
+
+def test_worktree_snapshot_includes_untracked_files_but_excludes_audit_output(tmp_path: Path) -> None:
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    _write(tmp_path, "local-only.txt", "untracked input\n")
+    _write(tmp_path, "docs/audit/02_analytical_report.md", "# generated audit\n")
+
+    import subprocess
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "audit@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Audit Test"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "src/app.py"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "initial"], cwd=tmp_path, check=True)
+
+    discovery = discover(tmp_path)
+    assert discovery.file("local-only.txt") is not None
+    assert discovery.file("docs/audit/02_analytical_report.md") is None
+
+    prepared = prepare_audit(
+        discovery,
+        classify_files(discovery),
+        classify_applicability(discovery, classify_stack(discovery)),
+    )
+    paths = {item.path for item in prepared.snapshot.project_state.tracked_input_fingerprints}
+    assert "local-only.txt" in paths
+    assert "docs/audit/02_analytical_report.md" not in paths
