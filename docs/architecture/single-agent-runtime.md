@@ -53,6 +53,8 @@ Implemented in this branch:
 - deterministic file classification;
 - deterministic stack signal classification;
 - deterministic audit applicability classification;
+- deterministic Engineering PASS 1 inspection;
+- deterministic Security PASS 2 inspection;
 - explicit task classification with an LLM-necessity signal;
 - creation of a real `TargetSnapshot`;
 - generation of a real `AuditPlan` and atomic `AuditWorkItem`s.
