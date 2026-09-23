@@ -7,6 +7,7 @@ from .classifiers import classify_applicability, classify_files, classify_stack
 from .discovery import discover
 from .engineering_runner import execute_engineering_pass
 from .security_runner import execute_security_pass
+from .report_writer import write_audit_artifacts
 from .orchestrator import Orchestrator
 from .planner import prepare_audit
 from .state_store import StateStore
@@ -27,6 +28,7 @@ def main() -> int:
         help="Prepare the plan, execute Engineering PASS 1, or execute the full two-pass audit",
     )
     parser.add_argument("--no-persist", action="store_true", help="Do not persist state during prepare phase")
+    parser.add_argument("--output-dir", default=None, help="Audit Markdown output directory (default: <target>/docs/audit)")
     args = parser.parse_args()
 
     discovery = discover(args.target)
@@ -53,17 +55,22 @@ def main() -> int:
         print(f"run={result.run.run_id}")
         print(f"snapshot={result.run.target_snapshot_ref}")
         if args.phase == "full":
-            final_run = execute_security_pass(
+            security = execute_security_pass(
                 orchestrator,
                 discovery,
                 prepared.plan,
                 list(prepared.work_items),
                 result.run,
             )
+            final_run = security.run
+            output_dir = args.output_dir or str(discovery.root / "docs" / "audit")
+            artifacts = write_audit_artifacts(output_dir, prepared, result, security)
             print("security_pass=complete")
             print(f"execution={final_run.execution_completeness.value}")
             print(f"coverage={final_run.coverage_completeness.value}")
             print(f"run={final_run.run_id}")
+            print(f"artifacts={len(artifacts)}")
+            print(f"output_dir={output_dir}")
         return 0
 
     if not args.no_persist:
