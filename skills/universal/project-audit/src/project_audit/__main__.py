@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from .classifiers import classify_applicability, classify_files, classify_stack
+from .discovery import discover
+from .planner import prepare_audit
+from .orchestrator import Orchestrator
+from .state_store import StateStore
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Prepare a project-audit single-agent run")
+    parser.add_argument("--target", default=".", help="Repository/worktree to inspect")
+    parser.add_argument("--state-dir", default=None, help="Audit state directory (default: <target>/.audit/runs)")
+    parser.add_argument("--no-persist", action="store_true", help="Do not persist the discovered snapshot/plan")
+    args = parser.parse_args()
+
+    discovery = discover(args.target)
+    files = classify_files(discovery)
+    stack = classify_stack(discovery)
+    applicability = classify_applicability(discovery, stack)
+    prepared = prepare_audit(discovery, files, applicability)
+
+    if not args.no_persist:
+        state_dir = Path(args.state_dir) if args.state_dir else discovery.root / ".audit" / "runs"
+        orchestrator = Orchestrator(StateStore(state_dir))
+        orchestrator.commit_snapshot(prepared.snapshot)
+        orchestrator.freeze_and_commit_plan(prepared.plan)
+        for work_item in prepared.work_items:
+            orchestrator.commit_work_item(work_item)
+
+    print(f"target={discovery.root}")
+    print(f"files={len(files)}")
+    print(f"git_repository={discovery.git.is_repository}")
+    print(f"revision={discovery.git.revision or 'NOT_AVAILABLE'}")
+    print(f"stack={','.join(stack) if stack else 'UNKNOWN'}")
+    print(f"work_items={len(prepared.work_items)}")
+    print(f"snapshot={prepared.snapshot.snapshot_fingerprint}")
+    print(f"persisted={not args.no_persist}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
