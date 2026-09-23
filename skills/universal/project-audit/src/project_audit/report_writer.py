@@ -9,8 +9,10 @@ from .discovery import DiscoverySnapshot
 from .security_runner import SecurityPassResult
 
 
-def _write(path: Path, content: str) -> None:
+def _write(path: Path, content: str, overwrite: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and not overwrite:
+        raise FileExistsError("Audit artifact already exists: {}".format(path))
     tmp = path.with_name("." + path.name + ".tmp")
     tmp.write_text(content, encoding="utf-8")
     tmp.replace(path)
@@ -335,6 +337,7 @@ def write_audit_artifacts(
     discovery: DiscoverySnapshot,
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
+    overwrite: bool = False,
 ) -> Dict[str, str]:
     root = Path(output_dir)
     paths = {
@@ -343,8 +346,8 @@ def write_audit_artifacts(
         "report": str(root / "02_analytical_report.md"),
         "ledger": str(root / "03_audit_ledger.md"),
     }
-    _write(Path(paths["inventory"]), render_inventory(prepared, discovery))
-    _write(Path(paths["coverage"]), render_coverage(prepared, engineering, security))
-    _write(Path(paths["report"]), render_report(prepared, discovery, engineering, security))
-    _write(Path(paths["ledger"]), render_ledger(engineering, security))
+    _write(Path(paths["inventory"]), render_inventory(prepared, discovery), overwrite)
+    _write(Path(paths["coverage"]), render_coverage(prepared, engineering, security), overwrite)
+    _write(Path(paths["report"]), render_report(prepared, discovery, engineering, security), overwrite)
+    _write(Path(paths["ledger"]), render_ledger(engineering, security), overwrite)
     return paths
