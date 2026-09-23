@@ -1,0 +1,59 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from project_audit.classifiers import classify_applicability, classify_files, classify_stack
+from project_audit.discovery import discover
+from project_audit.engineering_runner import execute_engineering_pass
+from project_audit.report_writer import write_audit_artifacts
+from project_audit.security_runner import execute_security_pass
+from project_audit.orchestrator import Orchestrator
+from project_audit.planner import prepare_audit
+from project_audit.state_store import StateStore
+
+
+def _write(root: Path, relative: str, content: str) -> None:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def test_report_writer_emits_required_four_markdown_artifacts(tmp_path: Path) -> None:
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    discovery = discover(tmp_path)
+    prepared = prepare_audit(
+        discovery,
+        classify_files(discovery),
+        classify_applicability(discovery, classify_stack(discovery)),
+    )
+
+    orchestrator = Orchestrator(StateStore(tmp_path / ".audit-state"))
+    engineering = execute_engineering_pass(
+        orchestrator,
+        discovery,
+        prepared.plan,
+        list(prepared.work_items),
+    )
+    security = execute_security_pass(
+        orchestrator,
+        discovery,
+        prepared.plan,
+        list(prepared.work_items),
+        engineering.run,
+    )
+
+    out = tmp_path / "docs" / "audit"
+    paths = write_audit_artifacts(
+        str(out),
+        prepared,
+        discovery,
+        engineering,
+        security,
+    )
+
+    assert set(paths) == {"inventory", "coverage", "report", "ledger"}
+    assert all(Path(path).is_file() for path in paths.values())
+    assert "APPLICABILITY MATRIX" in Path(paths["inventory"]).read_text(encoding="utf-8")
+    assert "INSPECTION COVERAGE" in Path(paths["coverage"]).read_text(encoding="utf-8")
+    assert "Security Review" in Path(paths["report"]).read_text(encoding="utf-8")
+    assert "AUDIT LEDGER" in Path(paths["ledger"]).read_text(encoding="utf-8")
