@@ -4,6 +4,8 @@ from pathlib import Path
 
 from project_audit.classifiers import ApplicabilityState, FileKind, classify_applicability, classify_file, classify_stack
 from project_audit.discovery import discover
+from project_audit.models import TargetMode
+import pytest
 from project_audit.planner import prepare_audit
 
 
@@ -77,3 +79,24 @@ def test_worktree_snapshot_includes_untracked_files_but_excludes_audit_output(tm
     paths = {item.path for item in prepared.snapshot.project_state.tracked_input_fingerprints}
     assert "local-only.txt" not in paths
     assert "docs/audit/02_analytical_report.md" not in paths
+
+
+def test_commit_target_requires_clean_git_worktree(tmp_path: Path) -> None:
+    import subprocess
+
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "audit@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Audit Test"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "src/app.py"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "initial"], cwd=tmp_path, check=True)
+    _write(tmp_path, "src/app.py", "print('changed')\n")
+
+    discovery = discover(tmp_path)
+    with pytest.raises(ValueError, match="clean working tree"):
+        prepare_audit(
+            discovery,
+            classify_files(discovery),
+            classify_applicability(discovery, classify_stack(discovery)),
+            target_mode=TargetMode.COMMIT,
+        )
