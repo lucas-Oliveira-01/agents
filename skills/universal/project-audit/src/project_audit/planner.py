@@ -48,11 +48,11 @@ def _working_tree_state(snapshot: DiscoverySnapshot) -> WorkingTreeState:
     return WorkingTreeState.CLEAN
 
 
-def _tracked_inputs(snapshot: DiscoverySnapshot) -> Tuple[TrackedInputFingerprint, ...]:
+def _input_fingerprints(snapshot: DiscoverySnapshot, target_mode: TargetMode) -> Tuple[TrackedInputFingerprint, ...]:
     tracked = set(snapshot.git.tracked_paths)
     rows = []
     for item in snapshot.files:
-        if snapshot.git.is_repository and item.path not in tracked:
+        if target_mode == TargetMode.COMMIT and snapshot.git.is_repository and item.path not in tracked:
             continue
         if item.binary or not item.sha256:
             continue
@@ -78,7 +78,7 @@ def build_target_snapshot(snapshot: DiscoverySnapshot, target_mode: TargetMode =
         revision_identity=snapshot.git.revision or "NOT_AVAILABLE",
         working_tree_state=_working_tree_state(snapshot),
         submodules_state=(),
-        tracked_input_fingerprints=_tracked_inputs(snapshot),
+        tracked_input_fingerprints=_input_fingerprints(snapshot, target_mode),
     )
     methodology = MethodologyState(
         audit_contract_version=AUDIT_CONTRACT_VERSION,
