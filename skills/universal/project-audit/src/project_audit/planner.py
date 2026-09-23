@@ -176,7 +176,21 @@ def build_plan(snapshot: TargetSnapshot, applicability: Iterable[ClassifiedAppli
     return plan, tuple(work_items)
 
 
-def prepare_audit(discovery: DiscoverySnapshot, files: Tuple[FileClassification, ...], applicability: Tuple[ClassifiedApplicability, ...], target_mode: TargetMode = TargetMode.WORKTREE) -> PreparedAudit:
+def prepare_audit(
+    discovery: DiscoverySnapshot,
+    files: Tuple[FileClassification, ...],
+    applicability: Tuple[ClassifiedApplicability, ...],
+    target_mode: TargetMode = TargetMode.WORKTREE,
+) -> PreparedAudit:
+    if target_mode == TargetMode.COMMIT:
+        if not discovery.git.is_repository:
+            raise ValueError("COMMIT target mode requires a Git repository.")
+        if discovery.git.working_tree_dirty:
+            raise ValueError(
+                "COMMIT target mode requires a clean working tree; "
+                "the current filesystem does not provably equal HEAD."
+            )
+
     snapshot = build_target_snapshot(discovery, target_mode=target_mode)
     plan, work_items = build_plan(snapshot, applicability)
     return PreparedAudit(snapshot, plan, work_items, files, applicability)
