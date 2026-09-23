@@ -339,38 +339,36 @@ def render_semantic_findings(
         return ""
 
     lines = ["## SEMANTIC FINDINGS", ""]
-    for index, (work_item_ref, candidate) in enumerate(candidates, start=1):
+    for index, (_, candidate) in enumerate(candidates, start=1):
         lines.extend([
             "### {} — {}".format(_semantic_finding_id(candidate, index), candidate.title),
             "",
             "Title: {}".format(candidate.title),
             "Category: {}".format(candidate.category),
-            "Subcategory: {}".format(candidate.subcategory or "NOT_DETERMINABLE"),
+            "Subcategory: {}".format(candidate.subcategory or ""),
             "Type: {}".format(candidate.finding_type),
             "Status: {}".format(candidate.status),
             "Severity: {}".format(candidate.severity),
             "Confidence: {}".format(candidate.confidence),
-            *(["Location: {}".format(_format_location(candidate.location))] if candidate.location else []),
+        ])
+        if candidate.location:
+            lines.append("Location: {}".format(_format_location(candidate.location)))
+        lines.extend([
             "Evidence:",
             candidate.evidence,
             "Description:",
             candidate.description,
-            "Cause:",
-            candidate.cause or "NOT_DETERMINABLE",
-            "Impact:",
-            candidate.impact or "NOT_DETERMINABLE",
-            "Exploitability:",
-            candidate.exploitability or "NOT_DETERMINABLE",
-            "Recommendation:",
-            candidate.recommendation or "NOT_DETERMINABLE",
-            "",
-            "Provenance:",
-            "Semantic WorkItem: {}".format(work_item_ref),
-            "",
         ])
-    return "\n".join(lines)
-
-
+        if candidate.cause:
+            lines.extend(["Cause:", candidate.cause])
+        if candidate.impact:
+            lines.extend(["Impact:", candidate.impact])
+        if candidate.exploitability:
+            lines.extend(["Exploitability:", candidate.exploitability])
+        if candidate.recommendation:
+            lines.extend(["Recommendation:", candidate.recommendation])
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 def render_ledger(
     engineering: EngineeringPassResult,
