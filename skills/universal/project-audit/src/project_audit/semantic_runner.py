@@ -15,6 +15,7 @@ from .models import (
     WorkItemFailureState,
 )
 from .orchestrator import Orchestrator
+from .planner import build_target_snapshot
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 
 
@@ -46,6 +47,14 @@ def execute_semantic_review(
     """Execute one semantic WorkItem with lifecycle and evidence gates."""
     if work_item.execution_state == ExecutionState.TERMINATED:
         raise ValueError("Cannot semantically review an already terminated WorkItem")
+
+    stored_snapshot = orchestrator.store.load_snapshot(run.target_snapshot_ref)
+    current_snapshot = build_target_snapshot(
+        discovery,
+        target_mode=stored_snapshot.target_mode,
+    )
+    if current_snapshot.snapshot_fingerprint != stored_snapshot.snapshot_fingerprint:
+        raise RuntimeError("Snapshot drift detected before semantic review.")
 
     orchestrator.commit_work_item(work_item)
     started = datetime.now(timezone.utc)
