@@ -10,8 +10,6 @@ from typing import Optional, Tuple
 
 _SKIP_DIRS = {".git", ".audit", "node_modules", "__pycache__", ".pytest_cache"}
 _BINARY_PROBE = 8192
-_HASH_LIMIT = 8 * 1024 * 1024
-
 
 @dataclass(frozen=True)
 class FileRecord:
@@ -28,6 +26,7 @@ class GitMetadata:
     branch: Optional[str]
     working_tree_dirty: Optional[bool]
     tracked_paths: Tuple[str, ...]
+    remote_url: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -70,8 +69,6 @@ def _is_binary(path: Path) -> bool:
 
 def _sha256(path: Path) -> Optional[str]:
     try:
-        if path.stat().st_size > _HASH_LIMIT:
-            return None
         digest = hashlib.sha256()
         with path.open("rb") as handle:
             for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -106,10 +103,11 @@ def _discover_files(root: Path) -> Tuple[FileRecord, ...]:
 def _discover_git(root: Path) -> GitMetadata:
     ok, inside = _run_git(root, "rev-parse", "--is-inside-work-tree")
     if not ok or inside.lower() != "true":
-        return GitMetadata(False, None, None, None, ())
+        return GitMetadata(False, None, None, None, (), None)
 
     _, revision = _run_git(root, "rev-parse", "HEAD")
     _, branch = _run_git(root, "branch", "--show-current")
+    _, remote_url = _run_git(root, "remote", "get-url", "origin")
     status_ok, status = _run_git(root, "status", "--porcelain=v1", "--untracked-files=all")
     _, tracked = _run_git(root, "ls-files")
 
@@ -119,6 +117,7 @@ def _discover_git(root: Path) -> GitMetadata:
         branch=branch or None,
         working_tree_dirty=(bool(status) if status_ok else None),
         tracked_paths=tuple(line for line in tracked.splitlines() if line),
+        remote_url=remote_url or None,
     )
 
 
