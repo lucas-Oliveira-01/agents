@@ -128,7 +128,11 @@ class SecurityAuditor:
 
         # Delegate via WorkerPort (ADR-09: auditor does not own EgressPolicy)
         receipt, evidence = self.worker_port.execute_delegation(
-            work_item, context_payload, started_at=now
+            work_item,
+            context_payload,
+            started_at=now,
+            data_is_sensitive=True,
+            target_snapshot_ref=self.snapshot.snapshot_fingerprint,
         )
         return receipt, evidence
 
