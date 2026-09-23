@@ -24,7 +24,7 @@ def main() -> int:
         "--phase",
         choices=("prepare", "engineering", "full"),
         default="prepare",
-        help="Prepare the plan or execute Engineering PASS 1",
+        help="Prepare the plan, execute Engineering PASS 1, or execute the full two-pass audit",
     )
     parser.add_argument("--no-persist", action="store_true", help="Do not persist state during prepare phase")
     args = parser.parse_args()
