@@ -350,7 +350,7 @@ def render_semantic_findings(
             "Status: {}".format(candidate.status),
             "Severity: {}".format(candidate.severity),
             "Confidence: {}".format(candidate.confidence),
-            "Location: {}".format(_format_location(candidate.location)),
+            *(["Location: {}".format(_format_location(candidate.location))] if candidate.location else []),
             "Evidence:",
             candidate.evidence,
             "Description:",
