@@ -66,6 +66,13 @@ def main() -> int:
             final_run = security.run
             output_dir = args.output_dir or str(discovery.root / "docs" / "audit")
             artifacts = write_audit_artifacts(output_dir, prepared, discovery, result, security, overwrite=args.overwrite_audit)
+            result.run.artifact_refs = list(artifacts.values())
+            orchestrator.commit_run(
+                result.run,
+                prepared.plan,
+                list(prepared.work_items),
+                known_run_ids=orchestrator.store.list_run_ids(),
+            )
             print("security_pass=complete")
             print(f"execution={final_run.execution_completeness.value}")
             print(f"coverage={final_run.coverage_completeness.value}")
