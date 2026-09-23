@@ -64,7 +64,7 @@ def main() -> int:
             )
             final_run = security.run
             output_dir = args.output_dir or str(discovery.root / "docs" / "audit")
-            artifacts = write_audit_artifacts(output_dir, prepared, result, security)
+            artifacts = write_audit_artifacts(output_dir, prepared, discovery, result, security)
             print("security_pass=complete")
             print(f"execution={final_run.execution_completeness.value}")
             print(f"coverage={final_run.coverage_completeness.value}")
