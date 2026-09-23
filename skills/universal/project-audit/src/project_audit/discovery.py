@@ -45,7 +45,7 @@ class DiscoverySnapshot:
         return next((item for item in self.files if item.path == wanted), None)
 
 
-def _run_git(root: Path, *args: str) -> tuple[bool, str]:
+def _run_git(root: Path, *args: str) -> Tuple[bool, str]:
     try:
         completed = subprocess.run(
             ["git", *args],
@@ -82,7 +82,7 @@ def _sha256(path: Path) -> Optional[str]:
 
 
 def _discover_files(root: Path) -> Tuple[FileRecord, ...]:
-    records: list[FileRecord] = []
+    records = []
     for current_root, dirs, filenames in os.walk(root, followlinks=False):
         dirs[:] = sorted(d for d in dirs if d not in _SKIP_DIRS)
         for filename in sorted(filenames):
@@ -92,13 +92,12 @@ def _discover_files(root: Path) -> Tuple[FileRecord, ...]:
             except OSError:
                 continue
             relative = path.relative_to(root).as_posix()
-            binary = _is_binary(path)
             records.append(
                 FileRecord(
                     path=relative,
                     size=size,
                     sha256=_sha256(path),
-                    binary=binary,
+                    binary=_is_binary(path),
                 )
             )
     return tuple(records)
@@ -123,7 +122,7 @@ def _discover_git(root: Path) -> GitMetadata:
     )
 
 
-def discover(root: str | Path) -> DiscoverySnapshot:
+def discover(root: str) -> DiscoverySnapshot:
     project_root = Path(root).expanduser().resolve()
     if not project_root.is_dir():
         raise ValueError(f"Target is not a directory: {project_root}")
