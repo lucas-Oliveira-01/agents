@@ -210,11 +210,7 @@ def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path
     orchestrator.commit_snapshot(prepared.snapshot)
     orchestrator.freeze_and_commit_plan(prepared.plan)
 
-    from project_audit.models import (
-        RunBudgetState,
-        RunPublicationState,
-        WorkItemFailureState,
-    )
+    from project_audit.models import ExecutionState, RunBudgetState, RunPublicationState
     work_item.plan_ref = prepared.plan.plan_id
     orchestrator.commit_work_item(work_item)
     first = work_item.start_attempt()
