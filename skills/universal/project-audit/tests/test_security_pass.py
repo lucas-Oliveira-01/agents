@@ -9,7 +9,7 @@ from project_audit.models import RunCoverageCompleteness, RunExecutionCompletene
 from project_audit.orchestrator import Orchestrator
 from project_audit.planner import prepare_audit
 from project_audit.security_pass import DeterministicSecurityAuditor
-from project_audit.security_runner import execute_security_pass
+from project_audit.security_runner import SecurityPassResult, execute_security_pass
 from project_audit.state_store import StateStore
 
 
@@ -63,7 +63,10 @@ def test_security_pass_finishes_same_run_after_engineering_pass(tmp_path: Path) 
         engineering.run,
     )
 
-    assert final_run.run_id == engineering.run.run_id
-    assert final_run.execution_completeness == RunExecutionCompleteness.COMPLETE
-    assert final_run.coverage_completeness == RunCoverageCompleteness.FULL
-    assert final_run.failure_state.value == "NONE"
+    assert isinstance(final_run, SecurityPassResult)
+    assert final_run.run.run_id == engineering.run.run_id
+    assert final_run.run.execution_completeness == RunExecutionCompleteness.COMPLETE
+    assert final_run.run.coverage_completeness == RunCoverageCompleteness.FULL
+    assert final_run.run.failure_state.value == "NONE"
+    assert final_run.inspections
+    assert final_run.evidence
