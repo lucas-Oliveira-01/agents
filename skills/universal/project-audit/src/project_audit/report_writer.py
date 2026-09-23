@@ -346,8 +346,20 @@ def write_audit_artifacts(
         "report": str(root / "02_analytical_report.md"),
         "ledger": str(root / "03_audit_ledger.md"),
     }
-    _write(Path(paths["inventory"]), render_inventory(prepared, discovery), overwrite)
-    _write(Path(paths["coverage"]), render_coverage(prepared, engineering, security), overwrite)
-    _write(Path(paths["report"]), render_report(prepared, discovery, engineering, security), overwrite)
-    _write(Path(paths["ledger"]), render_ledger(engineering, security), overwrite)
+
+    if not overwrite:
+        existing = sorted(path for path in paths.values() if Path(path).exists())
+        if existing:
+            raise FileExistsError(
+                "Audit artifact set already contains existing files: {}".format(", ".join(existing))
+            )
+
+    rendered = {
+        "inventory": render_inventory(prepared, discovery),
+        "coverage": render_coverage(prepared, engineering, security),
+        "report": render_report(prepared, discovery, engineering, security),
+        "ledger": render_ledger(engineering, security),
+    }
+    for key in ("inventory", "coverage", "report", "ledger"):
+        _write(Path(paths[key]), rendered[key], overwrite)
     return paths
