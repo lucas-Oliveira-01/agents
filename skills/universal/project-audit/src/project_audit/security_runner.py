@@ -12,7 +12,14 @@ from .models import (
     RunPublicationState, WorkItemFailureState,
 )
 from .orchestrator import Orchestrator
-from .security_pass import DeterministicSecurityAuditor
+from .security_pass import DeterministicSecurityAuditor, SecurityInspectionResult
+
+
+class SecurityPassResult:
+    def __init__(self, run: AuditRun, inspections: tuple[SecurityInspectionResult, ...], evidence: tuple[Evidence, ...]) -> None:
+        self.run = run
+        self.inspections = inspections
+        self.evidence = evidence
 
 
 def execute_security_pass(
@@ -22,9 +29,12 @@ def execute_security_pass(
     work_items: List[AuditWorkItem],
     run: AuditRun,
     auditor: Optional[DeterministicSecurityAuditor] = None,
-) -> AuditRun:
+) -> SecurityPassResult:
     """Execute the reserved SECURITY/* WorkItems in the existing AuditRun."""
     auditor = auditor or DeterministicSecurityAuditor()
+
+    inspections = []
+    evidences = []
 
     for item in work_items:
         if not item.target_surface.startswith("SECURITY/"):
@@ -75,6 +85,8 @@ def execute_security_pass(
         orchestrator.commit_evidence(evidence, item)
         item.terminate(failure_state=WorkItemFailureState.NONE)
         orchestrator.commit_work_item(item)
+        inspections.append(result)
+        evidences.append(evidence)
 
     pending = [
         item for item in work_items
@@ -107,4 +119,4 @@ def execute_security_pass(
         work_items,
         known_run_ids=orchestrator.store.list_run_ids(),
     )
-    return run
+    return SecurityPassResult(run, tuple(inspections), tuple(evidences))
