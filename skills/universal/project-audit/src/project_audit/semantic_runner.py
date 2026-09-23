@@ -83,8 +83,4 @@ def execute_semantic_review(
     work_item.terminate(failure_state=WorkItemFailureState.NONE)
     orchestrator.commit_work_item(work_item)
 
-    orchestrator.commit_evidence(result.evidence, work_item)
-    work_item.terminate(failure_state=WorkItemFailureState.NONE)
-    orchestrator.commit_work_item(work_item)
-
     return result
