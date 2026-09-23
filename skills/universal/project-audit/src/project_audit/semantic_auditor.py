@@ -10,7 +10,7 @@ from typing import Any, Dict, Optional, Tuple
 from .context_builder import ContextBundle
 from .delegation import DelegationStatus, WorkerPort
 from .models import AuditRun, AuditWorkItem, Evidence, EvidenceValidity, Provenance
-from .sensitivity import SensitivityAssessment, SensitivityState, aggregate_assessments
+from .sensitivity import SensitivityAssessment, SensitivityState, aggregate_assessments, assess_text
 
 
 _ALLOWED_CATEGORIES = {
@@ -105,10 +105,18 @@ def _parse_candidate(item: Any) -> SemanticFindingCandidate:
     if confidence not in _ALLOWED_CONFIDENCES:
         raise SemanticOutputError("unsupported confidence: " + confidence)
 
+    subcategory = item.get("subcategory")
+    if subcategory is not None and not isinstance(subcategory, str):
+        raise SemanticOutputError("subcategory must be a string or null")
+    for field_name in ("cause", "impact", "exploitability", "recommendation"):
+        value = item.get(field_name)
+        if value is not None and not isinstance(value, str):
+            raise SemanticOutputError(field_name + " must be a string or null")
+
     return SemanticFindingCandidate(
         title=item["title"].strip(),
         category=category,
-        subcategory=item.get("subcategory"),
+        subcategory=subcategory,
         finding_type=finding_type,
         status=status,
         severity=severity,
@@ -178,21 +186,20 @@ class SemanticAuditor:
         *,
         declared_sensitivity: Optional[SensitivityState] = None,
     ) -> SemanticReviewResult:
-        assessments = tuple(
-            SensitivityAssessment(
-                SensitivityState.UNKNOWN,
-                tuple(),
-                "Context is project-controlled and requires explicit egress authorization.",
-            )
-            if declared_sensitivity is None
-            else SensitivityAssessment(
+        actual_assessments = tuple(
+            assess_text(item.content, item.path)
+            for item in context.items
+        )
+        actual_sensitivity = aggregate_assessments(actual_assessments)
+        if declared_sensitivity is None:
+            sensitivity = actual_sensitivity
+        else:
+            declared = SensitivityAssessment(
                 declared_sensitivity,
                 tuple(),
                 "Sensitivity state was supplied by the caller/policy.",
             )
-            for _ in context.items
-        )
-        sensitivity = aggregate_assessments(assessments)
+            sensitivity = aggregate_assessments((actual_sensitivity, declared))
 
         started = datetime.now(timezone.utc)
         prompt = _build_prompt(context)
