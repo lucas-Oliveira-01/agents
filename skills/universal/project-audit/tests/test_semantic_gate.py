@@ -264,3 +264,87 @@ def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path
     assert persisted_item.attempts[1].receipt_ref == result.receipt.receipt_id
     assert result.evidence is not None
     assert orchestrator.store.list_evidence_ids()
+
+
+def test_semantic_auditor_rejects_location_outside_context(tmp_path: Path) -> None:
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    discovery = discover(tmp_path)
+    prepared = prepare_audit(
+        discovery,
+        classify_files(discovery),
+        classify_applicability(discovery, classify_stack(discovery)),
+    )
+    work_item = next(
+        item for item in prepared.work_items
+        if not item.target_surface.startswith("SECURITY/")
+    )
+    work_item.data_egress_policy = EgressPolicy(
+        destination=EgressDestination.APPROVED_EXTERNAL,
+        allow_sensitive=True,
+    )
+
+    backend = FakeBackend({
+        "findings": [{
+            "title": "Invalid location",
+            "category": "CODE_QUALITY",
+            "subcategory": "STATIC_REVIEW",
+            "type": "TECHNICAL_DEFECT",
+            "status": "PROBABLE",
+            "severity": "P2",
+            "confidence": "MEDIUM",
+            "location": {"file": "src/missing.py", "line": 1},
+            "evidence": "Evidence",
+            "description": "Description",
+        }]
+    })
+    auditor = SemanticAuditor(WorkerPort(backend, "test-semantic"))
+    result = auditor.review(
+        work_item,
+        _run_for(prepared, work_item),
+        build_context(discovery, work_item.target_surface),
+    )
+
+    assert result.status == "INVALID_OUTPUT"
+    assert result.evidence is None
+
+
+def test_semantic_auditor_rejects_location_beyond_context_lines(tmp_path: Path) -> None:
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    discovery = discover(tmp_path)
+    prepared = prepare_audit(
+        discovery,
+        classify_files(discovery),
+        classify_applicability(discovery, classify_stack(discovery)),
+    )
+    work_item = next(
+        item for item in prepared.work_items
+        if not item.target_surface.startswith("SECURITY/")
+    )
+    work_item.data_egress_policy = EgressPolicy(
+        destination=EgressDestination.APPROVED_EXTERNAL,
+        allow_sensitive=True,
+    )
+
+    backend = FakeBackend({
+        "findings": [{
+            "title": "Invalid line",
+            "category": "CODE_QUALITY",
+            "subcategory": "STATIC_REVIEW",
+            "type": "TECHNICAL_DEFECT",
+            "status": "PROBABLE",
+            "severity": "P2",
+            "confidence": "MEDIUM",
+            "location": {"file": "src/app.py", "line": 99},
+            "evidence": "Evidence",
+            "description": "Description",
+        }]
+    })
+    auditor = SemanticAuditor(WorkerPort(backend, "test-semantic"))
+    result = auditor.review(
+        work_item,
+        _run_for(prepared, work_item),
+        build_context(discovery, work_item.target_surface),
+    )
+
+    assert result.status == "INVALID_OUTPUT"
+    assert result.evidence is None
