@@ -21,6 +21,7 @@ def run_audit_normalize(
     output_dir: str,
     base_dir: Optional[str] = None,
     command: str = "audit-normalize",
+    timeout_seconds: int = 300,
 ) -> NormalizationResult:
     """Invoke audit-normalize only on the Markdown artifacts from this audit run."""
     argv = [command, "-i"] + list(input_paths) + ["-o", output_dir]
@@ -33,6 +34,7 @@ def run_audit_normalize(
             check=False,
             capture_output=True,
             text=True,
+            timeout=timeout_seconds,
         )
     except FileNotFoundError as exc:
         return NormalizationResult(
@@ -42,6 +44,15 @@ def run_audit_normalize(
             output_dir=output_dir,
             stdout="",
             stderr=str(exc),
+        )
+    except subprocess.TimeoutExpired as exc:
+        return NormalizationResult(
+            status="FAILED",
+            command=tuple(argv),
+            return_code=None,
+            output_dir=output_dir,
+            stdout=exc.stdout or "",
+            stderr="audit-normalize timed out after {} seconds".format(timeout_seconds),
         )
     except OSError as exc:
         return NormalizationResult(
