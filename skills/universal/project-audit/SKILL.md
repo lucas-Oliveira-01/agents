@@ -52,6 +52,9 @@ Implemented:
 - `TargetSnapshot` creation;
 - `AuditPlan`/`AuditWorkItem` preparation;
 - real deterministic Engineering PASS 1 execution;
+- conservative progressive context selection;
+- sensitivity/egress classification with fail-closed behavior;
+- gated semantic-review capability with structured output validation;
 - execution receipts and Evidence persistence for completed engineering work.
 
 Not implemented yet:
