@@ -49,17 +49,21 @@ def execute_engineering_pass(
     work_items: List[AuditWorkItem],
     auditor: Optional[EngineeringAuditor] = None,
     semantic_worker: Optional[SemanticAuditor] = None,
+    target_snapshot: Optional[object] = None,
 ) -> EngineeringPassResult:
     """Execute only non-security WorkItems as PASS 1 of the single-agent audit."""
     auditor = auditor or EngineeringAuditor()
 
-    snapshot = build_target_snapshot(discovery)
+    snapshot = target_snapshot or build_target_snapshot(discovery)
     if snapshot.snapshot_fingerprint != plan.target_snapshot_ref:
         raise ValueError(
             "Discovery state does not match the AuditPlan target snapshot. "
             "Refuse to execute against a different target."
         )
     orchestrator.commit_snapshot(snapshot)
+    current_snapshot = build_target_snapshot(discovery, target_mode=snapshot.target_mode)
+    if current_snapshot.snapshot_fingerprint != snapshot.snapshot_fingerprint:
+        raise ValueError("Snapshot drift detected before Engineering PASS 1 execution.")
     orchestrator.freeze_and_commit_plan(plan)
 
     run = AuditRun(
