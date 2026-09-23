@@ -196,7 +196,7 @@ class SemanticAuditor:
 
         started = datetime.now(timezone.utc)
         prompt = _build_prompt(context)
-        receipt, delegated_evidence = self.worker_port.execute_delegation(
+        execution = self.worker_port.execute_delegation(
             work_item,
             {
                 "prompt": prompt,
@@ -207,6 +207,9 @@ class SemanticAuditor:
             data_is_sensitive=sensitivity.is_sensitive,
             target_snapshot_ref=run.target_snapshot_ref,
         )
+        receipt = execution.receipt
+        delegated_evidence = execution.evidence
+        delegated_result = execution.result
 
         if receipt.exit_code == 126:
             return SemanticReviewResult(
@@ -233,8 +236,9 @@ class SemanticAuditor:
             )
 
         try:
-            payload = self._extract_payload(delegated_evidence, context, receipt)
-            candidates = _parse_output(payload)
+            if delegated_result is None or delegated_result.output_payload is None:
+                raise SemanticOutputError("semantic worker returned no output payload")
+            candidates = _parse_output(delegated_result.output_payload)
         except SemanticOutputError:
             return SemanticReviewResult(
                 work_item.work_item_id,
@@ -266,15 +270,6 @@ class SemanticAuditor:
             self._fingerprint(delegated_evidence),
             receipt,
             evidence,
-        )
-
-    @staticmethod
-    def _extract_payload(evidence: Evidence, context: ContextBundle, receipt: object) -> Any:
-        # The worker evidence currently stores only the output fingerprint.
-        # SemanticReviewResult therefore requires a backend contract capable of
-        # exposing the actual output payload in a future extension.
-        raise SemanticOutputError(
-            "delegation output payload is not available through Evidence alone"
         )
 
     @staticmethod
