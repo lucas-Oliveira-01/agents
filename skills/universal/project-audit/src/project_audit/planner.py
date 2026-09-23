@@ -41,23 +41,53 @@ class PreparedAudit:
 
 
 def _working_tree_state(snapshot: DiscoverySnapshot) -> WorkingTreeState:
-    if not snapshot.git.is_repository:
+    if not snapshot.git.is_repository or snapshot.git.working_tree_dirty is None:
         return WorkingTreeState.DIRTY
-    if snapshot.git.working_tree_dirty:
+
+    tracked = set(snapshot.git.tracked_paths)
+    status_path = snapshot.root
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+            cwd=status_path,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
         return WorkingTreeState.DIRTY
-    return WorkingTreeState.CLEAN
+
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    if not lines:
+        return WorkingTreeState.CLEAN
+
+    only_untracked = all(line.startswith("?? ") for line in lines)
+    return WorkingTreeState.UNTRACKED_ONLY if only_untracked else WorkingTreeState.DIRTY
+
 
 
 def _input_fingerprints(snapshot: DiscoverySnapshot, target_mode: TargetMode) -> Tuple[TrackedInputFingerprint, ...]:
+    critical_names = {
+        "pyproject.toml", "pom.xml", "build.gradle", "build.gradle.kts",
+        "package.json", "requirements.txt", "cargo.toml", "go.mod",
+        "dockerfile", "docker-compose.yml", "docker-compose.yaml",
+        "compose.yml", "compose.yaml", ".gitignore",
+    }
     tracked = set(snapshot.git.tracked_paths)
     rows = []
     for item in snapshot.files:
-        if target_mode == TargetMode.COMMIT and snapshot.git.is_repository and item.path not in tracked:
+        path_name = item.path.rsplit("/", 1)[-1].lower()
+        if path_name not in critical_names and not item.path.startswith(".github/workflows/"):
+            continue
+        if snapshot.git.is_repository and item.path not in tracked:
             continue
         if item.binary or not item.sha256:
             continue
         rows.append(TrackedInputFingerprint(item.path, item.sha256))
     return tuple(sorted(rows, key=lambda item: item.path))
+
 
 
 def _default_policies() -> Tuple[ExecutionPolicy, EgressPolicy]:
