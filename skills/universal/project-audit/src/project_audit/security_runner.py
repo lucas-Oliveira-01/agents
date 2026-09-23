@@ -126,19 +126,28 @@ def execute_security_pass(
         item for item in work_items
         if item.execution_state != ExecutionState.TERMINATED
     ]
+    blocked = [
+        item for item in work_items
+        if item.failure_state == WorkItemFailureState.SAFETY_BLOCK
+    ]
     failed = [
         item for item in work_items
-        if item.failure_state != WorkItemFailureState.NONE
+        if item.failure_state not in {WorkItemFailureState.NONE, WorkItemFailureState.SAFETY_BLOCK}
+    ]
+    succeeded = [
+        item for item in work_items
+        if item.execution_state == ExecutionState.TERMINATED
+        and item.failure_state == WorkItemFailureState.NONE
     ]
 
-    if failed:
-        run.execution_completeness = (
-            RunExecutionCompleteness.FAILED
-            if all(item.execution_state == ExecutionState.TERMINATED for item in work_items)
-            else RunExecutionCompleteness.PARTIAL
-        )
-        run.failure_state = RunFailureState.INFRA_ERROR
-        run.coverage_completeness = RunCoverageCompleteness.PARTIAL
+    if blocked or failed:
+        if not succeeded and blocked and not failed:
+            run.execution_completeness = RunExecutionCompleteness.BLOCKED
+            run.coverage_completeness = RunCoverageCompleteness.NONE
+        else:
+            run.execution_completeness = RunExecutionCompleteness.PARTIAL
+            run.coverage_completeness = RunCoverageCompleteness.PARTIAL
+        run.failure_state = RunFailureState.INFRA_ERROR if failed else RunFailureState.SAFETY_BLOCK
     elif pending:
         run.execution_completeness = RunExecutionCompleteness.PARTIAL
         run.coverage_completeness = RunCoverageCompleteness.PARTIAL
