@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from .models import AuditWorkItem, Evidence, ExecutionReceipt, ExecutionPolicy, Provenance
+from .models import AuditWorkItem, Evidence, ExecutionReceipt, ExecutionPolicy, Provenance, EvidenceValidity
 from .validators import validate_egress_policy
 
 
@@ -86,7 +86,12 @@ class WorkerPort:
         self.actor_identity = actor_identity
 
     def execute_delegation(
-        self, work_item: AuditWorkItem, context_payload: Dict[str, Any], started_at: datetime
+        self,
+        work_item: AuditWorkItem,
+        context_payload: Dict[str, Any],
+        started_at: datetime,
+        data_is_sensitive: Optional[bool] = None,
+        target_snapshot_ref: Optional[str] = None,
     ) -> tuple[ExecutionReceipt, Optional[Evidence]]:
         """
         Translates a WorkItem into a DelegationRequest, executes it via the backend,
@@ -97,7 +102,7 @@ class WorkerPort:
         # Security Egress Check
         # Sensitivity classification V1.1 is missing, so we default to UNKNOWN (None).
         # This triggers fail-closed evaluation per ADR-05.
-        egress_check = validate_egress_policy(work_item, data_is_sensitive=None)
+        egress_check = validate_egress_policy(work_item, data_is_sensitive=data_is_sensitive)
         if egress_check.is_error:
             finished_at = datetime.now(timezone.utc)
             receipt = ExecutionReceipt(
@@ -140,7 +145,7 @@ class WorkerPort:
 
         # 2. Build Evidence on success
         evidence = None
-        if result.status == DelegationStatus.SUCCESS and result.output_payload:
+        if result.status == DelegationStatus.SUCCESS and result.output_payload and target_snapshot_ref:
             import hashlib
             
             # Deterministic serialization for fingerprint
@@ -149,11 +154,11 @@ class WorkerPort:
 
             evidence = Evidence(
                 evidence_id=str(uuid.uuid4()),
-                target_snapshot_ref="PENDING",  # Orchestrator binds this
+                target_snapshot_ref=target_snapshot_ref,
                 work_item_ref=work_item.work_item_id,
                 source_refs=(),
                 dependencies=(),
-                validity=None,  # Not validated yet
+                validity=EvidenceValidity.NOT_DETERMINABLE,
                 provenance=Provenance(
                     actor=f"{self.actor_identity} via {result.provider_info or 'unknown'}",
                     generated_at=finished_at,
