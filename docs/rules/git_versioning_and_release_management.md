@@ -103,7 +103,18 @@ Do not use `feat` merely because a file was modified. Classify the semantic effe
 
 The default branch represents the stable repository state.
 
-Development work should occur on short-lived branches when the change is sufficiently large, risky or experimental.
+The default branch must not be used as a normal development workspace.
+
+All versioned changes must be prepared on short-lived topic branches before
+they are merged into the default branch. This applies to code, skills,
+repository rules, configuration, documentation procedures, schemas, tests and
+release artifacts.
+
+Committing directly to the default branch is reserved for exceptional emergency
+repairs when a branch-and-review path is unavailable and delaying the fix would
+leave the repository or runtime in a materially worse state. The exception and
+validation performed must be documented in the commit message or follow-up
+release notes.
 
 Recommended naming:
 
@@ -125,6 +136,43 @@ test/security-audit-regressions
 ```
 
 Do not create long-lived branches without a concrete maintenance reason.
+
+## Pull requests
+
+The standard integration path is:
+
+```text
+topic branch
+    ↓
+local validation
+    ↓
+pull request
+    ↓
+review / automated checks
+    ↓
+merge into default branch
+```
+
+Pull requests are required for non-trivial changes and are the default for all
+agent-authored changes. A pull request should make the change reviewable before
+integration into the default branch.
+
+A pull request must state:
+
+```text
+what changed
+why it changed
+affected skills, rules or runtime paths
+validation performed
+known limitations or follow-up work
+```
+
+Do not merge a pull request that mixes unrelated work merely because the changes
+happened in the same session.
+
+Do not treat "the agent finished editing files" as approval to merge. Merge only
+after the required validation has passed and the repository's review policy has
+been satisfied.
 
 ## Before committing
 
