@@ -5,36 +5,10 @@ from typing import List
 
 from .context_builder import build_context
 from .discovery import DiscoverySnapshot
-from .models import (
-    AuditRun,
-    AuditWorkItem,
-    ExecutionState,
-    RunCoverageCompleteness,
-    RunExecutionCompleteness,
-    RunFailureState,
-    WorkItemFailureState,
-)
+from .models import AuditRun, AuditWorkItem, ExecutionState, WorkItemFailureState
 from .orchestrator import Orchestrator
 from .planner import build_target_snapshot
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
-
-
-def _persist_run_state(
-    orchestrator: Orchestrator,
-    run: AuditRun,
-) -> List[AuditWorkItem]:
-    work_items = [
-        orchestrator.store.load_work_item(work_item_id)
-        for work_item_id in run.work_item_refs
-    ]
-    plan = orchestrator.store.load_plan(run.plan_ref, work_items=work_items)
-    orchestrator.commit_run(
-        run,
-        plan,
-        work_items,
-        known_run_ids=orchestrator.store.list_run_ids(),
-    )
-    return work_items
 
 
 def execute_semantic_review(
@@ -74,11 +48,7 @@ def execute_semantic_review(
             receipt_ref=result.receipt.receipt_id,
         )
         work_item.terminate(failure_state=WorkItemFailureState.SAFETY_BLOCK)
-        run.execution_completeness = RunExecutionCompleteness.PARTIAL
-        run.coverage_completeness = RunCoverageCompleteness.PARTIAL
-        run.failure_state = RunFailureState.SAFETY_BLOCK
         orchestrator.commit_work_item(work_item)
-        _persist_run_state(orchestrator, run)
         return result
 
     if result.status == "FAILED":
@@ -88,11 +58,7 @@ def execute_semantic_review(
             receipt_ref=result.receipt.receipt_id,
         )
         work_item.terminate(failure_state=WorkItemFailureState.INFRA_ERROR)
-        run.execution_completeness = RunExecutionCompleteness.PARTIAL
-        run.coverage_completeness = RunCoverageCompleteness.PARTIAL
-        run.failure_state = RunFailureState.INFRA_ERROR
         orchestrator.commit_work_item(work_item)
-        _persist_run_state(orchestrator, run)
         return result
 
     if result.status == "INVALID_OUTPUT":
@@ -126,28 +92,8 @@ def execute_semantic_review(
     work_item.terminate(failure_state=WorkItemFailureState.NONE)
     orchestrator.commit_work_item(work_item)
 
-    current_items = [
-        orchestrator.store.load_work_item(work_item_id)
-        for work_item_id in run.work_item_refs
-    ]
-    all_terminal = bool(current_items) and all(
-        item.execution_state == ExecutionState.TERMINATED
-        for item in current_items
-    )
-    any_failure = any(
-        item.failure_state != WorkItemFailureState.NONE
-        for item in current_items
-    )
-    run.execution_completeness = (
-        RunExecutionCompleteness.COMPLETE
-        if all_terminal and not any_failure
-        else RunExecutionCompleteness.PARTIAL
-    )
-    run.coverage_completeness = (
-        RunCoverageCompleteness.FULL
-        if all_terminal and not any_failure
-        else RunCoverageCompleteness.PARTIAL
-    )
-    run.failure_state = RunFailureState.NONE
-    _persist_run_state(orchestrator, run)
+    orchestrator.commit_evidence(result.evidence, work_item)
+    work_item.terminate(failure_state=WorkItemFailureState.NONE)
+    orchestrator.commit_work_item(work_item)
+
     return result
