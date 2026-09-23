@@ -12,6 +12,7 @@ from .models import (
     RunPublicationState, WorkItemFailureState,
 )
 from .orchestrator import Orchestrator
+from .planner import build_target_snapshot
 from .security_pass import DeterministicSecurityAuditor, SecurityInspectionResult
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 from .semantic_runner import execute_semantic_review
@@ -42,6 +43,23 @@ def execute_security_pass(
 ) -> SecurityPassResult:
     """Execute the reserved SECURITY/* WorkItems in the existing AuditRun."""
     auditor = auditor or DeterministicSecurityAuditor()
+
+    stored_snapshot = orchestrator.store.load_snapshot(run.target_snapshot_ref)
+    current_snapshot = build_target_snapshot(
+        discovery,
+        target_mode=stored_snapshot.target_mode,
+    )
+    if current_snapshot.snapshot_fingerprint != stored_snapshot.snapshot_fingerprint:
+        run.execution_completeness = RunExecutionCompleteness.PARTIAL
+        run.coverage_completeness = RunCoverageCompleteness.PARTIAL
+        run.failure_state = RunFailureState.SNAPSHOT_DRIFT
+        orchestrator.commit_run(
+            run,
+            plan,
+            work_items,
+            known_run_ids=orchestrator.store.list_run_ids(),
+        )
+        raise RuntimeError("Snapshot drift detected between Engineering PASS 1 and Security PASS 2.")
 
     inspections = []
     evidences = []
