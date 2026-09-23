@@ -269,8 +269,13 @@ def render_report(
         "",
         "## 24. Problemas Prioritários",
         "",
-        "No formal finding was emitted by the deterministic passes.",
-        "",
+    ])
+    semantic_markdown = render_semantic_findings(semantic_reviews)
+    if semantic_markdown:
+        lines.extend([semantic_markdown.rstrip(), ""])
+    else:
+        lines.append("No semantic findings were emitted in this run.")
+    lines.extend([
         "## 25. Plano de Evolução",
         "",
         "Add semantic confirmation, positive controls, final ledger semantics, and downstream audit-normalize integration.",
