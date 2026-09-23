@@ -88,3 +88,15 @@ The executable single-agent path now reaches:
 The remaining product gap is semantic audit interpretation: confirming observations, formalizing findings/controls, and producing the final audit semantics required by the canonical Markdown contract.
 
 No multi-agent runtime was introduced.
+
+
+## Semantic escalation boundary
+
+The current implementation can construct bounded context and classify its sensitivity before delegation. The semantic worker is injectable rather than automatically connected to an external model.
+
+Default behavior is fail-closed:
+
+text flow:
+context -> sensitivity UNKNOWN -> egress.allow_sensitive=false -> BLOCKED
+
+A semantic call requires an already-authorized WorkerPort backend and an explicit policy capable of allowing the classified data. OmniRoute remains an infrastructure gateway; project-audit does not select provider or concrete model.
