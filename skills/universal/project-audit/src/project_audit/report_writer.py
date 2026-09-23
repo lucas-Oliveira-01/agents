@@ -5,6 +5,7 @@ from typing import Dict, Iterable
 
 from .engineering_runner import EngineeringPassResult
 from .planner import PreparedAudit
+from .discovery import DiscoverySnapshot
 from .security_runner import SecurityPassResult
 
 
@@ -24,19 +25,19 @@ def _inspection_result(observations: Iterable[object]) -> str:
     return "NOT_DETERMINABLE"
 
 
-def _identity(prepared: PreparedAudit) -> Dict[str, str]:
+def _identity(prepared: PreparedAudit, discovery: DiscoverySnapshot) -> Dict[str, str]:
     project = prepared.snapshot.project_state
     return {
         "repository": project.repository_identity,
         "commit": project.revision_identity,
-        "branch": "NOT_DETERMINABLE",
+        "branch": discovery.git.branch or "NOT_DETERMINABLE",
         "version": "NOT_DETERMINABLE",
         "build_version": "NOT_DETERMINABLE",
     }
 
 
-def render_inventory(prepared: PreparedAudit) -> str:
-    identity = _identity(prepared)
+def render_inventory(prepared: PreparedAudit, discovery: DiscoverySnapshot) -> str:
+    identity = _identity(prepared, discovery)
     lines = [
         "# INVENTORY AND THREAT MODEL",
         "",
@@ -85,6 +86,7 @@ def render_inventory(prepared: PreparedAudit) -> str:
 
 def render_coverage(
     prepared: PreparedAudit,
+    discovery: DiscoverySnapshot,
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
 ) -> str:
@@ -149,7 +151,7 @@ def render_report(
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
 ) -> str:
-    identity = _identity(prepared)
+    identity = _identity(prepared, discovery)
     engineering_obs = [o for r in engineering.inspections for o in r.observations]
     security_obs = [o for r in security.inspections for o in r.observations]
     lines = [
@@ -326,6 +328,7 @@ def render_ledger(
 def write_audit_artifacts(
     output_dir: str,
     prepared: PreparedAudit,
+    discovery: DiscoverySnapshot,
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
 ) -> Dict[str, str]:
@@ -336,8 +339,8 @@ def write_audit_artifacts(
         "report": str(root / "02_analytical_report.md"),
         "ledger": str(root / "03_audit_ledger.md"),
     }
-    _write(Path(paths["inventory"]), render_inventory(prepared))
+    _write(Path(paths["inventory"]), render_inventory(prepared, discovery))
     _write(Path(paths["coverage"]), render_coverage(prepared, engineering, security))
-    _write(Path(paths["report"]), render_report(prepared, engineering, security))
+    _write(Path(paths["report"]), render_report(prepared, discovery, engineering, security))
     _write(Path(paths["ledger"]), render_ledger(engineering, security))
     return paths
