@@ -98,3 +98,43 @@ def test_omniroute_backend_handles_exceptions_gracefully():
     assert result.status == DelegationStatus.FAILED
     assert "Connection refused" in result.error_message
     assert result.provider_info == "omniroute/exception"
+
+
+def test_omniroute_backend_factory_uses_discovered_schema_filtering() -> None:
+    class FakeClient:
+        def __init__(self):
+            self.called = None
+            self.filtered = None
+
+        def filter_optional_params(self, tool, arguments):
+            self.filtered = dict(arguments)
+            self.filtered.pop("temperature", None)
+            return self.filtered
+
+        def call_tool(self, tool, arguments):
+            self.called = (tool, arguments)
+            return {"content": [{"type": "text", "text": '{"findings": []}'}]}
+
+    from project_audit.omniroute_backend import create_backend_from_mcp_client
+
+    client = FakeClient()
+    backend = create_backend_from_mcp_client(client)
+    result = backend.delegate(_request())
+
+    assert result.status == DelegationStatus.SUCCESS
+    assert client.called is not None
+    assert client.called[0] == "delegar_tarefa"
+    assert "temperature" not in client.called[1]
+
+
+def test_omniroute_backend_factory_rejects_incompatible_client() -> None:
+    from project_audit.omniroute_backend import (
+        OmniRouteBackendConfigurationError,
+        create_backend_from_mcp_client,
+    )
+
+    try:
+        create_backend_from_mcp_client(object())
+    except OmniRouteBackendConfigurationError:
+        return
+    raise AssertionError("incompatible client was accepted")
