@@ -62,8 +62,7 @@ class MCPOmniRouteBackend(DelegationBackend):
                 usage_tokens=0,
             )
 
-    @staticmethod
-    def _build_arguments(request: DelegationRequest) -> Dict[str, Any]:
+    def _build_arguments(self, request: DelegationRequest) -> Dict[str, Any]:
         try:
             if self._task_builder_factory is not None:
                 TaskBuilder = self._task_builder_factory
