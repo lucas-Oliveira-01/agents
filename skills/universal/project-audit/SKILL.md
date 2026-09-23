@@ -73,3 +73,12 @@ Not implemented yet:
 Engineering PASS 1 is read-only and uses deterministic inspection. Security work items are intentionally left for PASS 2.
 
 The engine must not claim full audit publication merely because PASS 1 completed.
+
+
+## Runtime safety constraints
+
+- `WORKTREE` is the default target and represents the discovered filesystem.
+- `COMMIT` is accepted only when the target is a Git repository with a clean working tree; the current implementation does not checkout or materialize another commit.
+- Semantic escalation is opt-in through the `semantic_worker` API.
+- Supplying a semantic worker without an explicit `semantic_egress_policy` is rejected.
+- Semantic work uses a second `Attempt` on the same `AuditWorkItem`; the item is not reopened after termination.
