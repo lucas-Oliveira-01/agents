@@ -26,6 +26,7 @@ from .report_writer import write_audit_artifacts
 from .runtime import FullAuditResult, run_full_audit
 from .normalization_runner import NormalizationResult, run_audit_normalize
 from .delegation import WorkerExecution
+from .omniroute_backend import MCPOmniRouteBackend, create_backend_from_mcp_client, create_local_omniroute_backend
 from .models import (
     TargetSnapshot, AuditPlan, AuditWorkItem, Attempt, ExecutionReceipt, Evidence, AuditRun,
     WorkItemAction, ExecutionState, WorkItemFailureState, RunExecutionCompleteness,
@@ -41,6 +42,10 @@ __all__ = [
     "DiscoverySnapshot", "FileRecord", "GitMetadata", "discover",
     "EngineeringAuditor", "EngineeringInspectionResult", "Observation",
     "EngineeringPassResult", "execute_engineering_pass",
+    "SemanticAuditor", "SemanticFindingCandidate", "SemanticReviewResult", "execute_semantic_review",
+    "ContextBundle", "ContextItem", "build_context",
+    "SensitivityAssessment", "SensitivityState", "aggregate_assessments", "assess_text",
+    "WorkerExecution",
     "DeterministicSecurityAuditor", "SecurityInspectionResult", "SecurityObservation", "SecurityPassResult", "execute_security_pass", "write_audit_artifacts", "NormalizationResult", "run_audit_normalize",
     "TargetSnapshot", "AuditPlan", "AuditWorkItem", "Attempt", "ExecutionReceipt", "Evidence", "AuditRun",
     "WorkItemAction", "ExecutionState", "WorkItemFailureState", "RunExecutionCompleteness",
@@ -48,4 +53,5 @@ __all__ = [
     "EvidenceValidity", "FindingLifecycle", "FindingFingerprint", "Provenance", "ExecutionPolicy",
     "EgressPolicy", "FilesystemAccess", "NetworkAccess", "CredentialAccess", "EgressDestination",
     "TargetMode", "WorkingTreeState",
+    "MCPOmniRouteBackend", "create_backend_from_mcp_client", "create_local_omniroute_backend",
 ]
