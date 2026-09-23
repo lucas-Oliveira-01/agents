@@ -8,6 +8,7 @@ from .discovery import discover
 from .engineering_runner import execute_engineering_pass
 from .security_runner import execute_security_pass
 from .report_writer import write_audit_artifacts
+from .normalization_runner import run_audit_normalize
 from .orchestrator import Orchestrator
 from .planner import prepare_audit
 from .state_store import StateStore
@@ -30,6 +31,8 @@ def main() -> int:
     parser.add_argument("--no-persist", action="store_true", help="Do not persist state during prepare phase")
     parser.add_argument("--output-dir", default=None, help="Audit Markdown output directory (default: <target>/docs/audit)")
     parser.add_argument("--overwrite-audit", action="store_true", help="Explicitly allow replacing existing audit artifacts")
+    parser.add_argument("--normalize", action="store_true", help="Invoke audit-normalize after Markdown generation")
+    parser.add_argument("--normalize-command", default="audit-normalize", help="Downstream audit-normalize executable")
     args = parser.parse_args()
 
     discovery = discover(args.target)
@@ -79,6 +82,24 @@ def main() -> int:
             print(f"run={final_run.run_id}")
             print(f"artifacts={len(artifacts)}")
             print(f"output_dir={output_dir}")
+            if args.normalize:
+                normalized_dir = str(Path(output_dir) / "normalized")
+                normalization = run_audit_normalize(
+                    output_dir,
+                    normalized_dir,
+                    base_dir=str(discovery.root),
+                    command=args.normalize_command,
+                )
+                print(f"normalization={normalization.status}")
+                print(f"normalization_return_code={normalization.return_code}")
+                if normalization.stdout:
+                    print(normalization.stdout.rstrip())
+                if normalization.stderr:
+                    print(normalization.stderr.rstrip())
+                if normalization.status == "FAILED":
+                    return 3
+                if normalization.status == "NOT_EXECUTED":
+                    return 4
         return 0
 
     if not args.no_persist:
