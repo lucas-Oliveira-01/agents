@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime, timezone
 
 from project_audit.classifiers import classify_applicability, classify_files, classify_stack
 from project_audit.context_builder import build_context
@@ -182,3 +183,88 @@ def test_semantic_auditor_rejects_invalid_worker_output(tmp_path: Path) -> None:
 
     assert result.status == "INVALID_OUTPUT"
     assert result.evidence is None
+
+
+def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path) -> None:
+    from project_audit.semantic_runner import execute_semantic_review
+    from project_audit.state_store import StateStore
+    from project_audit.orchestrator import Orchestrator
+
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    discovery = discover(tmp_path)
+    prepared = prepare_audit(
+        discovery,
+        classify_files(discovery),
+        classify_applicability(discovery, classify_stack(discovery)),
+    )
+    work_item = next(
+        item for item in prepared.work_items
+        if item.target_surface.startswith("SECURITY/")
+    )
+    work_item.data_egress_policy = EgressPolicy(
+        destination=EgressDestination.APPROVED_EXTERNAL,
+        allow_sensitive=True,
+    )
+    prepared.plan.egress_policy = work_item.data_egress_policy
+    orchestrator = Orchestrator(StateStore(tmp_path / ".audit-state"))
+    orchestrator.commit_snapshot(prepared.snapshot)
+    orchestrator.freeze_and_commit_plan(prepared.plan)
+
+    from project_audit.models import (
+        RunBudgetState,
+        RunPublicationState,
+        WorkItemFailureState,
+    )
+    work_item.plan_ref = prepared.plan.plan_id
+    orchestrator.commit_work_item(work_item)
+    first = work_item.start_attempt()
+    first.finish(
+        datetime.now(timezone.utc),
+        exit_code=0,
+        receipt_ref="deterministic-receipt",
+    )
+    work_item.execution_state = ExecutionState.RUNNING
+    orchestrator.commit_work_item(work_item)
+
+    backend = FakeBackend({
+        "findings": [{
+            "title": "Semantic candidate",
+            "category": "SECURITY",
+            "subcategory": "AUTHENTICATION",
+            "type": "RISK",
+            "status": "PROBABLE",
+            "severity": "P2",
+            "confidence": "MEDIUM",
+            "location": {"file": "src/app.py", "line": 1},
+            "evidence": "Observed semantic evidence.",
+            "description": "Candidate requires confirmation.",
+        }]
+    })
+    worker = SemanticAuditor(WorkerPort(backend, "test-semantic"))
+    run = AuditRun(
+        run_id="run-semantic",
+        target_snapshot_ref=prepared.snapshot.snapshot_fingerprint,
+        plan_ref=prepared.plan.plan_id,
+        work_item_refs=[work_item.work_item_id],
+        execution_completeness=RunExecutionCompleteness.RUNNING,
+        coverage_completeness=RunCoverageCompleteness.PARTIAL,
+        failure_state=RunFailureState.NONE,
+        budget_state=RunBudgetState.HEALTHY,
+        publication_state=RunPublicationState.NOT_PUBLISHED,
+    )
+
+    result = execute_semantic_review(
+        orchestrator,
+        discovery,
+        run,
+        work_item,
+        worker,
+    )
+
+    persisted_item = orchestrator.store.load_work_item(work_item.work_item_id)
+    assert result.status == "COMPLETED"
+    assert persisted_item.execution_state == ExecutionState.TERMINATED
+    assert len(persisted_item.attempts) == 2
+    assert persisted_item.attempts[1].receipt_ref == result.receipt.receipt_id
+    assert result.evidence is not None
+    assert orchestrator.store.list_evidence_ids()
