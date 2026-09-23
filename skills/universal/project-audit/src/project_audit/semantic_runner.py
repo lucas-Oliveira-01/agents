@@ -6,6 +6,7 @@ from typing import List
 from .context_builder import build_context
 from .discovery import DiscoverySnapshot
 from .models import (
+    AuditPlan,
     AuditRun,
     AuditWorkItem,
     ExecutionState,
@@ -21,15 +22,19 @@ from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 def _persist_run_state(
     orchestrator: Orchestrator,
     run: AuditRun,
-    plan_ref: str,
-    work_items: List[AuditWorkItem],
-) -> None:
+) -> List[AuditWorkItem]:
+    work_items = [
+        orchestrator.store.load_work_item(work_item_id)
+        for work_item_id in run.work_item_refs
+    ]
+    plan = orchestrator.store.load_plan(run.plan_ref, work_items=work_items)
     orchestrator.commit_run(
         run,
-        orchestrator.store.load_plan(plan_ref, work_items=work_items),
+        plan,
         work_items,
         known_run_ids=orchestrator.store.list_run_ids(),
     )
+    return work_items
 
 
 def execute_semantic_review(
@@ -64,12 +69,7 @@ def execute_semantic_review(
         run.coverage_completeness = RunCoverageCompleteness.PARTIAL
         run.failure_state = RunFailureState.SAFETY_BLOCK
         orchestrator.commit_work_item(work_item)
-        orchestrator.commit_run(
-            run,
-            orchestrator.store.load_plan(run.plan_ref, work_items=[work_item]),
-            [work_item],
-            known_run_ids=orchestrator.store.list_run_ids(),
-        )
+        _persist_run_state(orchestrator, run)
         return result
 
     if result.status == "FAILED":
@@ -122,9 +122,25 @@ def execute_semantic_review(
     work_item.terminate(failure_state=WorkItemFailureState.NONE)
     orchestrator.commit_work_item(work_item)
 
-    run.execution_completeness = RunExecutionCompleteness.COMPLETE
-    run.coverage_completeness = RunCoverageCompleteness.FULL
+    current_items = _persist_run_state(orchestrator, run)
+    all_terminal = bool(current_items) and all(
+        item.execution_state == ExecutionState.TERMINATED
+        for item in current_items
+    )
+    any_failure = any(
+        item.failure_state != WorkItemFailureState.NONE
+        for item in current_items
+    )
+    run.execution_completeness = (
+        RunExecutionCompleteness.COMPLETE
+        if all_terminal and not any_failure
+        else RunExecutionCompleteness.PARTIAL
+    )
+    run.coverage_completeness = (
+        RunCoverageCompleteness.FULL
+        if all_terminal and not any_failure
+        else RunCoverageCompleteness.PARTIAL
+    )
     run.failure_state = RunFailureState.NONE
-
-    _persist_run_state(orchestrator, run, run.plan_ref, [work_item])
+    _persist_run_state(orchestrator, run)
     return result
