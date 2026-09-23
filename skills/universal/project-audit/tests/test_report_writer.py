@@ -57,3 +57,33 @@ def test_report_writer_emits_required_four_markdown_artifacts(tmp_path: Path) ->
     assert "INSPECTION COVERAGE" in Path(paths["coverage"]).read_text(encoding="utf-8")
     assert "Security Review" in Path(paths["report"]).read_text(encoding="utf-8")
     assert "AUDIT LEDGER" in Path(paths["ledger"]).read_text(encoding="utf-8")
+
+
+def test_report_writer_preflights_existing_artifact_set(tmp_path: Path) -> None:
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    discovery = discover(tmp_path)
+    prepared = prepare_audit(
+        discovery,
+        classify_files(discovery),
+        classify_applicability(discovery, classify_stack(discovery)),
+    )
+    orchestrator = Orchestrator(StateStore(tmp_path / ".audit-state"))
+    engineering = execute_engineering_pass(orchestrator, discovery, prepared.plan, list(prepared.work_items))
+    security = execute_security_pass(orchestrator, discovery, prepared.plan, list(prepared.work_items), engineering.run)
+
+    out = tmp_path / "docs" / "audit"
+    out.mkdir(parents=True)
+    existing = out / "00_inventory_and_threat_model.md"
+    existing.write_text("existing", encoding="utf-8")
+
+    try:
+        write_audit_artifacts(str(out), prepared, discovery, engineering, security)
+    except FileExistsError:
+        pass
+    else:
+        raise AssertionError("existing audit artifacts must block the whole write set")
+
+    assert existing.read_text(encoding="utf-8") == "existing"
+    assert not (out / "01_coverage_manifest.md").exists()
+    assert not (out / "02_analytical_report.md").exists()
+    assert not (out / "03_audit_ledger.md").exists()
