@@ -63,6 +63,19 @@ class DelegationResult:
     usage_tokens: Optional[int]
 
 
+@dataclasses.dataclass(frozen=True)
+class WorkerExecution:
+    """Execution envelope preserving backward-compatible tuple unpacking."""
+
+    receipt: ExecutionReceipt
+    evidence: Optional[Evidence]
+    result: Optional[DelegationResult]
+
+    def __iter__(self):
+        yield self.receipt
+        yield self.evidence
+
+
 class DelegationBackend(abc.ABC):
     """
     Abstract gateway to the execution layer.
@@ -92,7 +105,7 @@ class WorkerPort:
         started_at: datetime,
         data_is_sensitive: Optional[bool] = None,
         target_snapshot_ref: Optional[str] = None,
-    ) -> tuple[ExecutionReceipt, Optional[Evidence]]:
+    ) -> WorkerExecution:
         """
         Translates a WorkItem into a DelegationRequest, executes it via the backend,
         and translates the DelegationResult back into an ExecutionReceipt and Evidence.
@@ -117,7 +130,7 @@ class WorkerPort:
                 artifact_refs=[],
                 environment_summary=f"WorkerPort: {self.actor_identity} | error: {egress_check.message}",
             )
-            return receipt, None
+            return WorkerExecution(receipt, None, None)
 
         result = self.backend.delegate(request)
         finished_at = datetime.now(timezone.utc)
