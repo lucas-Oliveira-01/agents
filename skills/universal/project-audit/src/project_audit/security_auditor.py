@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from project_audit.models import (
+    AuditPlan,
     AuditWorkItem,
     TargetSnapshot,
     WorkItemAction,
@@ -71,7 +72,7 @@ class SecurityAuditor:
         self.scope = scope
         self.actor_identity = "security-auditor/v1"
 
-    def generate_work_items(self, plan_id: str) -> List[AuditWorkItem]:
+    def generate_work_items(self, plan: AuditPlan) -> List[AuditWorkItem]:
         """
         Generate one AuditWorkItem per tracked input in the TargetSnapshot.
 
@@ -83,13 +84,13 @@ class SecurityAuditor:
             items.append(
                 AuditWorkItem(
                     work_item_id=str(uuid.uuid4()),
-                    plan_ref=plan_id,
+                    plan_ref=plan.plan_id,
                     auditor="security-auditor",
                     target_surface=tracked.path,
                     action=WorkItemAction.REAUDIT,
                     decision_basis="Initial security scan for scope: " + self.scope,
-                    effective_execution_policy=None,   # Handled by plan/orchestrator
-                    data_egress_policy=None,           # Handled by plan/orchestrator
+                    effective_execution_policy=plan.execution_policy,
+                    data_egress_policy=plan.egress_policy,
                     execution_state=ExecutionState.PLANNED,
                     failure_state=WorkItemFailureState.NONE,
                     attempts=[],
@@ -127,7 +128,11 @@ class SecurityAuditor:
 
         # Delegate via WorkerPort (ADR-09: auditor does not own EgressPolicy)
         receipt, evidence = self.worker_port.execute_delegation(
-            work_item, context_payload, started_at=now
+            work_item,
+            context_payload,
+            started_at=now,
+            data_is_sensitive=True,
+            target_snapshot_ref=self.snapshot.snapshot_fingerprint,
         )
         return receipt, evidence
 

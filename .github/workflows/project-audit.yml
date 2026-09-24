@@ -1,0 +1,70 @@
+name: project-audit
+
+on:
+  push:
+    paths:
+      - "skills/universal/project-audit/**"
+      - "skills/universal/audit-normalize/**"
+      - "skills/universal/omniroute-delegation/**"
+      - ".github/workflows/project-audit.yml"
+  pull_request:
+    paths:
+      - "skills/universal/project-audit/**"
+      - "skills/universal/audit-normalize/**"
+      - "skills/universal/omniroute-delegation/**"
+      - ".github/workflows/project-audit.yml"
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.13"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install project-audit
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "skills/universal/project-audit[test]" -e "skills/universal/audit-normalize" -e "skills/universal/omniroute-delegation"
+
+      - name: Compile source
+        run: python -m compileall -q skills/universal/project-audit/src
+
+      - name: Run tests
+        run: python -m pytest -q skills/universal/project-audit/tests
+
+
+  normalize-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install audit pipeline
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "skills/universal/project-audit[test]"
+          python -m pip install -e "skills/universal/audit-normalize"
+
+      - name: Execute full audit and normalize
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          mkdir -p "$tmp/src"
+          printf "print('ok')\n" > "$tmp/src/app.py"
+          python -m project_audit --target "$tmp" --phase full --normalize --normalize-command audit-normalize

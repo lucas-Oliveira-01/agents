@@ -441,12 +441,33 @@ class TestPublicationEligibility:
             execution_completeness=completeness,
             coverage_completeness=RunCoverageCompleteness.FULL,
             failure_state=RunFailureState.NONE,
+            artifact_refs=[
+                "docs/audit/00_inventory.md",
+                "docs/audit/01_coverage.md",
+                "docs/audit/02_analytical.md",
+                "docs/audit/03_audit_ledger.md",
+            ],
         )
 
     def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot, work_item):
         run = self._make_run(audit_plan, target_snapshot)
         report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert not report.has_errors
+
+    def test_complete_run_without_audit_artifacts_is_not_publishable(self, audit_plan, target_snapshot, work_item):
+        run = AuditRun(
+            run_id=str(uuid.uuid4()),
+            target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+            plan_ref=audit_plan.plan_id,
+            work_item_refs=[work_item.work_item_id],
+            execution_completeness=RunExecutionCompleteness.COMPLETE,
+            coverage_completeness=RunCoverageCompleteness.FULL,
+            failure_state=RunFailureState.NONE,
+            artifact_refs=[],
+        )
+        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
+        error_codes = [r.code for r in report.errors()]
+        assert "PUBLISH_ARTIFACTS_MISSING" in error_codes
 
     def test_snapshot_drift_blocks_publication(self, audit_plan, target_snapshot, work_item):
         run = self._make_run(audit_plan, target_snapshot)

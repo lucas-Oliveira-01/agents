@@ -88,7 +88,7 @@ def validate_dict(entity_dict: dict, schema_name: str, schema_dir: Optional[Path
 
     errors: List[str] = []
     try:
-        format_checker = jsonschema.draft202012_format_checker
+        format_checker = jsonschema.Draft202012Validator.FORMAT_CHECKER
         if registry is not None:
             validator_cls = validator_for(schema)
             validator = validator_cls(schema, registry=registry, format_checker=format_checker)

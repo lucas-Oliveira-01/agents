@@ -1,18 +1,84 @@
 # project-audit — Core Engine V1
 
-Core orchestration engine for the project-audit skill system.
+Core orchestration engine for the `project-audit` skill system.
 
-Implements the Canonical Data Model (Layer 2) as defined in `docs/references/canonical-data-model.md`.
+The current product runtime is **single-agent**. Development may use Codex, Antigravity, and OpenCode, but those are not runtime auditors.
 
 ## Scope
 
 This package contains:
-- Domain types (TargetSnapshot, AuditPlan, AuditWorkItem, Evidence, AuditRun, Attempt, ExecutionReceipt)
-- Semantic Validators (pure, deterministic, no LLM)
-- State Store (local durable persistence with atomic writes)
+
+- Domain types (`TargetSnapshot`, `AuditPlan`, `AuditWorkItem`, `Evidence`, `AuditRun`, `Attempt`, `ExecutionReceipt`)
+- Deterministic discovery and classification
+- Single-agent Engineering PASS 1 executor
+- Semantic validators (pure, deterministic, no LLM)
+- State store (local durable persistence with atomic writes)
 - Core orchestration primitives
 - FakeAuditor for engine validation
 
-## Architecture
+## Current execution boundary
 
-See `docs/references/` for the frozen architectural baseline.
+```text
+Target Repository
+      |
+      v
+Deterministic Discovery
+      |
+      v
+File / Stack / Applicability Classification
+      |
+      v
+AuditPlan + WorkItems
+      |
+      v
+PASS 1 — Engineering
+      |
+      +--> deterministic observations + Evidence
+      |
+      v
+PASS 2 — Security
+```
+
+`audit-normalize` remains downstream and is not invoked by the core engine during this phase.
+
+## Phase status
+
+Implemented:
+
+- repository filesystem discovery;
+- read-only Git metadata discovery;
+- deterministic file and stack classification;
+- applicability decisions with explicit uncertainty;
+- `TargetSnapshot` creation;
+- `AuditPlan`/`AuditWorkItem` preparation;
+- real deterministic Engineering PASS 1 execution;
+- conservative progressive context selection;
+- sensitivity/egress classification with fail-closed behavior;
+- gated semantic-review capability with structured output validation;
+- execution receipts and Evidence persistence for completed engineering work.
+
+Not implemented yet:
+
+- semantic Engineering escalation;
+- independent Security PASS 2 execution;
+- final four-file Markdown audit output writer;
+- correlation between PASS 1 and PASS 2;
+- optional `audit-normalize` downstream handoff from the CLI; the normalizer remains a separate skill;
+- advanced incremental reuse/cache;
+- Evidence Dependency Graph;
+- multi-agent audit runtime.
+
+## Safety boundary
+
+Engineering PASS 1 is read-only and uses deterministic inspection. Security work items are intentionally left for PASS 2.
+
+The engine must not claim full audit publication merely because PASS 1 completed.
+
+
+## Runtime safety constraints
+
+- `WORKTREE` is the default target and represents the discovered filesystem.
+- `COMMIT` is accepted only when the target is a Git repository with a clean working tree; the current implementation does not checkout or materialize another commit.
+- Semantic escalation is opt-in through the `semantic_worker` API.
+- Supplying a semantic worker without an explicit `semantic_egress_policy` is rejected.
+- Semantic work uses a second `Attempt` on the same `AuditWorkItem`; the item is not reopened after termination.

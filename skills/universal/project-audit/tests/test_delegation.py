@@ -1,10 +1,11 @@
-import uuid
 """
 test_delegation.py — Tests for Delegation Boundary
 
 Tests the WorkerPort and DelegationBackend abstractions to ensure the Core Engine
 can delegate execution without coupling to OmniRoute or concrete models.
 """
+
+import uuid
 
 from datetime import datetime, timezone
 from typing import Any, Dict
@@ -53,7 +54,13 @@ def test_worker_port_success_translation():
     backend = FakeDelegationBackend(mock_result)
     port = WorkerPort(backend=backend, actor_identity="test-actor")
 
-    receipt, evidence = port.execute_delegation(wi, context, started_at)
+    receipt, evidence = port.execute_delegation(
+        wi,
+        context,
+        started_at,
+        data_is_sensitive=False,
+        target_snapshot_ref="a" * 64,
+    )
 
     # Validate Request sent to backend
     assert backend.last_request is not None
@@ -76,6 +83,10 @@ def test_worker_port_success_translation():
     # Fingerprint must be populated
     assert evidence.fingerprint is not None
     assert len(evidence.fingerprint) == 64
+    from project_audit.schema_validator import validate_evidence
+    assert validate_evidence(evidence.to_dict()) == []
+    assert evidence.validity.value == "NOT_DETERMINABLE"
+    assert evidence.target_snapshot_ref == "a" * 64
 
 
 def test_worker_port_blocked_translation():
@@ -94,7 +105,13 @@ def test_worker_port_blocked_translation():
     backend = FakeDelegationBackend(mock_result)
     port = WorkerPort(backend=backend, actor_identity="test-actor")
 
-    receipt, evidence = port.execute_delegation(wi, {}, datetime.now(timezone.utc))
+    receipt, evidence = port.execute_delegation(
+        wi,
+        {},
+        datetime.now(timezone.utc),
+        data_is_sensitive=False,
+        target_snapshot_ref="b" * 64,
+    )
 
     # Exit code 126 signifies BLOCKED (Safety Gate convention)
     assert receipt.exit_code == 126
@@ -118,7 +135,13 @@ def test_worker_port_failed_translation():
     backend = FakeDelegationBackend(mock_result)
     port = WorkerPort(backend=backend, actor_identity="test-actor")
 
-    receipt, evidence = port.execute_delegation(wi, {}, datetime.now(timezone.utc))
+    receipt, evidence = port.execute_delegation(
+        wi,
+        {},
+        datetime.now(timezone.utc),
+        data_is_sensitive=False,
+        target_snapshot_ref="c" * 64,
+    )
 
     assert receipt.exit_code == 1
     assert "Provider timeout" in str(receipt.environment_summary)

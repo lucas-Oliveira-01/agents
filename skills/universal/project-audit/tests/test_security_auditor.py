@@ -11,11 +11,14 @@ Test taxonomy
 """
 
 import json
-from unittest.mock import Mock
+import uuid
+from dataclasses import replace
 
 import pytest
 
-from project_audit.delegation import WorkerPort
+from project_audit.delegation import WorkerPort, DelegationBackend, DelegationResult, DelegationStatus
+from tests.conftest import make_project_state, make_methodology_state, make_work_item
+from project_audit.models import AuditPlan, WorkingTreeState
 from project_audit.models import (
     EgressDestination,
     EgressPolicy,
@@ -33,52 +36,55 @@ from project_audit.security_auditor import SecurityAuditor
 # ---------------------------------------------------------------------------
 
 
+class ResponseBackend(DelegationBackend):
+    """Only the network response is simulated; policies and evidence are real."""
+
+    def __init__(self, status=DelegationStatus.SUCCESS):
+        self.status = status
+        self.requests = []
+
+    def delegate(self, request):
+        self.requests.append(request)
+        return DelegationResult(request.request_id, self.status, {"findings": []}, None, "test", 0)
+
+
+def _port(status=DelegationStatus.SUCCESS):
+    return WorkerPort(ResponseBackend(status), "security-test")
+
+
+def _plan(snapshot):
+    item = make_work_item(str(uuid.uuid4()))
+    return AuditPlan(
+        plan_id=item.plan_ref, target_snapshot_ref=snapshot.snapshot_fingerprint,
+        requested_scope=["security"], applicability_decisions=[], resolved_scope=["security"],
+        work_items=[], execution_policy=item.effective_execution_policy,
+        egress_policy=EgressPolicy(EgressDestination.APPROVED_EXTERNAL, True),
+    )
+
+
 @pytest.fixture
 def dummy_snapshot():
-    return TargetSnapshot(
-        target_mode=TargetMode.COMMIT,
-        project_state=ProjectState(
-            repository_identity="test-repo",
-            revision_identity="test-rev",
-            working_tree_state="CLEAN",
-            submodules_state=[],
-            tracked_input_fingerprints=[
-                TrackedInputFingerprint(path="src/main.py", fingerprint="1234"),
-                TrackedInputFingerprint(path="src/auth.py", fingerprint="5678"),
-            ],
-        ),
-        methodology_state=Mock(),
-        snapshot_fingerprint="abc",
-    )
+    state = replace(make_project_state(), tracked_input_fingerprints=(
+        TrackedInputFingerprint("src/main.py", "a" * 64),
+        TrackedInputFingerprint("src/auth.py", "b" * 64),
+    ))
+    return TargetSnapshot.create(TargetMode.WORKTREE, state, make_methodology_state())
 
 
-def _snapshot_with_path(path: str) -> TargetSnapshot:
-    return TargetSnapshot(
-        target_mode=TargetMode.COMMIT,
-        project_state=ProjectState(
-            repository_identity="r",
-            revision_identity="r",
-            working_tree_state="CLEAN",
-            submodules_state=[],
-            tracked_input_fingerprints=[
-                TrackedInputFingerprint(path=path, fingerprint="x")
-            ],
-        ),
-        methodology_state=Mock(),
-        snapshot_fingerprint="a" * 64,
-    )
+def _snapshot_with_path(path):
+    state = replace(make_project_state(), tracked_input_fingerprints=(
+        TrackedInputFingerprint(path, "a" * 64),
+    ))
+    return TargetSnapshot.create(TargetMode.WORKTREE, state, make_methodology_state())
 
 
-def _auditor_and_prompt(path: str) -> str:
-    """Helper: build the prompt that would be sent for a given target_surface."""
+def _auditor_and_prompt(path):
     snap = _snapshot_with_path(path)
-    port = Mock(spec=WorkerPort)
-    port.execute_delegation.return_value = (Mock(), None)
+    port = _port()
     auditor = SecurityAuditor(port, snap, "FULL")
-    items = auditor.generate_work_items("plan-x")
+    items = auditor.generate_work_items(_plan(snap))
     auditor.execute(items[0])
-    args, _ = port.execute_delegation.call_args
-    return args[1]["prompt"]
+    return port.backend.requests[-1].context_payload["prompt"]
 
 
 # ---------------------------------------------------------------------------
@@ -88,58 +94,48 @@ def _auditor_and_prompt(path: str) -> str:
 
 class TestGenerateWorkItems:
     def test_one_item_per_tracked_input(self, dummy_snapshot):
-        auditor = SecurityAuditor(Mock(spec=WorkerPort), dummy_snapshot, "FULL")
-        items = auditor.generate_work_items("plan-123")
+        auditor = SecurityAuditor(_port(), dummy_snapshot, "FULL")
+        items = auditor.generate_work_items(_plan(dummy_snapshot))
         assert len(items) == 2
 
     def test_target_surface_matches_path(self, dummy_snapshot):
-        auditor = SecurityAuditor(Mock(spec=WorkerPort), dummy_snapshot, "FULL")
-        items = auditor.generate_work_items("plan-123")
+        auditor = SecurityAuditor(_port(), dummy_snapshot, "FULL")
+        items = auditor.generate_work_items(_plan(dummy_snapshot))
         assert items[0].target_surface == "src/main.py"
         assert items[1].target_surface == "src/auth.py"
 
     def test_auditor_label(self, dummy_snapshot):
-        auditor = SecurityAuditor(Mock(spec=WorkerPort), dummy_snapshot, "FULL")
-        items = auditor.generate_work_items("plan-123")
+        auditor = SecurityAuditor(_port(), dummy_snapshot, "FULL")
+        items = auditor.generate_work_items(_plan(dummy_snapshot))
         assert all(i.auditor == "security-auditor" for i in items)
 
 
 class TestExecuteDelegation:
     def test_delegates_to_worker_port(self, dummy_snapshot):
-        port = Mock(spec=WorkerPort)
-        mock_receipt = Mock()
-        mock_receipt.exit_code = 0
-        mock_evidence = Mock()
-        port.execute_delegation.return_value = (mock_receipt, mock_evidence)
-
+        port = _port()
         auditor = SecurityAuditor(port, dummy_snapshot, "FULL")
-        items = auditor.generate_work_items("plan-123")
+        plan = _plan(dummy_snapshot)
+        items = auditor.generate_work_items(plan)
         receipt, evidence = auditor.execute(items[0])
-
-        assert receipt is mock_receipt
-        assert evidence is mock_evidence
-        port.execute_delegation.assert_called_once()
+        assert receipt.exit_code == 0
+        assert receipt.to_dict()["policy_snapshot"] == plan.execution_policy.to_dict()
+        assert evidence.to_dict()["validity"] == "NOT_DETERMINABLE"
+        assert evidence.target_snapshot_ref == dummy_snapshot.snapshot_fingerprint
+        assert len(port.backend.requests) == 1
 
     def test_passes_scope_in_payload(self, dummy_snapshot):
-        port = Mock(spec=WorkerPort)
-        port.execute_delegation.return_value = (Mock(), None)
+        port = _port()
         auditor = SecurityAuditor(port, dummy_snapshot, "ONLY_AUTH")
-        items = auditor.generate_work_items("plan-123")
+        items = auditor.generate_work_items(_plan(dummy_snapshot))
         auditor.execute(items[0])
-        args, _ = port.execute_delegation.call_args
-        assert args[1]["scope"] == "ONLY_AUTH"
+        assert port.backend.requests[0].context_payload["scope"] == "ONLY_AUTH"
 
     def test_failure_returns_none_evidence(self, dummy_snapshot):
-        port = Mock(spec=WorkerPort)
-        receipt = Mock()
-        receipt.exit_code = 1
-        port.execute_delegation.return_value = (receipt, None)
-
-        auditor = SecurityAuditor(port, dummy_snapshot, "FULL")
-        items = auditor.generate_work_items("plan-123")
-        r, ev = auditor.execute(items[0])
-        assert r.exit_code == 1
-        assert ev is None
+        auditor = SecurityAuditor(_port(DelegationStatus.FAILED), dummy_snapshot)
+        items = auditor.generate_work_items(_plan(dummy_snapshot))
+        receipt, evidence = auditor.execute(items[0])
+        assert receipt.exit_code == 1
+        assert evidence is None
 
 
 # ---------------------------------------------------------------------------
@@ -154,13 +150,11 @@ class TestPromptStructure:
     """
 
     def _get_prompt(self, dummy_snapshot):
-        port = Mock(spec=WorkerPort)
-        port.execute_delegation.return_value = (Mock(), None)
+        port = _port()
         auditor = SecurityAuditor(port, dummy_snapshot, "FULL")
-        items = auditor.generate_work_items("plan-x")
+        items = auditor.generate_work_items(_plan(dummy_snapshot))
         auditor.execute(items[0])
-        args, _ = port.execute_delegation.call_args
-        return args[1]["prompt"]
+        return port.backend.requests[-1].context_payload["prompt"]
 
     def test_task_section_present(self, dummy_snapshot):
         assert "## TASK" in self._get_prompt(dummy_snapshot)
@@ -214,10 +208,7 @@ class TestSerializeUntrustedData:
     """Unit tests for the JSON serialization contract."""
 
     def _make_work_item(self, path: str):
-        from project_audit.models import ExecutionState, WorkItemAction, WorkItemFailureState
-        import uuid as _uuid
-
-        return Mock(target_surface=path)
+        return make_work_item(str(uuid.uuid4()), target_surface=path)
 
     def test_returns_valid_json(self):
         wi = self._make_work_item("src/auth.py")

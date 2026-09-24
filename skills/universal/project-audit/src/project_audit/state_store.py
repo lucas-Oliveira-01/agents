@@ -133,6 +133,7 @@ def _load_execution_policy(d: dict) -> ExecutionPolicy:
         network=NetworkAccess(d["network"]),
         credentials=CredentialAccess(d["credentials"]),
         timeout_ms=d.get("timeout_ms"),
+        max_retries=d.get("max_retries", 3),
     )
 
 
