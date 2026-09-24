@@ -35,7 +35,7 @@ def test_security_auditor_records_sink_without_claiming_exploitability(tmp_path:
 
     assert result.source_refs == ("src/client.py",)
     assert result.observations[0].state == "OBSERVED"
-    assert "does not" in result.observations[0].summary
+    assert "remain to be established" in result.observations[0].summary
 
 
 def test_security_pass_finishes_same_run_after_engineering_pass(tmp_path: Path) -> None:
@@ -47,7 +47,7 @@ def test_security_pass_finishes_same_run_after_engineering_pass(tmp_path: Path) 
     applicability = classify_applicability(discovery, classify_stack(discovery))
     prepared = prepare_audit(discovery, files, applicability)
 
-    orchestrator = Orchestrator(StateStore(tmp_path / ".audit-state"))
+    orchestrator = Orchestrator(StateStore(tmp_path / ".audit" / "runs"))
     engineering = execute_engineering_pass(
         orchestrator,
         discovery,

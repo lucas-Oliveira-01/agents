@@ -598,9 +598,9 @@ def validate_snapshot_drift(
 def validate_publication_artifacts_registered(run: AuditRun) -> ValidationResult:
     """A complete audit must register the four required Markdown artifact outputs."""
     required = {
-        "00_inventory_and_threat_model.md",
-        "01_coverage_manifest.md",
-        "02_analytical_report.md",
+        "00_inventory.md",
+        "01_coverage.md",
+        "02_analytical.md",
         "03_audit_ledger.md",
     }
     registered = {ref.rsplit("/", 1)[-1] for ref in run.artifact_refs}

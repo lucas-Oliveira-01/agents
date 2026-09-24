@@ -7,9 +7,9 @@ from .classifiers import classify_applicability, classify_files, classify_stack
 from .discovery import discover
 from .models import TargetMode
 from .normalization_runner import run_audit_normalize
-from .orchestrator import Orchestrator
+from .orchestrator import Orchestrator, SnapshotDriftError
 from .planner import prepare_audit
-from .runtime import run_full_audit
+from .runtime import run_full_audit, audit_paths, initialize_audit_repository
 from .state_store import StateStore
 
 
@@ -28,14 +28,17 @@ def main() -> int:
         help="Prepare the plan, execute Engineering PASS 1, or execute the full two-pass audit",
     )
     parser.add_argument("--no-persist", action="store_true", help="Do not persist state during prepare phase")
-    parser.add_argument("--output-dir", default=None, help="Audit Markdown output directory (default: <target>/docs/audit)")
+    parser.add_argument("--output-dir", default=None, help="Audit Markdown output directory (default: <target>/.audit)")
     parser.add_argument("--overwrite-audit", action="store_true", help="Explicitly allow replacing existing audit artifacts")
     parser.add_argument("--normalize", action="store_true", help="Invoke audit-normalize after Markdown generation")
     parser.add_argument("--normalize-command", default="audit-normalize", help="Downstream audit-normalize executable")
     parser.add_argument("--target-mode", choices=("WORKTREE", "COMMIT"), default="WORKTREE", help="Define whether the audit target is the current worktree or the Git commit state")
     args = parser.parse_args()
 
-    discovery = discover(args.target)
+    root, vault, state_dir, output_dir = audit_paths(args.target, args.state_dir, args.output_dir)
+    if not (args.phase == "prepare" and args.no_persist):
+        initialize_audit_repository(root, vault)
+    discovery = discover(str(root))
     files = classify_files(discovery)
     stack = classify_stack(discovery)
     applicability = classify_applicability(discovery, stack)
@@ -76,6 +79,7 @@ def main() -> int:
             discovery,
             prepared.plan,
             list(prepared.work_items),
+            target_snapshot=prepared.snapshot,
         )
         print("phase=engineering")
         print(f"execution={engineering.run.execution_completeness.value}")
@@ -98,12 +102,13 @@ def main() -> int:
     final_run = result.security.run
 
     print("phase=full")
+    print(f"status={final_run.audit_status}")
     print(f"execution={final_run.execution_completeness.value}")
     print(f"coverage={final_run.coverage_completeness.value}")
     print(f"run={final_run.run_id}")
     print(f"snapshot={final_run.target_snapshot_ref}")
     print(f"artifacts={len(result.artifacts)}")
-    print(f"output_dir={args.output_dir or str(result.discovery.root / 'docs' / 'audit')}")
+    print(f"output_dir={args.output_dir or str(result.discovery.root / '.audit')}")
     if result.normalization is not None:
         print(f"normalization={result.normalization.status}")
         print(f"normalization_return_code={result.normalization.return_code}")
@@ -120,4 +125,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SnapshotDriftError as exc:
+        print(f"status=STALE\nfailure_state=SNAPSHOT_DRIFT\n{exc}")
+        raise SystemExit(2)

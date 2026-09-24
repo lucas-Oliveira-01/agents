@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import uuid
 from datetime import datetime, timezone
 
 from project_audit.classifiers import classify_applicability, classify_files, classify_stack
@@ -206,7 +207,7 @@ def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path
         allow_sensitive=True,
     )
     prepared.plan.egress_policy = work_item.data_egress_policy
-    orchestrator = Orchestrator(StateStore(tmp_path / ".audit-state"))
+    orchestrator = Orchestrator(StateStore(tmp_path / ".audit" / "runs"))
     orchestrator.commit_snapshot(prepared.snapshot)
     orchestrator.freeze_and_commit_plan(prepared.plan)
 
@@ -217,7 +218,7 @@ def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path
     first.finish(
         datetime.now(timezone.utc),
         exit_code=0,
-        receipt_ref="deterministic-receipt",
+        receipt_ref=str(uuid.uuid4()),
     )
     work_item.execution_state = ExecutionState.RUNNING
     orchestrator.commit_work_item(work_item)
@@ -238,7 +239,7 @@ def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path
     })
     worker = SemanticAuditor(WorkerPort(backend, "test-semantic"))
     run = AuditRun(
-        run_id="run-semantic",
+        run_id=str(uuid.uuid4()),
         target_snapshot_ref=prepared.snapshot.snapshot_fingerprint,
         plan_ref=prepared.plan.plan_id,
         work_item_refs=[work_item.work_item_id],

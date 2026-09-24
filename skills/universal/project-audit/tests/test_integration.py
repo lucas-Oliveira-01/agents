@@ -309,27 +309,17 @@ class TestSnapshotDrift:
 
 
 class TestPublicationEligibility:
-    def test_complete_run_is_publication_eligible(
-        self, orchestrator, target_snapshot, fake_auditor, execution_policy, egress_policy
-    ):
-        plan, work_items = _make_full_plan(target_snapshot, execution_policy, egress_policy)
-        run = orchestrator.execute_vertical_slice(
-            snapshot=target_snapshot,
-            plan=plan,
-            work_items=work_items,
-            auditor=fake_auditor,
-        )
-        evidence_ids = state_store_from_orchestrator(orchestrator).list_evidence_ids()
-        evidence_list = [
-            state_store_from_orchestrator(orchestrator).load_evidence(eid)
-            for eid in evidence_ids
-        ]
+    def test_complete_run_is_publication_eligible(self, tmp_path):
+        from project_audit.runtime import run_full_audit
+        (tmp_path / "app.py").write_text("print('ok')\n")
+        result = run_full_audit(str(tmp_path))
+        orchestrator = Orchestrator(StateStore(tmp_path / ".audit" / "runs"))
+        store = orchestrator.store
+        run = store.load_run(result.security.run.run_id)
         report = orchestrator.check_publication_eligibility(
-            run=run,
-            plan=plan,
-            work_items=work_items,
-            evidence_list=evidence_list,
-            current_snapshot_fingerprint=target_snapshot.snapshot_fingerprint,
+            run, result.prepared.plan, list(result.prepared.work_items),
+            [store.load_evidence(eid) for eid in store.list_evidence_ids()],
+            result.prepared.snapshot.snapshot_fingerprint,
         )
         assert not report.has_errors
 

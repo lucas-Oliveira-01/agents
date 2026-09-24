@@ -41,7 +41,7 @@ def test_engineering_pass_executes_only_non_security_work_items(tmp_path: Path) 
     applicability = classify_applicability(discovery, classify_stack(discovery))
     prepared = prepare_audit(discovery, files, applicability)
 
-    orchestrator = Orchestrator(StateStore(tmp_path / ".audit-state"))
+    orchestrator = Orchestrator(StateStore(tmp_path / ".audit" / "runs"))
     result = execute_engineering_pass(
         orchestrator,
         discovery,

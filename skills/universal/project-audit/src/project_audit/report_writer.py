@@ -278,7 +278,7 @@ def render_report(
     lines.extend([
         "## 25. Plano de Evolução",
         "",
-        "Add semantic confirmation, positive controls, final ledger semantics, and downstream audit-normalize integration.",
+        "Resolve remaining semantic uncertainties against source evidence before promoting observations to findings.",
         "",
         "## 26. O que não fazer agora",
         "",
@@ -392,19 +392,20 @@ def render_ledger(
         "",
         "No positive control was formalized automatically in this phase.",
         "",
-        "## Inspection Observations",
-        "",
     ]
     semantic_markdown = render_semantic_findings(semantic_reviews)
     if semantic_markdown:
         lines.extend([semantic_markdown.rstrip(), ""])
 
+    lines.extend(["## Inspection Observations", ""])
     for result in list(engineering.inspections) + list(security.inspections):
-        lines.append("### {}".format(result.target_surface))
+        lines.extend(["### {}".format(result.target_surface), "",
+                      "| Observation | State | Summary | Sources |", "|---|---|---|---|"])
         for obs in result.observations:
-            lines.append("- {} — {} — {}".format(obs.code, obs.state, obs.summary))
-            if obs.source_refs:
-                lines.append("  - Sources: {}".format(", ".join(obs.source_refs)))
+            # Finding-ID bullet syntax is reserved for semantic findings. Preserve
+            # raw observations as a separate table for the normalizer boundary.
+            cells = (obs.code, obs.state, obs.summary, ", ".join(obs.source_refs))
+            lines.append("| " + " | ".join(cell.replace("|", "&#124;").replace("\n", " ") for cell in cells) + " |")
         lines.append("")
     lines.extend([
         "## LIMITATIONS",
@@ -427,9 +428,9 @@ def write_audit_artifacts(
 ) -> Dict[str, str]:
     root = Path(output_dir)
     paths = {
-        "inventory": str(root / "00_inventory_and_threat_model.md"),
-        "coverage": str(root / "01_coverage_manifest.md"),
-        "report": str(root / "02_analytical_report.md"),
+        "inventory": str(root / "00_inventory.md"),
+        "coverage": str(root / "01_coverage.md"),
+        "report": str(root / "02_analytical.md"),
         "ledger": str(root / "03_audit_ledger.md"),
     }
 

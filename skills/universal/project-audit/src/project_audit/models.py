@@ -771,9 +771,17 @@ class AuditRun:
     previous_run_ref: Optional[str] = None   # incremental: reference to older run
     recovery_from_ref: Optional[str] = None  # recovery: reference to interrupted run
 
+    @property
+    def audit_status(self) -> str:
+        """ADR-11 status is derived; drift can never be presented as complete."""
+        if self.failure_state == RunFailureState.SNAPSHOT_DRIFT:
+            return "STALE"
+        return self.execution_completeness.value
+
     def to_dict(self) -> dict:
         d: dict = {
             "run_id": self.run_id,
+            "audit_status": self.audit_status,
             "target_snapshot_ref": self.target_snapshot_ref,
             "plan_ref": self.plan_ref,
             "execution_completeness": self.execution_completeness.value,

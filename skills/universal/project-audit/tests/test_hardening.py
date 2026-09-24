@@ -332,11 +332,15 @@ class TestCanPublishCriticalStates:
         codes = [r.code for r in report.errors()]
         assert "PUBLISH_EXECUTION_INCOMPLETE" in codes
 
-    def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot, work_item):
-        run = self._run(audit_plan, target_snapshot, RunExecutionCompleteness.COMPLETE)
-        # Fix: COMPLETE runs need FULL coverage to publish (or PARTIAL if explicitly allowed)
-        run.coverage_completeness = RunCoverageCompleteness.FULL
-        report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
+    def test_complete_clean_run_can_publish(self, tmp_path):
+        from project_audit.runtime import run_full_audit
+        (tmp_path / "app.py").write_text("print('ok')\n")
+        result = run_full_audit(str(tmp_path))
+        report = can_publish(
+            result.security.run, list(result.prepared.work_items),
+            list(result.engineering.evidence + result.security.evidence),
+            result.prepared.snapshot.snapshot_fingerprint, result.prepared.plan,
+        )
         assert not report.has_errors
 
     def test_running_run_cannot_publish(self, audit_plan, target_snapshot):

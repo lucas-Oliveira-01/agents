@@ -83,6 +83,8 @@ def test_worker_port_success_translation():
     # Fingerprint must be populated
     assert evidence.fingerprint is not None
     assert len(evidence.fingerprint) == 64
+    from project_audit.schema_validator import validate_evidence
+    assert validate_evidence(evidence.to_dict()) == []
     assert evidence.validity.value == "NOT_DETERMINABLE"
     assert evidence.target_snapshot_ref == "a" * 64
 

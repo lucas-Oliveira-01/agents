@@ -44,22 +44,7 @@ def execute_security_pass(
     """Execute the reserved SECURITY/* WorkItems in the existing AuditRun."""
     auditor = auditor or DeterministicSecurityAuditor()
 
-    stored_snapshot = orchestrator.store.load_snapshot(run.target_snapshot_ref)
-    current_snapshot = build_target_snapshot(
-        discovery,
-        target_mode=stored_snapshot.target_mode,
-    )
-    if current_snapshot.snapshot_fingerprint != stored_snapshot.snapshot_fingerprint:
-        run.execution_completeness = RunExecutionCompleteness.PARTIAL
-        run.coverage_completeness = RunCoverageCompleteness.PARTIAL
-        run.failure_state = RunFailureState.SNAPSHOT_DRIFT
-        orchestrator.commit_run(
-            run,
-            plan,
-            work_items,
-            known_run_ids=orchestrator.store.list_run_ids(),
-        )
-        raise RuntimeError("Snapshot drift detected between Engineering PASS 1 and Security PASS 2.")
+    orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
 
     inspections = []
     evidences = []
@@ -71,12 +56,14 @@ def execute_security_pass(
         if item.execution_state == ExecutionState.TERMINATED:
             continue
 
+        orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
         orchestrator.commit_work_item(item)
         started = datetime.now(timezone.utc)
         attempt = item.start_attempt(started_at=started)
         orchestrator.commit_work_item(item)
 
         result = auditor.inspect(discovery, item.work_item_id, item.target_surface)
+        orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
         finished = datetime.now(timezone.utc)
 
         receipt = ExecutionReceipt(
@@ -124,6 +111,8 @@ def execute_security_pass(
                 run,
                 item,
                 semantic_worker,
+                plan=plan,
+                work_items=work_items,
             )
             semantic_reviews.append(semantic_result)
             if semantic_result.evidence is not None:
@@ -174,6 +163,7 @@ def execute_security_pass(
         run.coverage_completeness = RunCoverageCompleteness.FULL
         run.failure_state = RunFailureState.NONE
 
+    orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
     orchestrator.commit_run(
         run,
         plan,

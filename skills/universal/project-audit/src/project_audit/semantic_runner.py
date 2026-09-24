@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from .context_builder import build_context
 from .discovery import DiscoverySnapshot
-from .models import AuditRun, AuditWorkItem, ExecutionState, WorkItemFailureState
+from .models import AuditPlan, AuditRun, AuditWorkItem, ExecutionState, WorkItemFailureState
 from .orchestrator import Orchestrator
 from .planner import build_target_snapshot
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
@@ -17,18 +17,17 @@ def execute_semantic_review(
     run: AuditRun,
     work_item: AuditWorkItem,
     worker: SemanticAuditor,
+    *,
+    plan: Optional[AuditPlan] = None,
+    work_items: Optional[List[AuditWorkItem]] = None,
 ) -> SemanticReviewResult:
     """Execute one semantic WorkItem with lifecycle and evidence gates."""
     if work_item.execution_state == ExecutionState.TERMINATED:
         raise ValueError("Cannot semantically review an already terminated WorkItem")
 
-    stored_snapshot = orchestrator.store.load_snapshot(run.target_snapshot_ref)
-    current_snapshot = build_target_snapshot(
-        discovery,
-        target_mode=stored_snapshot.target_mode,
-    )
-    if current_snapshot.snapshot_fingerprint != stored_snapshot.snapshot_fingerprint:
-        raise RuntimeError("Snapshot drift detected before semantic review.")
+    plan = plan or orchestrator.store.load_plan(run.plan_ref)
+    work_items = work_items if work_items is not None else [work_item]
+    orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
 
     orchestrator.commit_work_item(work_item)
     started = datetime.now(timezone.utc)
@@ -37,6 +36,7 @@ def execute_semantic_review(
 
     context = build_context(discovery, work_item.target_surface)
     result = worker.review(work_item, run, context)
+    orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
     orchestrator.commit_receipt(result.receipt)
 
     finished = datetime.now(timezone.utc)

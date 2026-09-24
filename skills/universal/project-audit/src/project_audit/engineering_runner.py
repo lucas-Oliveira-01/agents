@@ -61,9 +61,6 @@ def execute_engineering_pass(
             "Refuse to execute against a different target."
         )
     orchestrator.commit_snapshot(snapshot)
-    current_snapshot = build_target_snapshot(discovery, target_mode=snapshot.target_mode)
-    if current_snapshot.snapshot_fingerprint != snapshot.snapshot_fingerprint:
-        raise ValueError("Snapshot drift detected before Engineering PASS 1 execution.")
     orchestrator.freeze_and_commit_plan(plan)
 
     run = AuditRun(
@@ -78,6 +75,8 @@ def execute_engineering_pass(
         publication_state=RunPublicationState.NOT_PUBLISHED,
     )
 
+    orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
+
     inspections = []
     evidences = []
     semantic_reviews = []
@@ -86,12 +85,14 @@ def execute_engineering_pass(
         if item.target_surface.startswith("SECURITY/"):
             continue
 
+        orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
         orchestrator.commit_work_item(item)
         started = datetime.now(timezone.utc)
         attempt = item.start_attempt(started_at=started)
         orchestrator.commit_work_item(item)
 
         result = auditor.inspect(discovery, item.work_item_id, item.target_surface)
+        orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
         finished = datetime.now(timezone.utc)
 
         receipt = ExecutionReceipt(
@@ -140,6 +141,8 @@ def execute_engineering_pass(
                 run,
                 item,
                 semantic_worker,
+                plan=plan,
+                work_items=work_items,
             )
             semantic_reviews.append(semantic_result)
             if semantic_result.evidence is not None:
@@ -192,6 +195,7 @@ def execute_engineering_pass(
         run.coverage_completeness = RunCoverageCompleteness.FULL if succeeded else RunCoverageCompleteness.NONE
         run.failure_state = RunFailureState.NONE
 
+    orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
     orchestrator.commit_run(
         run,
         plan,

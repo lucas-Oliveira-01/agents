@@ -27,7 +27,7 @@ def test_report_writer_emits_required_four_markdown_artifacts(tmp_path: Path) ->
         classify_applicability(discovery, classify_stack(discovery)),
     )
 
-    orchestrator = Orchestrator(StateStore(tmp_path / ".audit-state"))
+    orchestrator = Orchestrator(StateStore(tmp_path / ".audit" / "runs"))
     engineering = execute_engineering_pass(
         orchestrator,
         discovery,
@@ -42,7 +42,7 @@ def test_report_writer_emits_required_four_markdown_artifacts(tmp_path: Path) ->
         engineering.run,
     )
 
-    out = tmp_path / "docs" / "audit"
+    out = tmp_path / ".audit"
     paths = write_audit_artifacts(
         str(out),
         prepared,
@@ -67,13 +67,13 @@ def test_report_writer_preflights_existing_artifact_set(tmp_path: Path) -> None:
         classify_files(discovery),
         classify_applicability(discovery, classify_stack(discovery)),
     )
-    orchestrator = Orchestrator(StateStore(tmp_path / ".audit-state"))
+    orchestrator = Orchestrator(StateStore(tmp_path / ".audit" / "runs"))
     engineering = execute_engineering_pass(orchestrator, discovery, prepared.plan, list(prepared.work_items))
     security = execute_security_pass(orchestrator, discovery, prepared.plan, list(prepared.work_items), engineering.run)
 
-    out = tmp_path / "docs" / "audit"
-    out.mkdir(parents=True)
-    existing = out / "00_inventory_and_threat_model.md"
+    out = tmp_path / ".audit"
+    out.mkdir(parents=True, exist_ok=True)
+    existing = out / "00_inventory.md"
     existing.write_text("existing", encoding="utf-8")
 
     try:
@@ -84,8 +84,8 @@ def test_report_writer_preflights_existing_artifact_set(tmp_path: Path) -> None:
         raise AssertionError("existing audit artifacts must block the whole write set")
 
     assert existing.read_text(encoding="utf-8") == "existing"
-    assert not (out / "01_coverage_manifest.md").exists()
-    assert not (out / "02_analytical_report.md").exists()
+    assert not (out / "01_coverage.md").exists()
+    assert not (out / "02_analytical.md").exists()
     assert not (out / "03_audit_ledger.md").exists()
 
 

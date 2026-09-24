@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from .fake_auditor import FakeAuditor, FakeAuditorResult, FakeAuditorWithSnapshot
 from .models import (
@@ -32,6 +33,7 @@ from .models import (
     EgressDestination,
     EgressPolicy,
     Evidence,
+    EvidenceValidity,
     ExecutionPolicy,
     ExecutionReceipt,
     ExecutionState,
@@ -242,6 +244,49 @@ class Orchestrator:
             return True
         return False
 
+    def ensure_snapshot_current(
+        self, run: AuditRun, plan: AuditPlan, work_items: List[AuditWorkItem],
+        current_fingerprint: str,
+    ) -> None:
+        """Fail closed for the whole run; keep stale diagnostics, reuse nothing."""
+        if (run.failure_state != RunFailureState.SNAPSHOT_DRIFT
+                and not self.detect_snapshot_drift(run, current_fingerprint)):
+            return
+        run.failure_state = RunFailureState.SNAPSHOT_DRIFT
+        run.publication_state = RunPublicationState.NOT_PUBLISHED
+        run.artifact_refs.clear()
+        run.execution_completeness = RunExecutionCompleteness.PARTIAL
+        blocked = [i for i in work_items if i.failure_state == WorkItemFailureState.SAFETY_BLOCK]
+        complete = [i for i in work_items if i.execution_state == ExecutionState.TERMINATED
+                    and i.failure_state == WorkItemFailureState.NONE]
+        if not work_items or len(blocked) == len(work_items):
+            run.coverage_completeness = RunCoverageCompleteness.NONE
+        elif len(complete) == len(work_items):
+            run.coverage_completeness = RunCoverageCompleteness.FULL
+        else:
+            run.coverage_completeness = RunCoverageCompleteness.PARTIAL
+        for evidence_id in self.store.list_evidence_ids():
+            evidence = self.store.load_evidence(evidence_id)
+            if evidence.work_item_ref in run.work_item_refs:
+                self.store.save_evidence(replace(evidence, validity=EvidenceValidity.STALE))
+        self.commit_run(run, plan, work_items, known_run_ids=self.store.list_run_ids())
+        raise SnapshotDriftError("SNAPSHOT_DRIFT: audit is STALE; a full re-run is required.")
+
+    def check_target_unchanged(
+        self, root: Path, run: AuditRun, plan: AuditPlan, work_items: List[AuditWorkItem],
+    ) -> None:
+        from .discovery import discover
+        from .planner import build_target_snapshot
+
+        snapshot = self.store.load_snapshot(run.target_snapshot_ref)
+        try:
+            current = build_target_snapshot(discover(str(root)), snapshot.target_mode)
+        except (OSError, ValueError):
+            # Missing/unreadable input cannot establish snapshot identity.
+            self.ensure_snapshot_current(run, plan, work_items, "UNREADABLE")
+            return
+        self.ensure_snapshot_current(run, plan, work_items, current.snapshot_fingerprint)
+
     # ------------------------------------------------------------------ #
     # Recovery (ADR-07): reconstruct state from disk after interruption   #
     # ------------------------------------------------------------------ #
@@ -284,6 +329,7 @@ class Orchestrator:
         auditor: FakeAuditorWithSnapshot,
         previous_run_ref: Optional[str] = None,
         recovery_from_ref: Optional[str] = None,
+        snapshot_provider: Optional[Callable[[], TargetSnapshot]] = None,
     ) -> AuditRun:
         """
         Execute the full vertical slice:
@@ -315,8 +361,16 @@ class Orchestrator:
 
         collected_evidence: List[Evidence] = []
 
+        def check_snapshot() -> None:
+            if snapshot_provider is not None:
+                self.ensure_snapshot_current(run, plan, work_items, snapshot_provider().snapshot_fingerprint)
+            elif Path(snapshot.project_state.repository_identity).is_dir():
+                self.check_target_unchanged(Path(snapshot.project_state.repository_identity), run, plan, work_items)
+
+        check_snapshot()
         # 4. Execute each WorkItem
         for work_item in work_items:
+            check_snapshot()
             # Commit initial planned state
             self.commit_work_item(work_item)
 
@@ -327,6 +381,7 @@ class Orchestrator:
             # Worker executes (isolated output — not yet committed to canonical state)
             receipt, evidence = auditor.execute(work_item, started_at=now)
 
+            check_snapshot()
             # Commit receipt (evidence of execution)
             self.commit_receipt(receipt)
 
@@ -401,6 +456,7 @@ class Orchestrator:
         else:
             run.coverage_completeness = RunCoverageCompleteness.NONE
 
+        check_snapshot()
         # 6. Commit the run
         known_run_ids = self.store.list_run_ids()
         self.commit_run(run, plan, work_items, known_run_ids=known_run_ids)

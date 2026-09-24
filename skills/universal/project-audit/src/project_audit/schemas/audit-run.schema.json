@@ -5,6 +5,7 @@
   "description": "Aggregate container tracking the execution state and references to underlying entities.",
   "type": "object",
   "properties": {
+    "audit_status": {"type": "string", "enum": ["STALE", "PLANNED", "RUNNING", "COMPLETE", "PARTIAL", "FAILED", "BLOCKED"]},
     "run_id": { "$ref": "shared.schema.json#/$defs/uuid" },
     "target_snapshot_ref": { "$ref": "shared.schema.json#/$defs/fingerprint" },
     "plan_ref": { "$ref": "shared.schema.json#/$defs/uuid" },

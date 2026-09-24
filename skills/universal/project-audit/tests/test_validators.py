@@ -442,9 +442,9 @@ class TestPublicationEligibility:
             coverage_completeness=RunCoverageCompleteness.FULL,
             failure_state=RunFailureState.NONE,
             artifact_refs=[
-                "docs/audit/00_inventory_and_threat_model.md",
-                "docs/audit/01_coverage_manifest.md",
-                "docs/audit/02_analytical_report.md",
+                "docs/audit/00_inventory.md",
+                "docs/audit/01_coverage.md",
+                "docs/audit/02_analytical.md",
                 "docs/audit/03_audit_ledger.md",
             ],
         )

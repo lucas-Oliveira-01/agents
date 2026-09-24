@@ -4,10 +4,14 @@ on:
   push:
     paths:
       - "skills/universal/project-audit/**"
+      - "skills/universal/audit-normalize/**"
+      - "skills/universal/omniroute-delegation/**"
       - ".github/workflows/project-audit.yml"
   pull_request:
     paths:
       - "skills/universal/project-audit/**"
+      - "skills/universal/audit-normalize/**"
+      - "skills/universal/omniroute-delegation/**"
       - ".github/workflows/project-audit.yml"
 
 jobs:
@@ -28,7 +32,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install project-audit
-        run: python -m pip install --upgrade pip && python -m pip install -e "skills/universal/project-audit[test]"
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "skills/universal/project-audit[test]" -e "skills/universal/audit-normalize" -e "skills/universal/omniroute-delegation"
 
       - name: Compile source
         run: python -m compileall -q skills/universal/project-audit/src
@@ -61,4 +67,4 @@ jobs:
           tmp="$(mktemp -d)"
           mkdir -p "$tmp/src"
           printf "print('ok')\n" > "$tmp/src/app.py"
-          python -m project_audit             --target "$tmp"             --phase full             --output-dir "$tmp/docs/audit"             --normalize             --normalize-command audit-normalize
+          python -m project_audit --target "$tmp" --phase full --normalize --normalize-command audit-normalize

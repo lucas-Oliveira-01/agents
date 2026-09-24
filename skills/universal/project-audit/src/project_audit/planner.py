@@ -69,22 +69,12 @@ def _working_tree_state(snapshot: DiscoverySnapshot) -> WorkingTreeState:
 
 
 def _input_fingerprints(snapshot: DiscoverySnapshot, target_mode: TargetMode) -> Tuple[TrackedInputFingerprint, ...]:
-    critical_names = {
-        "pyproject.toml", "pom.xml", "build.gradle", "build.gradle.kts",
-        "package.json", "requirements.txt", "cargo.toml", "go.mod",
-        "dockerfile", "docker-compose.yml", "docker-compose.yaml",
-        "compose.yml", "compose.yaml", ".gitignore",
-    }
-    tracked = set(snapshot.git.tracked_paths)
+    # V1 re-runs the entire audit: fingerprint every discovered input, including
+    # untracked and binary files, instead of a dependency/configuration subset.
     rows = []
     for item in snapshot.files:
-        path_name = item.path.rsplit("/", 1)[-1].lower()
-        if path_name not in critical_names and not item.path.startswith(".github/workflows/"):
-            continue
-        if snapshot.git.is_repository and item.path not in tracked:
-            continue
-        if item.binary or not item.sha256:
-            continue
+        if item.sha256 is None:
+            raise ValueError(f"Cannot fingerprint audit input: {item.path}")
         rows.append(TrackedInputFingerprint(item.path, item.sha256))
     return tuple(sorted(rows, key=lambda item: item.path))
 
