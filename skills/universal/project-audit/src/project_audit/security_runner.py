@@ -139,7 +139,11 @@ def execute_security_pass(
     ]
     failed = [
         item for item in work_items
-        if item.failure_state not in {WorkItemFailureState.NONE, WorkItemFailureState.SAFETY_BLOCK}
+        if item.failure_state not in {WorkItemFailureState.NONE, WorkItemFailureState.SAFETY_BLOCK, WorkItemFailureState.SCHEMA_VIOLATION}
+    ]
+    semantic_failed = [
+        item for item in work_items
+        if item.failure_state == WorkItemFailureState.SCHEMA_VIOLATION
     ]
     succeeded = [
         item for item in work_items
@@ -147,7 +151,11 @@ def execute_security_pass(
         and item.failure_state == WorkItemFailureState.NONE
     ]
 
-    if blocked or failed:
+    if semantic_failed:
+        run.execution_completeness = RunExecutionCompleteness.PARTIAL
+        run.coverage_completeness = RunCoverageCompleteness.PARTIAL
+        run.failure_state = RunFailureState.SEMANTIC_COVERAGE_FAILED
+    elif blocked or failed:
         if not succeeded and blocked and not failed:
             run.execution_completeness = RunExecutionCompleteness.BLOCKED
             run.coverage_completeness = RunCoverageCompleteness.NONE

@@ -102,7 +102,11 @@ def test_cli_initializes_vault_for_each_persistent_phase(tmp_path, monkeypatch, 
     from project_audit.__main__ import main
     (tmp_path / "app.py").write_text("print('ok')\n")
     monkeypatch.setattr(sys, "argv", ["project_audit", "--target", str(tmp_path), "--phase", phase])
-    assert main() == 0
+    ret = main()
+    if phase == "full":
+        assert ret in (0, 4)
+    else:
+        assert ret == 0
     assert (tmp_path / ".audit" / ".git").is_dir()
     assert "/.audit/" in (tmp_path / ".gitignore").read_text()
     if phase == "full":

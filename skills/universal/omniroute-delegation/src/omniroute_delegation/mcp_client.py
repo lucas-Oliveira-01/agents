@@ -160,7 +160,7 @@ class MCPClient:
         client = MCPClient()
         session = client.initialize()
         tools = client.discover_tools()
-        result = client.call_tool("delegar_tarefa", {"tarefa": "..."})
+        result = client.call_tool("delegate_task", {"task": "..."})
     """
 
     def __init__(

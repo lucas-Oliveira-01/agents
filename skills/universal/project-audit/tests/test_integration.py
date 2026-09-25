@@ -22,7 +22,7 @@ import pytest
 
 from project_audit.fake_auditor import FakeAuditor, FakeAuditorResult, FakeAuditorWithSnapshot
 from project_audit.models import (
-    ApplicabilityDecision,
+    ApplicabilityDecision, ApplicabilityState,
     AuditPlan,
     AuditRun,
     AuditWorkItem,
@@ -75,7 +75,7 @@ def _make_full_plan(target_snapshot, execution_policy, egress_policy) -> tuple:
         applicability_decisions=[
             ApplicabilityDecision(
                 domain="security",
-                applicable=True,
+                applicable=ApplicabilityState.APPLICABLE,
                 decision_basis="Test: security applicable",
                 evidence_refs=[],
             )

@@ -18,7 +18,7 @@
         "type": "object",
         "properties": {
           "domain": { "type": "string" },
-          "applicable": { "type": "boolean" },
+          "applicable": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE", "UNKNOWN"] },
           "decision_basis": { "type": "string" },
           "evidence_refs": {
             "type": "array",

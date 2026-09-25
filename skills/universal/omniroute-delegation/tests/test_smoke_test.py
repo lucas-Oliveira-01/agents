@@ -314,8 +314,8 @@ class TestSmokeTestExpectedToolsStep:
         mock_http = MagicMock(spec=httpx.Client)
         client = MCPClient(http_client=mock_http)
         # Only add some tools
-        client._session.tools["delegar_tarefa"] = ToolSchema.from_mcp(
-            make_tool_dict("delegar_tarefa")
+        client._session.tools["delegate_task"] = ToolSchema.from_mcp(
+            make_tool_dict("delegate_task")
         )
 
         runner = SmokeTestRunner(client)
@@ -344,7 +344,7 @@ class TestSmokeTestMinimalDelegationStep:
         mock_http = MagicMock(spec=httpx.Client)
         client = MCPClient(http_client=mock_http)
         client._session.is_initialized = True
-        client._session.tools["delegar_tarefa"] = ToolSchema.from_mcp(make_tool_dict())
+        client._session.tools["delegate_task"] = ToolSchema.from_mcp(make_tool_dict())
         client.call_tool = MagicMock(return_value=None)
         runner = SmokeTestRunner(client)
         runner._step_minimal_delegation()
@@ -354,7 +354,7 @@ class TestSmokeTestMinimalDelegationStep:
         mock_http = MagicMock(spec=httpx.Client)
         client = MCPClient(http_client=mock_http)
         client._session.is_initialized = True
-        client._session.tools["delegar_tarefa"] = ToolSchema.from_mcp(make_tool_dict())
+        client._session.tools["delegate_task"] = ToolSchema.from_mcp(make_tool_dict())
         client.call_tool = MagicMock(return_value={"content": [{"type": "text", "text": "OK"}]})
         runner = SmokeTestRunner(client)
         runner._step_minimal_delegation()

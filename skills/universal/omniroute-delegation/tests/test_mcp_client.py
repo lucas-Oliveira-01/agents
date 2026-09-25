@@ -103,22 +103,22 @@ class TestToolSchema:
     def test_parse_full_tool(self):
         tool_dict = make_tool_dict()
         schema = ToolSchema.from_mcp(tool_dict)
-        assert schema.name == "delegar_tarefa"
-        assert "tarefa" in schema.required_params
-        assert "perfil" in schema.optional_params
-        assert "contexto" in schema.optional_params
+        assert schema.name == "delegate_task"
+        assert "task" in schema.required_params
+        assert "profile" in schema.optional_params
+        assert "context" in schema.optional_params
 
     def test_accepts_param(self):
         tool_dict = make_tool_dict()
         schema = ToolSchema.from_mcp(tool_dict)
-        assert schema.accepts_param("tarefa") is True
-        assert schema.accepts_param("perfil") is True
+        assert schema.accepts_param("task") is True
+        assert schema.accepts_param("profile") is True
         assert schema.accepts_param("nonexistent") is False
 
     def test_get_param_type(self):
         tool_dict = make_tool_dict()
         schema = ToolSchema.from_mcp(tool_dict)
-        assert schema.get_param_type("tarefa") == "string"
+        assert schema.get_param_type("task") == "string"
         assert schema.get_param_type("max_tokens") == "integer"
         assert schema.get_param_type("temperature") == "number"
         assert schema.get_param_type("nonexistent") is None
@@ -126,11 +126,11 @@ class TestToolSchema:
     def test_get_param_enum(self):
         tool_dict = make_tool_dict()
         schema = ToolSchema.from_mcp(tool_dict)
-        enum = schema.get_param_enum("perfil")
+        enum = schema.get_param_enum("profile")
         assert enum is not None
         assert "coding" in enum
         assert "coding:pro" in enum
-        assert schema.get_param_enum("tarefa") is None
+        assert schema.get_param_enum("task") is None
 
     def test_empty_schema(self):
         schema = ToolSchema.from_mcp({"name": "empty", "inputSchema": {}})
@@ -156,15 +156,15 @@ class TestSessionManagement:
         session = MCPSession()
         assert not session.is_initialized
         assert session.session_id is None
-        assert not session.has_tool("delegar_tarefa")
-        assert session.get_tool("delegar_tarefa") is None
+        assert not session.has_tool("delegate_task")
+        assert session.get_tool("delegate_task") is None
 
     def test_session_with_tools(self):
         session = MCPSession()
         tool = ToolSchema.from_mcp(make_tool_dict())
-        session.tools["delegar_tarefa"] = tool
-        assert session.has_tool("delegar_tarefa")
-        assert session.get_tool("delegar_tarefa") is tool
+        session.tools["delegate_task"] = tool
+        assert session.has_tool("delegate_task")
+        assert session.get_tool("delegate_task") is tool
         assert not session.has_tool("nonexistent")
 
 
@@ -340,11 +340,11 @@ class TestMCPClientDiscoverTools:
         client = self._make_initialized_client()
         tools = client.discover_tools()
 
-        assert "delegar_tarefa" in tools
-        assert "consultar_delegacao" in tools
-        assert "resumo_delegacoes" in tools
-        assert "consultar_cache" in tools
-        assert "invalidar_cache" in tools
+        assert "delegate_task" in tools
+        assert "query_delegation" in tools
+        assert "delegation_summary" in tools
+        assert "query_cache" in tools
+        assert "invalidate_cache" in tools
         assert len(tools) == 5
 
     def test_discover_tools_not_initialized(self):
@@ -416,7 +416,7 @@ class TestMCPClientCallTool:
 
     def test_call_tool_success(self):
         client = self._make_ready_client()
-        result = client.call_tool("delegar_tarefa", {"tarefa": "test task"})
+        result = client.call_tool("delegate_task", {"task": "test task"})
         assert result is not None
 
     def test_call_tool_not_initialized(self):
@@ -424,7 +424,7 @@ class TestMCPClientCallTool:
         client = MCPClient(http_client=mock_client)
 
         with pytest.raises(MCPProtocolError):
-            client.call_tool("delegar_tarefa", {"tarefa": "test"})
+            client.call_tool("delegate_task", {"task": "test"})
 
     def test_call_tool_rejects_unknown_tool_before_http(self):
         mock_client = MagicMock(spec=httpx.Client)
@@ -438,7 +438,7 @@ class TestMCPClientCallTool:
         client = self._make_ready_client()
         mock_http = client._http
         with pytest.raises(MCPProtocolError, match="Invalid tool parameters"):
-            client.call_tool("delegar_tarefa", {"tarefa": 123})
+            client.call_tool("delegate_task", {"task": 123})
         assert mock_http.post.call_count == 2
 
     def test_call_tool_application_error(self):
@@ -464,7 +464,7 @@ class TestMCPClientCallTool:
         client.initialize()
         client.discover_tools()
         with pytest.raises(MCPApplicationError) as exc_info:
-            client.call_tool("delegar_tarefa", {"tarefa": "test"})
+            client.call_tool("delegate_task", {"task": "test"})
         assert exc_info.value.code == -32000
 
 
@@ -481,38 +481,38 @@ class TestParameterValidation:
         client = MCPClient(http_client=MagicMock(spec=httpx.Client))
         client._session.is_initialized = True
         tool = ToolSchema.from_mcp(make_tool_dict())
-        client._session.tools["delegar_tarefa"] = tool
+        client._session.tools["delegate_task"] = tool
         return client
 
     def test_valid_params(self):
         client = self._make_client_with_tools()
         errors = client.validate_tool_params(
-            "delegar_tarefa",
-            {"tarefa": "test", "perfil": "coding"},
+            "delegate_task",
+            {"task": "test", "profile": "coding"},
         )
         assert errors == []
 
     def test_missing_required_param(self):
         client = self._make_client_with_tools()
         errors = client.validate_tool_params(
-            "delegar_tarefa",
-            {"perfil": "coding"},
+            "delegate_task",
+            {"profile": "coding"},
         )
-        assert any("tarefa" in e for e in errors)
+        assert any("task" in e for e in errors)
 
     def test_unknown_param(self):
         client = self._make_client_with_tools()
         errors = client.validate_tool_params(
-            "delegar_tarefa",
-            {"tarefa": "test", "unknown_param": "value"},
+            "delegate_task",
+            {"task": "test", "unknown_param": "value"},
         )
         assert any("unknown_param" in e for e in errors)
 
     def test_invalid_enum_value(self):
         client = self._make_client_with_tools()
         errors = client.validate_tool_params(
-            "delegar_tarefa",
-            {"tarefa": "test", "perfil": "nonexistent_profile"},
+            "delegate_task",
+            {"task": "test", "profile": "nonexistent_profile"},
         )
         assert any("nonexistent_profile" in e for e in errors)
 
@@ -520,7 +520,7 @@ class TestParameterValidation:
         client = self._make_client_with_tools()
         errors = client.validate_tool_params(
             "nonexistent_tool",
-            {"tarefa": "test"},
+            {"task": "test"},
         )
         assert any("not found" in e for e in errors)
 
@@ -537,30 +537,30 @@ class TestParameterFiltering:
         client = MCPClient(http_client=MagicMock(spec=httpx.Client))
         client._session.is_initialized = True
         tool = ToolSchema.from_mcp(make_tool_dict())
-        client._session.tools["delegar_tarefa"] = tool
+        client._session.tools["delegate_task"] = tool
         return client
 
     def test_filter_removes_unknown(self):
         client = self._make_client_with_tools()
         filtered = client.filter_optional_params(
-            "delegar_tarefa",
-            {"tarefa": "test", "perfil": "coding", "unknown": "value"},
+            "delegate_task",
+            {"task": "test", "profile": "coding", "unknown": "value"},
         )
-        assert "tarefa" in filtered
-        assert "perfil" in filtered
+        assert "task" in filtered
+        assert "profile" in filtered
         assert "unknown" not in filtered
 
     def test_filter_preserves_all_known(self):
         client = self._make_client_with_tools()
         filtered = client.filter_optional_params(
-            "delegar_tarefa",
-            {"tarefa": "test", "perfil": "coding", "cache_mode": "native"},
+            "delegate_task",
+            {"task": "test", "profile": "coding", "cache_mode": "native"},
         )
         assert len(filtered) == 3
 
     def test_filter_unknown_tool(self):
         client = self._make_client_with_tools()
-        params = {"tarefa": "test", "extra": "val"}
+        params = {"task": "test", "extra": "val"}
         filtered = client.filter_optional_params("unknown_tool", params)
         assert filtered == params  # No filtering when tool unknown
 

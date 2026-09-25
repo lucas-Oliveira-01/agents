@@ -179,7 +179,7 @@ class StateStore:
             "snapshots": self.root / "target_snapshots",
             "plans": self.root / "audit_plans",
             "work_items": self.root / "audit_work_items",
-            "evidences": self.root / "evidences",
+            "evidence": self.root / "evidence",
             "runs": self.root / "audit_runs",
             "receipts": self.root / "execution_receipts",
         }
@@ -257,7 +257,13 @@ class StateStore:
             requested_scope=list(d.get("requested_scope", [])),
             applicability_decisions=applicability,
             resolved_scope=list(d.get("resolved_scope", [])),
-            work_items=work_items or [],
+            # Fix S06: preserve refs if not loaded
+            work_items=work_items if work_items is not None else [
+                # We can't fully instantiate them without loading from disk,
+                # but models.py doesn't allow string refs here. 
+                # Actually, S06 says "load_plan ignora esses IDs". S06 expects the store to load them!
+                self.load_work_item(wi["work_item_id"]) for wi in d.get("work_items", [])
+            ],
             execution_policy=_load_execution_policy(d["execution_policy"]),
             egress_policy=_load_egress_policy(d["egress_policy"]),
             budget_envelope=budget,
@@ -293,11 +299,11 @@ class StateStore:
     # ---- Evidence ----
 
     def save_evidence(self, evidence: Evidence) -> None:
-        path = self._dirs["evidences"] / f"{evidence.evidence_id}.json"
+        path = self._dirs["evidence"] / f"{evidence.evidence_id}.json"
         _atomic_write(path, evidence.to_dict())
 
     def load_evidence(self, evidence_id: str) -> Evidence:
-        path = self._dirs["evidences"] / f"{evidence_id}.json"
+        path = self._dirs["evidence"] / f"{evidence_id}.json"
         d = _read_json(path)
         return Evidence(
             evidence_id=d["evidence_id"],
@@ -369,4 +375,4 @@ class StateStore:
         return [p.stem for p in self._dirs["work_items"].glob("*.json")]
 
     def list_evidence_ids(self) -> List[str]:
-        return [p.stem for p in self._dirs["evidences"].glob("*.json")]
+        return [p.stem for p in self._dirs["evidence"].glob("*.json")]

@@ -83,6 +83,8 @@ class ValidationReport:
             return ValidationLevel.ERROR
         if self.has_warnings:
             return ValidationLevel.WARNING
+        if any(r.level == ValidationLevel.UNDETERMINABLE for r in self.results):
+            return ValidationLevel.UNDETERMINABLE
         return ValidationLevel.PASS
 
     def errors(self) -> List[ValidationResult]:
@@ -431,8 +433,9 @@ def validate_coverage_completeness_derivable(
     (semantic-validators.md §6)
     """
     # Derive expected coverage from applicability decisions
+    from .models import ApplicabilityState
     applicable_domains = {
-        d.domain for d in plan.applicability_decisions if d.applicable
+        d.domain for d in plan.applicability_decisions if d.applicable == ApplicabilityState.APPLICABLE
     }
     resolved_domains = set(plan.resolved_scope)
 

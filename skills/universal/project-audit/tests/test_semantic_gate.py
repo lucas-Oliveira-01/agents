@@ -209,11 +209,12 @@ def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path
     prepared.plan.egress_policy = work_item.data_egress_policy
     orchestrator = Orchestrator(StateStore(tmp_path / ".audit" / "runs"))
     orchestrator.commit_snapshot(prepared.snapshot)
+    for wi in prepared.work_items:
+        wi.plan_ref = prepared.plan.plan_id
+        orchestrator.commit_work_item(wi)
     orchestrator.freeze_and_commit_plan(prepared.plan)
 
     from project_audit.models import ExecutionState, RunBudgetState, RunPublicationState
-    work_item.plan_ref = prepared.plan.plan_id
-    orchestrator.commit_work_item(work_item)
     first = work_item.start_attempt()
     first.finish(
         datetime.now(timezone.utc),

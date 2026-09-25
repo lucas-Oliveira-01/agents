@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from project_audit.models import (
-    ApplicabilityDecision,
+    ApplicabilityDecision, ApplicabilityState,
     AuditPlan,
     AuditRun,
     AuditWorkItem,
