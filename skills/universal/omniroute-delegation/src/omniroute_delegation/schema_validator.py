@@ -52,7 +52,7 @@ class SchemaValidator:
 
     Usage:
         validator = SchemaValidator()
-        result = validator.validate_delegation_task({"tarefa": "..."})
+        result = validator.validate_delegation_task({"task": "..."})
         if not result:
             print(result.errors)
     """
@@ -143,7 +143,7 @@ class SchemaValidator:
                 )
 
         # Rule: tarefa should contain structured sections
-        tarefa = params.get("tarefa", "")
+        tarefa = params.get("task", "")
         if isinstance(tarefa, str) and tarefa:
             expected_sections = [
                 "Objetivo:",

@@ -29,7 +29,7 @@ class TestSchemaLoading:
         validator = SchemaValidator(str(REFERENCES_DIR))
         schema = validator.delegation_schema
         assert schema["$id"] == "omniroute-delegation-task.schema.json"
-        assert "tarefa" in schema["properties"]
+        assert "task" in schema["properties"]
 
     def test_load_mcp_schema(self):
         validator = SchemaValidator(str(REFERENCES_DIR))
@@ -67,21 +67,21 @@ class TestDelegationTaskValid:
         return SchemaValidator(str(REFERENCES_DIR))
 
     def test_minimal_valid(self, validator: SchemaValidator):
-        result = validator.validate_delegation_task({"tarefa": "Test task"})
+        result = validator.validate_delegation_task({"task": "Test task"})
         assert result.is_valid
 
     def test_full_valid(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": (
+                "task": (
                     "Objetivo: test\n"
                     "Restrições: none\n"
                     "Contexto: none\n"
                     "Formato esperado: text\n"
                     "Critérios de sucesso: correct"
                 ),
-                "perfil": "coding",
-                "contexto": "some context",
+                "profile": "coding",
+                "context": "some context",
                 "task_id": "task-001",
                 "cache_mode": "native",
                 "max_tokens": 500,
@@ -93,7 +93,7 @@ class TestDelegationTaskValid:
     def test_deterministic_with_cache_key(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": (
+                "task": (
                     "Objetivo: test\n"
                     "Restrições: none\n"
                     "Contexto: none\n"
@@ -110,14 +110,14 @@ class TestDelegationTaskValid:
     def test_bypass_cache(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "cache_mode": "bypass",
             }
         )
         assert result.is_valid
 
     def test_bool_conversion_truthy(self, validator: SchemaValidator):
-        result = validator.validate_delegation_task({"tarefa": "valid"})
+        result = validator.validate_delegation_task({"task": "valid"})
         assert bool(result) is True
 
 
@@ -136,22 +136,22 @@ class TestDelegationTaskInvalid:
     def test_missing_tarefa(self, validator: SchemaValidator):
         result = validator.validate_delegation_task({})
         assert not result.is_valid
-        assert any("tarefa" in e.lower() for e in result.errors)
+        assert any("task" in e.lower() for e in result.errors)
 
     def test_empty_tarefa(self, validator: SchemaValidator):
-        result = validator.validate_delegation_task({"tarefa": ""})
+        result = validator.validate_delegation_task({"task": ""})
         assert not result.is_valid
 
     @pytest.mark.parametrize("value", [None, True])
     def test_invalid_tarefa_type_returns_result(self, validator: SchemaValidator, value):
-        result = validator.validate_delegation_task({"tarefa": value})
+        result = validator.validate_delegation_task({"task": value})
         assert not result.is_valid
         assert result.errors
 
     def test_invalid_cache_mode(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "cache_mode": "invalid_mode",
             }
         )
@@ -160,7 +160,7 @@ class TestDelegationTaskInvalid:
     def test_invalid_temperature_too_high(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "temperature": 5.0,
             }
         )
@@ -169,7 +169,7 @@ class TestDelegationTaskInvalid:
     def test_negative_max_tokens(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "max_tokens": -1,
             }
         )
@@ -178,7 +178,7 @@ class TestDelegationTaskInvalid:
     def test_additional_properties_rejected(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "unknown_field": "value",
             }
         )
@@ -204,7 +204,7 @@ class TestSemanticRules:
     def test_deterministic_without_cache_key(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "cache_mode": "deterministic",
             }
         )
@@ -214,7 +214,7 @@ class TestSemanticRules:
     def test_deterministic_with_session_id(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "cache_mode": "deterministic",
                 "cache_key": "key123",
                 "session_id": "sess-001",
@@ -226,7 +226,7 @@ class TestSemanticRules:
     def test_missing_task_sections_warning(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "Just a plain task without sections",
+                "task": "Just a plain task without sections",
             }
         )
         assert result.is_valid  # Not an error, just a warning
@@ -236,7 +236,7 @@ class TestSemanticRules:
     def test_complete_task_no_warning(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": (
+                "task": (
                     "Objetivo: do something\n"
                     "Restrições: none\n"
                     "Contexto: here\n"
@@ -251,7 +251,7 @@ class TestSemanticRules:
     def test_deterministic_nonzero_temperature_warning(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "cache_mode": "deterministic",
                 "cache_key": "key123",
                 "temperature": 0.5,
@@ -263,7 +263,7 @@ class TestSemanticRules:
     def test_very_low_max_tokens_warning(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "max_tokens": 5,
             }
         )
@@ -347,7 +347,7 @@ class TestMCPMessageValidation:
         result = validator.validate_tools_list_result(
             {
                 "tools": [
-                    {"name": "delegar_tarefa", "inputSchema": {"type": "object"}},
+                    {"name": "delegate_task", "inputSchema": {"type": "object"}},
                 ],
             }
         )

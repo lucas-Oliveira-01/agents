@@ -37,11 +37,11 @@ from omniroute_delegation.mcp_client import (
 
 # Known tools from the contract (for reference only)
 EXPECTED_TOOLS = [
-    "delegar_tarefa",
-    "consultar_delegacao",
-    "resumo_delegacoes",
-    "consultar_cache",
-    "invalidar_cache",
+    "delegate_task",
+    "query_delegation",
+    "delegation_summary",
+    "query_cache",
+    "invalidate_cache",
 ]
 
 
@@ -347,12 +347,12 @@ class SmokeTestRunner:
 
     def _step_minimal_delegation(self) -> None:
         """Step 6: Execute a minimal delegation to prove the circuit."""
-        if not self._client.session.has_tool("delegar_tarefa"):
+        if not self._client.session.has_tool("delegate_task"):
             self._report.add(
                 StepResult(
                     name="minimal_delegation",
                     status=StepStatus.SKIP,
-                    message="Skipped: 'delegar_tarefa' tool not available.",
+                    message="Skipped: 'delegate_task' tool not available.",
                 )
             )
             return
@@ -366,19 +366,19 @@ class SmokeTestRunner:
         )
 
         # Build minimal arguments — only include params confirmed by schema
-        tool = self._client.session.get_tool("delegar_tarefa")
-        args: Dict[str, Any] = {"tarefa": task_text}
+        tool = self._client.session.get_tool("delegate_task")
+        args: Dict[str, Any] = {"task": task_text}
 
         # Only add perfil if the tool accepts it
-        if tool and tool.accepts_param("perfil"):
-            args["perfil"] = "cheap"
+        if tool and tool.accepts_param("profile"):
+            args["profile"] = "cheap"
 
         # Only add cache_mode if accepted
         if tool and tool.accepts_param("cache_mode"):
             args["cache_mode"] = "bypass"
 
         try:
-            result, duration = self._timed(lambda: self._client.call_tool("delegar_tarefa", args))
+            result, duration = self._timed(lambda: self._client.call_tool("delegate_task", args))
             if not self._has_smoke_success(result):
                 self._report.add(
                     StepResult(

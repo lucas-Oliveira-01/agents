@@ -79,14 +79,14 @@ class TestProfilePreservation:
     def test_coding_pro_preserved_with_colon(self):
         """coding:pro must not become coding_pro."""
         task = TaskBuilder().objetivo("Test").restricoes("None").perfil("coding:pro").build()
-        assert task["perfil"] == "coding:pro"
-        assert "_" not in task["perfil"]
+        assert task["profile"] == "coding:pro"
+        assert "_" not in task["profile"]
 
     def test_profile_values_exact(self):
         """All observed profiles are stored exactly as given."""
         for profile in OBSERVED_PROFILES:
             task = TaskBuilder().objetivo("Test").restricoes("None").perfil(profile).build()
-            assert task["perfil"] == profile
+            assert task["profile"] == profile
 
     def test_auto_not_treated_as_profile(self):
         """auto is a route/target, not automatically a profile."""
@@ -94,7 +94,7 @@ class TestProfilePreservation:
         # but the contract says to confirm schema first.
         # We just ensure it doesn't transform it.
         task = TaskBuilder().objetivo("Test").restricoes("None").perfil("auto").build()
-        assert task["perfil"] == "auto"
+        assert task["profile"] == "auto"
 
 
 # ===========================================================================
@@ -203,7 +203,7 @@ class TestContextEfficiency:
         """Default context should not bloat the payload."""
         task = TaskBuilder().objetivo("Quick test").restricoes("None").build()
         # No contexto param when not set
-        assert "contexto" not in task
+        assert "context" not in task
 
     def test_explicit_format_sets_expectations(self):
         """Explicit output format reduces ambiguity."""
@@ -214,7 +214,7 @@ class TestContextEfficiency:
             .formato("JSON array of objects")
             .build()
         )
-        assert "Formato esperado: JSON array of objects" in task["tarefa"]
+        assert "Formato esperado: JSON array of objects" in task["task"]
 
 
 # ===========================================================================
@@ -245,7 +245,7 @@ class TestPromptInjectionDefense:
             .contexto("def hello():\n    return 'world'")
             .build()
         )
-        assert task["contexto"] == "def hello():\n    return 'world'"
+        assert task["context"] == "def hello():\n    return 'world'"
 
     def test_credential_in_objective_rejected(self):
         with pytest.raises(ValueError, match="credential"):
@@ -268,7 +268,7 @@ class TestRecursionGuard:
             .restricoes("Do not execute commands, do not use tools, do not delegate")
             .build()
         )
-        tarefa = task["tarefa"]
+        tarefa = task["task"]
         assert "Restrições:" in tarefa
         # The restriction text should be preserved
         assert "não" in tarefa.lower() or "do not" in tarefa.lower()
@@ -291,20 +291,20 @@ class TestParameterSchemaCompliance:
         tool = ToolSchema.from_mcp(
             make_tool_dict(
                 properties={
-                    "tarefa": {"type": "string"},
-                    "perfil": {"type": "string"},
+                    "task": {"type": "string"},
+                    "profile": {"type": "string"},
                 },
-                required=["tarefa"],
+                required=["task"],
             )
         )
-        client._session.tools["delegar_tarefa"] = tool
+        client._session.tools["delegate_task"] = tool
 
         filtered = client.filter_optional_params(
-            "delegar_tarefa",
-            {"tarefa": "test", "perfil": "coding", "unknown_param": "val"},
+            "delegate_task",
+            {"task": "test", "profile": "coding", "unknown_param": "val"},
         )
-        assert "tarefa" in filtered
-        assert "perfil" in filtered
+        assert "task" in filtered
+        assert "profile" in filtered
         assert "unknown_param" not in filtered
 
     def test_validate_catches_invalid_enum(self):
@@ -314,11 +314,11 @@ class TestParameterSchemaCompliance:
         client._session.is_initialized = True
 
         tool = ToolSchema.from_mcp(make_tool_dict())
-        client._session.tools["delegar_tarefa"] = tool
+        client._session.tools["delegate_task"] = tool
 
         errors = client.validate_tool_params(
-            "delegar_tarefa",
-            {"tarefa": "test", "cache_mode": "invalid_mode"},
+            "delegate_task",
+            {"task": "test", "cache_mode": "invalid_mode"},
         )
         assert len(errors) > 0
 
@@ -334,7 +334,7 @@ class TestSchemaStructuralValidation:
     def test_delegation_schema_requires_tarefa(self):
         validator = SchemaValidator(str(REFERENCES_DIR))
         schema = validator.delegation_schema
-        assert "tarefa" in schema.get("required", [])
+        assert "task" in schema.get("required", [])
 
     def test_delegation_schema_defines_cache_enum(self):
         validator = SchemaValidator(str(REFERENCES_DIR))
@@ -347,7 +347,7 @@ class TestSchemaStructuralValidation:
         validator = SchemaValidator(str(REFERENCES_DIR))
         result = validator.validate_delegation_task(
             {
-                "tarefa": "test",
+                "task": "test",
                 "cache_mode": "deterministic",
             }
         )

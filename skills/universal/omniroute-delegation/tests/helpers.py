@@ -9,7 +9,7 @@ REFERENCES_DIR = Path(__file__).parent.parent / "references"
 
 
 def make_tool_dict(
-    name: str = "delegar_tarefa",
+    name: str = "delegate_task",
     description: str = "Delegate a task",
     properties: Optional[Dict[str, Any]] = None,
     required: Optional[List[str]] = None,
@@ -17,13 +17,13 @@ def make_tool_dict(
     """Create a mock tool dictionary as returned by tools/list."""
     if properties is None:
         properties = {
-            "tarefa": {"type": "string", "description": "Task text"},
-            "perfil": {
+            "task": {"type": "string", "description": "Task text"},
+            "profile": {
                 "type": "string",
                 "description": "Profile hint",
                 "enum": ["cheap", "fast", "coding", "coding:pro", "smart"],
             },
-            "contexto": {"type": "string", "description": "Context"},
+            "context": {"type": "string", "description": "Context"},
             "task_id": {"type": "string", "description": "Tracking ID"},
             "session_id": {"type": "string", "description": "Session ID"},
             "cache_mode": {
@@ -36,7 +36,7 @@ def make_tool_dict(
             "temperature": {"type": "number", "description": "Temperature"},
         }
     if required is None:
-        required = ["tarefa"]
+        required = ["task"]
 
     return {
         "name": name,
@@ -55,27 +55,27 @@ def make_tools_list_response(
     """Create a mock tools/list JSON-RPC response."""
     if tools is None:
         tools = [
-            make_tool_dict("delegar_tarefa"),
+            make_tool_dict("delegate_task"),
             make_tool_dict(
-                "consultar_delegacao",
+                "query_delegation",
                 "Query delegation status",
                 {"task_id": {"type": "string"}},
                 ["task_id"],
             ),
             make_tool_dict(
-                "resumo_delegacoes",
+                "delegation_summary",
                 "Summary of delegations",
                 {},
                 [],
             ),
             make_tool_dict(
-                "consultar_cache",
+                "query_cache",
                 "Query cache",
                 {"cache_key": {"type": "string"}},
                 ["cache_key"],
             ),
             make_tool_dict(
-                "invalidar_cache",
+                "invalidate_cache",
                 "Invalidate cache",
                 {"cache_key": {"type": "string"}},
                 ["cache_key"],

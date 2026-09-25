@@ -30,9 +30,9 @@ class TestTaskConstruction:
 
     def test_minimal_task(self):
         task = TaskBuilder().objetivo("Analyze code").restricoes("Do not execute").build()
-        assert "tarefa" in task
-        assert "Objetivo: Analyze code" in task["tarefa"]
-        assert "Restrições: Do not execute" in task["tarefa"]
+        assert "task" in task
+        assert "Objetivo: Analyze code" in task["task"]
+        assert "Restrições: Do not execute" in task["task"]
 
     def test_full_task(self):
         task = (
@@ -49,8 +49,8 @@ class TestTaskConstruction:
             .temperature(0)
             .build()
         )
-        assert task["tarefa"].startswith("Objetivo: Review function")
-        assert task["perfil"] == "coding"
+        assert task["task"].startswith("Objetivo: Review function")
+        assert task["profile"] == "coding"
         assert task["task_id"] == "task-001"
         assert task["cache_mode"] == "native"
         assert task["max_tokens"] == 500
@@ -66,7 +66,7 @@ class TestTaskConstruction:
             .criterios("Correct")
             .build()
         )
-        tarefa = task["tarefa"]
+        tarefa = task["task"]
         assert "Objetivo:" in tarefa
         assert "Restrições:" in tarefa
         assert "Contexto:" in tarefa
@@ -75,28 +75,28 @@ class TestTaskConstruction:
 
     def test_default_contexto(self):
         task = TaskBuilder().objetivo("Test").restricoes("None").build()
-        assert "Nenhum contexto adicional" in task["tarefa"]
+        assert "Nenhum contexto adicional" in task["task"]
 
     def test_default_formato(self):
         task = TaskBuilder().objetivo("Test").restricoes("None").build()
-        assert "Texto livre" in task["tarefa"]
+        assert "Texto livre" in task["task"]
 
     def test_default_criterios(self):
         task = TaskBuilder().objetivo("Test").restricoes("None").build()
-        assert "Resposta correta e completa" in task["tarefa"]
+        assert "Resposta correta e completa" in task["task"]
 
     def test_contexto_only_added_when_nonempty(self):
         task = TaskBuilder().objetivo("Test").restricoes("None").build()
         # contexto key should not be in params since _contexto is empty
-        assert "contexto" not in task
+        assert "context" not in task
 
     def test_contexto_added_when_set(self):
         task = TaskBuilder().objetivo("Test").restricoes("None").contexto("Some code").build()
-        assert task["contexto"] == "Some code"
+        assert task["context"] == "Some code"
 
     def test_optional_params_excluded_when_none(self):
         task = TaskBuilder().objetivo("Test").restricoes("None").build()
-        assert "perfil" not in task
+        assert "profile" not in task
         assert "task_id" not in task
         assert "session_id" not in task
         assert "cache_mode" not in task
