@@ -48,9 +48,37 @@ class DelegationGateway:
         if findings:
             raise CredentialLeakPreventedError(findings)
 
-    def build_task(self, task: DelegationTask) -> Dict[str, Any]:
-        """Validate and convert an internal task to the MCP wire contract."""
+    def _to_runtime_arguments(self, task: DelegationTask) -> Dict[str, Any]:
+        """Map canonical English fields to the discovered runtime schema."""
         payload = task.to_wire()
+        tool = self._client.session.get_tool(self.TOOL_NAME)
+        if tool is None:
+            raise SchemaViolationError("Required delegation tool is unavailable.")
+
+        aliases = {
+            "task": ("task", "tarefa"),
+            "profile": ("profile", "perfil"),
+            "context": ("context", "contexto"),
+        }
+        mapped: Dict[str, Any] = {}
+        for field_name, value in payload.items():
+            candidates = aliases.get(field_name, (field_name,))
+            runtime_name = next((name for name in candidates if tool.accepts_param(name)), None)
+            if runtime_name is None:
+                if field_name in {"task", "profile", "context"}:
+                    raise SchemaViolationError(
+                        "Runtime tool schema does not expose a compatible field: " + field_name
+                    )
+                if tool.accepts_param(field_name):
+                    runtime_name = field_name
+                else:
+                    continue
+            mapped[runtime_name] = value
+        return mapped
+
+    def build_task(self, task: DelegationTask) -> Dict[str, Any]:
+        """Validate and convert an internal task to the discovered wire contract."""
+        payload = self._to_runtime_arguments(task)
         self._scan(payload)
         validation = self._client.validate_tool_params(self.TOOL_NAME, payload)
         if validation:
