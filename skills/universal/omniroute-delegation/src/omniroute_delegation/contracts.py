@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -24,7 +24,7 @@ class DelegateKind(str, Enum):
 class TransportContract(BaseModel):
     model_config = ConfigDict(extra="forbid")
     jsonrpc: str = "2.0"
-    request_id: int | str
+    request_id: Union[int, str]
     method: str
     params: Optional[Dict[str, Any]] = None
 
