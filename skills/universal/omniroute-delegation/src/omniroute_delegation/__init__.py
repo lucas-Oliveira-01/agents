@@ -4,7 +4,7 @@ Provides diagnostic utilities, schema validation, and MCP client helpers
 for the OmniRoute gateway delegation protocol.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 from omniroute_delegation.contracts import (
     AuditContract,
