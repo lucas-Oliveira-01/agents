@@ -40,9 +40,9 @@ class DelegationTask(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    task: str = Field(alias="tarefa", min_length=1)
-    profile: Optional[str] = Field(default=None, alias="perfil")
-    context: Optional[str] = Field(default=None, alias="contexto")
+    task: str = Field(min_length=1)
+    profile: Optional[str] = None
+    context: Optional[str] = None
     task_id: Optional[str] = None
     session_id: Optional[str] = None
     cache_mode: Optional[str] = None
@@ -58,7 +58,7 @@ class DelegationTask(BaseModel):
         return value
 
     def to_wire(self) -> Dict[str, Any]:
-        return self.model_dump(by_alias=True, exclude_none=True)
+        return self.model_dump(exclude_none=True)
 
 
 class LeafFinding(BaseModel):
