@@ -23,7 +23,7 @@ MCP_PROTOCOL_VERSION = "2024-11-05"
 
 CLIENT_INFO = {
     "name": "omniroute-delegation",
-    "version": "1.0.0",
+    "version": "1.1.0",
 }
 
 
