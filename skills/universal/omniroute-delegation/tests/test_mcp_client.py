@@ -672,3 +672,24 @@ class TestHealthCheck:
         result = client.health_check()
         assert result["status"] == "ok"
         assert result["raw"] == "OK"
+
+
+def test_call_tool_blocks_credentials_before_transport():
+    from unittest.mock import MagicMock
+
+    from omniroute_delegation.exceptions import CredentialLeakPreventedError
+
+    mock_http = MagicMock(spec=httpx.Client)
+    client = MCPClient(http_client=mock_http)
+    client._session.is_initialized = True
+    client._session.tools["delegar_tarefa"] = ToolSchema.from_mcp(
+        make_tool_dict()
+    )
+
+    with pytest.raises(CredentialLeakPreventedError):
+        client.call_tool(
+            "delegar_tarefa",
+            {"tarefa": "api_key=sk-secretkey123456789012345"},
+        )
+
+    mock_http.post.assert_not_called()
