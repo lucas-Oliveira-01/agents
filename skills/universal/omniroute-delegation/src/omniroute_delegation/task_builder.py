@@ -236,6 +236,26 @@ class TaskBuilder:
 
         return params
 
+
+    # Legacy aliases retained for existing callers; English methods are canonical.
+    def objetivo(self, value: str) -> "TaskBuilder":
+        return self.objective(value)
+
+    def restricoes(self, value: str) -> "TaskBuilder":
+        return self.constraints(value)
+
+    def contexto(self, value: str) -> "TaskBuilder":
+        return self.context(value)
+
+    def formato(self, value: str) -> "TaskBuilder":
+        return self.format(value)
+
+    def criterios(self, value: str) -> "TaskBuilder":
+        return self.criteria(value)
+
+    def perfil(self, value: str) -> "TaskBuilder":
+        return self.profile(value)
+
     # -- Utility methods ---------------------------------------------------
 
     @staticmethod
