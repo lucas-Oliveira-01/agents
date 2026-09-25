@@ -181,9 +181,9 @@ class TaskBuilder:
             ValueError: If required fields are missing or security violations detected.
         """
         # Validate required fields
-        if not self._objective:
+        if not self._objective.strip():
             raise ValueError("'objetivo' is required for every delegation task.")
-        if not self._constraints:
+        if not self._constraints.strip():
             raise ValueError("'restricoes' is required for every delegation task.")
 
         # Build tarefa string
@@ -219,7 +219,7 @@ class TaskBuilder:
         for field_name, value in params.items():
             if isinstance(value, str):
                 scan = self.scan_for_credentials(value)
-                if not scan.is_clean and False: # Bypassed for source code audits
+                if not scan.is_clean and True:
                     findings.extend(f"{field_name}: {finding}" for finding in scan.findings)
         if findings:
             raise ValueError(
