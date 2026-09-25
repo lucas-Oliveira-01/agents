@@ -138,6 +138,10 @@ def run_full_audit(
         artifact_map = {key: str(resolved_output_dir / Path(path).name) for key, path in staged.items()}
         final_paths = [Path(path) for path in artifact_map.values()]
         normalized_dir = resolved_output_dir / "normalized"
+        if normalized_dir.exists() and normalized_dir.is_symlink():
+            if not normalized_dir.resolve().is_relative_to(resolved_output_dir.resolve()):
+                raise ValueError(f"Security violation: normalized directory {normalized_dir} escapes audit vault.")
+
         if normalize:
             final_paths += [normalized_dir / name for name in (
                 "report_data.json", "validation_report.json", "source_manifest.json", "report_data.schema.json",

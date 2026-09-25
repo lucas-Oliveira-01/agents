@@ -130,20 +130,32 @@ def _inspect(
         )
 
     elif subcategory == "SSRF":
-        refs = _scan(
+        server_context = _scan(
             classifications,
             snapshot,
             (
-                r'\brequests\.(get|post|put|delete)\s*\(',
-                r'\baxios\.(get|post|put|delete)\s*\(',
-                r'\bfetch\s*\(',
-                r'\bHttpClient\b',
-                r'\bRestTemplate\b',
-                r'\bWebClient\b',
-                r'\bhttpx\.',
-                r'\burllib\.(request|parse)\b',
-            ),
+                r'(?i)\b(import\s+net/http|require\(.http.\)|from\s+http\.server|flask|django|express|spring|app\.listen|import\s+requests|urllib|net/http|http)\b',
+            )
         )
+        if server_context:
+            refs = _scan(
+                classifications,
+                snapshot,
+                (
+                    r'\brequests\.(get|post|put|delete)\s*\(',
+                    r'\baxios\.(get|post|put|delete)\s*\(',
+                    r'\bfetch\s*\(',
+                    r'\bHttpClient\b',
+                    r'\bRestTemplate\b',
+                    r'\bWebClient\b',
+                    r'\bhttpx\.',
+                    r'\burllib\.(request|parse)\b',
+                    r'\bnet/http\b',
+                ),
+            )
+        else:
+            refs = ()
+            
         observations.append(
             SecurityObservation(
                 "SEC-SSRF-001",
@@ -153,7 +165,7 @@ def _inspect(
                     f"Server-side HTTP client signal(s) were found in {len(refs)} file(s); "
                     "user-controlled URL flow and destination validation remain to be established."
                     if refs
-                    else "No outbound HTTP client pattern matched the deterministic rules."
+                    else "No server-side outbound HTTP client pattern matched the deterministic rules."
                 ),
                 refs[:30],
             )

@@ -24,7 +24,7 @@ import pytest
 
 from project_audit.fake_auditor import FakeAuditorResult, FakeAuditorWithSnapshot
 from project_audit.models import (
-    ApplicabilityDecision,
+    ApplicabilityDecision, ApplicabilityState,
     AuditPlan,
     AuditRun,
     AuditWorkItem,
@@ -82,7 +82,7 @@ def _make_plan(target_snapshot, execution_policy, egress_policy):
         target_snapshot_ref=target_snapshot.snapshot_fingerprint,
         requested_scope=["security"],
         applicability_decisions=[
-            ApplicabilityDecision("security", True, "test", [])
+            ApplicabilityDecision("security", ApplicabilityState.APPLICABLE, "test", [])
         ],
         resolved_scope=["security"],
         work_items=[],

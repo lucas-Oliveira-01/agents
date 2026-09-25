@@ -97,6 +97,7 @@ class RunFailureState(str, Enum):
     SAFETY_BLOCK = "SAFETY_BLOCK"
     SNAPSHOT_DRIFT = "SNAPSHOT_DRIFT"
     BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
+    SEMANTIC_COVERAGE_FAILED = "SEMANTIC_COVERAGE_FAILED"
 
 
 class RunBudgetState(str, Enum):
@@ -628,17 +629,22 @@ class AuditWorkItem:
 # ---------------------------------------------------------------------------
 
 
+class ApplicabilityState(str, Enum):
+    APPLICABLE = "APPLICABLE"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+    UNKNOWN = "UNKNOWN"
+
 @dataclass
 class ApplicabilityDecision:
     domain: str
-    applicable: bool
+    applicable: ApplicabilityState
     decision_basis: str
     evidence_refs: List[str]  # uuid refs
 
     def to_dict(self) -> dict:
         return {
             "domain": self.domain,
-            "applicable": self.applicable,
+            "applicable": self.applicable.value if isinstance(self.applicable, ApplicabilityState) else self.applicable,
             "decision_basis": self.decision_basis,
             "evidence_refs": list(self.evidence_refs),
         }

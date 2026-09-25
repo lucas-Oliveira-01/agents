@@ -44,6 +44,8 @@ class SemanticFindingCandidate:
     impact: Optional[str]
     exploitability: Optional[str]
     recommendation: Optional[str]
+    raw_severity: Optional[str] = None
+    normalization_rule: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -92,8 +94,24 @@ def _parse_candidate(item: Any) -> SemanticFindingCandidate:
     category = item["category"].strip().upper()
     finding_type = item["type"].strip().upper()
     status = item["status"].strip().upper()
-    severity = item["severity"].strip().upper()
+    raw_severity = item["severity"].strip().upper()
     confidence = item["confidence"].strip().upper()
+
+    severity = raw_severity
+    normalization_rule = None
+
+    if severity == "CRITICAL":
+        severity = "P0"
+        normalization_rule = "CRITICAL->P0"
+    elif severity == "HIGH":
+        severity = "P1"
+        normalization_rule = "HIGH->P1"
+    elif severity == "MEDIUM":
+        severity = "P2"
+        normalization_rule = "MEDIUM->P2"
+    elif severity == "LOW":
+        severity = "P3"
+        normalization_rule = "LOW->P3"
 
     if category not in _ALLOWED_CATEGORIES:
         raise SemanticOutputError("unsupported category: " + category)
@@ -129,15 +147,21 @@ def _parse_candidate(item: Any) -> SemanticFindingCandidate:
         impact=item.get("impact"),
         exploitability=item.get("exploitability"),
         recommendation=item.get("recommendation"),
+        raw_severity=raw_severity,
+        normalization_rule=normalization_rule,
     )
 
 
 def _parse_output(payload: Any) -> Tuple[SemanticFindingCandidate, ...]:
-    if not isinstance(payload, dict):
-        raise SemanticOutputError("semantic worker output must be a JSON object")
-    findings = payload.get("findings")
-    if not isinstance(findings, list):
-        raise SemanticOutputError("semantic worker output must contain a findings array")
+    if isinstance(payload, list):
+        findings = payload
+    elif isinstance(payload, dict):
+        findings = payload.get("findings")
+        if not isinstance(findings, list):
+            raise SemanticOutputError("semantic worker output must contain a findings array")
+    else:
+        raise SemanticOutputError("semantic worker output must be a JSON object or list")
+    
     return tuple(_parse_candidate(item) for item in findings)
 
 
@@ -283,7 +307,8 @@ class SemanticAuditor:
                 raise SemanticOutputError("semantic worker returned no output payload")
             candidates = _parse_output(delegated_result.output_payload)
             _validate_candidates_against_context(candidates, context)
-        except SemanticOutputError:
+        except SemanticOutputError as e:
+            print(f"DEBUG SCHEMA VIOLATION: {e}")
             return SemanticReviewResult(
                 work_item.work_item_id,
                 work_item.target_surface,

@@ -9,24 +9,24 @@ class FakeBuilder:
     def __init__(self):
         self.values = {}
 
-    def objetivo(self, value):
-        self.values["objetivo"] = value
+    def objective(self, value):
+        self.values["objective"] = value
         return self
 
-    def restricoes(self, value):
-        self.values["restricoes"] = value
+    def constraints(self, value):
+        self.values["constraints"] = value
         return self
 
-    def contexto(self, value):
-        self.values["contexto"] = value
+    def context(self, value):
+        self.values["context"] = value
         return self
 
-    def formato(self, value):
-        self.values["formato"] = value
+    def format(self, value):
+        self.values["format"] = value
         return self
 
-    def criterios(self, value):
-        self.values["criterios"] = value
+    def criteria(self, value):
+        self.values["criteria"] = value
         return self
 
     def task_id(self, value):
@@ -70,10 +70,10 @@ def test_omniroute_backend_builds_current_task_contract():
 
     assert result.status == DelegationStatus.SUCCESS
     assert observed["server"] == "omnirouter"
-    assert observed["tool"] == "delegar_tarefa"
+    assert observed["tool"] == "delegate_task"
     assert observed["args"]["task_id"] == "test-req"
     assert observed["args"]["temperature"] == 0
-    assert "source" in observed["args"]["contexto"]
+    assert "source" in observed["args"]["context"]
 
 
 def test_omniroute_backend_handles_mcp_error():
@@ -123,7 +123,7 @@ def test_omniroute_backend_factory_uses_discovered_schema_filtering() -> None:
 
     assert result.status == DelegationStatus.SUCCESS
     assert client.called is not None
-    assert client.called[0] == "delegar_tarefa"
+    assert client.called[0] == "delegate_task"
     assert "temperature" not in client.called[1]
 
 

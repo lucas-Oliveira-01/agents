@@ -414,14 +414,19 @@ class Orchestrator:
         # Invariant: BLOCKED ≠ FAILED ≠ PARTIAL ≠ COMPLETE (ADR-07)
         blocked = [wi for wi in work_items if wi.failure_state == WorkItemFailureState.SAFETY_BLOCK]
         failed = [wi for wi in work_items if wi.failure_state == WorkItemFailureState.INFRA_ERROR]
+        semantic_failed = [wi for wi in work_items if wi.failure_state == WorkItemFailureState.SCHEMA_VIOLATION]
         succeeded = [wi for wi in work_items if wi.failure_state == WorkItemFailureState.NONE
                      and wi.execution_state == ExecutionState.TERMINATED]
 
         all_blocked = len(blocked) == len(work_items) and work_items
         any_failed = bool(failed)
+        any_semantic = bool(semantic_failed)
         any_succeeded = bool(succeeded)
 
-        if any_failed and not any_succeeded:
+        if any_semantic:
+            run.execution_completeness = RunExecutionCompleteness.PARTIAL
+            run.failure_state = RunFailureState.SEMANTIC_COVERAGE_FAILED
+        elif any_failed and not any_succeeded:
             # All executed items failed (no partial success)
             run.execution_completeness = RunExecutionCompleteness.FAILED
             run.failure_state = RunFailureState.INFRA_ERROR

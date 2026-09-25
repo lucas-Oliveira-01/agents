@@ -12,6 +12,7 @@ import pytest
 
 from project_audit.models import (
     ApplicabilityDecision,
+    ApplicabilityState,
     AuditPlan,
     AuditWorkItem,
     BudgetEnvelope,
@@ -112,13 +113,13 @@ def audit_plan(target_snapshot, execution_policy, egress_policy) -> AuditPlan:
         applicability_decisions=[
             ApplicabilityDecision(
                 domain="security",
-                applicable=True,
+                applicable=ApplicabilityState.APPLICABLE,
                 decision_basis="Security audit applicable — auth module present",
                 evidence_refs=[],
             ),
             ApplicabilityDecision(
                 domain="code",
-                applicable=True,
+                applicable=ApplicabilityState.APPLICABLE,
                 decision_basis="Code audit applicable — Python sources detected",
                 evidence_refs=[],
             ),

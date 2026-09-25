@@ -140,10 +140,19 @@ def build_plan(snapshot: TargetSnapshot, applicability: Iterable[ClassifiedAppli
             )
         )
 
+    from .models import ApplicabilityState as ModelsApplicabilityState
+
+    def map_applicability(state):
+        if state == ApplicabilityState.APPLICABLE:
+            return ModelsApplicabilityState.APPLICABLE
+        if state == ApplicabilityState.NOT_APPLICABLE:
+            return ModelsApplicabilityState.NOT_APPLICABLE
+        return ModelsApplicabilityState.UNKNOWN
+
     canonical_decisions = [
         CanonicalApplicabilityDecision(
             domain=f"{decision.category}/{decision.subcategory}",
-            applicable=decision.state != ApplicabilityState.NOT_APPLICABLE,
+            applicable=map_applicability(decision.state),
             decision_basis=(
                 f"state={decision.state.value}; {decision.reason}; "
                 f"evidence={', '.join(decision.evidence_paths[:3]) or 'none'}"

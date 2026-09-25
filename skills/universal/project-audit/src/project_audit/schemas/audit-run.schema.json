@@ -29,7 +29,7 @@
     },
     "failure_state": {
       "type": "string",
-      "enum": ["NONE", "INFRA_ERROR", "SAFETY_BLOCK", "SNAPSHOT_DRIFT", "BUDGET_EXHAUSTED"]
+      "enum": ["NONE", "INFRA_ERROR", "SAFETY_BLOCK", "SNAPSHOT_DRIFT", "BUDGET_EXHAUSTED", "SEMANTIC_COVERAGE_FAILED"]
     },
     "budget_state": {
       "type": "string",
