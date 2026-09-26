@@ -28,6 +28,9 @@
     "raw_output_sha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "derived_from_evidence_ref": {
+      "$ref": "shared.schema.json#/$defs/uuid"
     }
   },
   "required": [
