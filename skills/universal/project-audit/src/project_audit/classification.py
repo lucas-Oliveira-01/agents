@@ -83,7 +83,10 @@ class ProjectProfile:
 
 _SURFACE_PATTERNS = {
     "HTTP": (
+        r"\bimport\s+requests\b",
+        r"\bfrom\s+requests\s+import\b",
         r"\brequests\.(get|post|put|delete|patch)\s*\(",
+        r"\bimport\s+axios\b",
         r"\baxios\.(get|post|put|delete|patch)\s*\(",
         r"\bfetch\s*\(",
         r"\bHttpClient\b",
