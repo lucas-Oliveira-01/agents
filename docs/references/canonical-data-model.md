@@ -98,4 +98,4 @@ Answers: *"What actually happened during this execution?"*
   - `failure_state` / `budget_state`
   - `publication_state`: Enforces the barrier preventing publication of blocked/failed runs.
 - **Artifacts:**
-  - `work_item_refs` / `artifact_refs`
+  - `work_item_refs` / `artifact_refs`\n## Phase 5 — Immutable Auto-Fix Transaction\n\nAuto-fix is a transaction over immutable audit state, never an in-place mutation of an existing Run/Evidence/Finding record.\nThe transaction is valid only for one independently VERIFIED P0/P1 candidate from a clean COMMIT-target Snapshot A.\n\nThe worker operates in an isolated L3W workspace and may return a patch touching only the candidate's verified source file.\nThe Orchestrator applies the patch only after `git apply --check`, captures Snapshot B, and runs a dedicated post-fix audit.\nA Before/After Ledger records Snapshot A, Snapshot B, patch SHA-256, worker receipt, and post-fix finding presence.\nFindingLifecycle=FIXED is recorded only when the same logical finding identity is absent after the post-fix audit; otherwise\nthe transaction is NOT_FIXED/PERSISTING. The historical source run and its Evidence remain immutable.\n\n
