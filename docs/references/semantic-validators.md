@@ -1,6 +1,6 @@
 # Semantic Validators (Orchestrator Layer 2)
 
-*Status: DRAFT (Pre-implementation phase)*
+*Status: IMPLEMENTED — Phase 2 semantic invariants*
 
 While JSON Schemas enforce structure (types, required fields), **Semantic Validators** enforce meaning, invariants, and cross-object consistency. They act as the pure, deterministic gateway that prevents the Orchestrator from corrupting the `.audit/runs/` state.
 
@@ -61,3 +61,21 @@ While JSON Schemas enforce structure (types, required fields), **Semantic Valida
   - Plan is valid and all required work is accounted for.
   - No critical integrity errors exist in the artifacts.
   - No `FAILED` or `BLOCKED` items exist without explicit risk acceptance.
+
+
+## Phase 2 Implementation Notes
+
+The deterministic semantic layer now exposes a complete state-graph validation entry point,
+`validate_state_graph(...)`, covering Snapshot → Plan → WorkItem → Attempt → Run → Evidence
+relationships without mutating persisted state.
+
+Coverage is derived from the set of selected audit domains and the set of domains actually
+covered by successfully terminated or safely reusable WorkItems. WorkItem count is not used as
+a proxy for scope coverage.
+
+Finding lifecycle is independent from finding epistemic status. The lifecycle model includes
+`NEW`, `PERSISTING`, `MODIFIED`, `FIXED`, `REGRESSED`, and `INVALIDATED`.
+`INVALIDATED -> FIXED` is rejected; `REGRESSED` requires a prior `FIXED` state.
+
+Evidence persistence also enforces exact WorkItem and TargetSnapshot references, and the
+optional raw model-output hash is verified deterministically.
