@@ -207,7 +207,10 @@ class SemanticRecoveryLoop:
                 )
             except SchemaViolationError as exc:
                 last_error = exc
-                if 'payload' in locals():
+                error_raw_output = getattr(exc, "raw_output", None)
+                if isinstance(error_raw_output, str):
+                    last_raw_output = error_raw_output
+                elif "payload" in locals():
                     last_raw_output = _raw_output_for(payload)
                 accumulated_errors.append({
                     "attempt": attempt,
