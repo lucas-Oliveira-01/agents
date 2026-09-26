@@ -467,6 +467,16 @@ def plan_incremental_actions_stable(
     return tuple(bindings)
 
 
+def _remap_reference(value: str, path_aliases: Optional[Mapping[str, str]]) -> str:
+    if not path_aliases:
+        return value
+    normalized = normalize_input_ref(value)
+    replacement = path_aliases.get(normalized)
+    if replacement is None:
+        return value
+    return replacement + value[len(normalized):]
+
+
 def derive_reused_evidence(
     prior: Evidence,
     current_snapshot: TargetSnapshot,
@@ -474,14 +484,15 @@ def derive_reused_evidence(
     *,
     generated_at,
     actor: str = "project-audit/incremental-reuse",
+    path_aliases: Optional[Mapping[str, str]] = None,
 ) -> Evidence:
     """Create a fresh immutable Evidence record for a safe REUSE decision."""
     return Evidence(
         evidence_id=str(uuid.uuid4()),
         target_snapshot_ref=current_snapshot.snapshot_fingerprint,
         work_item_ref=current_work_item.work_item_id,
-        source_refs=tuple(prior.source_refs),
-        dependencies=tuple(prior.dependencies),
+        source_refs=tuple(_remap_reference(value, path_aliases) for value in prior.source_refs),
+        dependencies=tuple(_remap_reference(value, path_aliases) for value in prior.dependencies),
         validity=EvidenceValidity.VALID,
         provenance=Provenance(
             actor=actor,
