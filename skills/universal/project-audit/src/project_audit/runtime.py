@@ -132,9 +132,20 @@ def run_full_audit(
     # Phase 4: independent verification happens after semantic review and before
     # any report/normalizer consolidation. The verifier receives only persisted
     # Evidence context and the immutable TargetSnapshot, not the model narrative.
+    work_item_map = {item.work_item_id: item for item in work_items}
+    # Reload the canonical Evidence from disk so the verifier cannot depend on
+    # an unpersisted in-memory semantic response.
+    persisted_reviews = []
+    for review in semantic_reviews:
+        evidence = review.evidence
+        if evidence is not None:
+            evidence = orchestrator.store.load_evidence(evidence.evidence_id)
+        persisted_reviews.append(
+            __import__("dataclasses").replace(review, evidence=evidence)
+        )
     verification_results = verify_semantic_reviews(
-        semantic_reviews,
-        {item.work_item_id: item for item in work_items},
+        tuple(persisted_reviews),
+        work_item_map,
         prepared.snapshot,
     )
     consolidated = consolidated_reviews(semantic_reviews, verification_results)
