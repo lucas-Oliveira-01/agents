@@ -35,7 +35,19 @@ from .normalization_runner import NormalizationResult, run_audit_normalize
 from .delegation import WorkerExecution
 from .autofix import AutoFixError, FixCandidate, FixLedger, logical_finding_key, run_immutable_fix
 from .verifier import IndependentVerifier, VerificationResult, VerificationVerdict, candidate_identity, consolidated_reviews, verify_semantic_reviews
-from .incremental import (IncrementalDecision, DependencyKind, DependencyNode, EvidenceDependencyGraph, decide_incremental_action, build_dependency_graph, plan_incremental_actions)
+from .incremental import (
+    IncrementalDecision,
+    DependencyKind,
+    DependencyNode,
+    EvidenceDependencyGraph,
+    IncrementalBinding,
+    decide_incremental_action,
+    build_dependency_graph,
+    plan_incremental_actions,
+    match_previous_evidence,
+    plan_incremental_actions_stable,
+    derive_reused_evidence,
+)
 from .omniroute_backend import OmniRouteDelegationBackend, create_local_omniroute_backend
 from .models import (
     TargetSnapshot, AuditPlan, AuditWorkItem, Attempt, ExecutionReceipt, Evidence, AuditRun,
@@ -67,9 +79,11 @@ __all__ = [
     "TargetMode", "WorkingTreeState",
     "OmniRouteDelegationBackend", "create_local_omniroute_backend",
     "IncrementalDecision", "DependencyKind", "DependencyNode", "EvidenceDependencyGraph",
+    "IncrementalBinding",
     "IndependentVerifier", "VerificationResult", "VerificationVerdict", "candidate_identity", "verify_semantic_reviews", "consolidated_reviews",
     "AutoFixError", "FixCandidate", "FixLedger", "logical_finding_key", "run_immutable_fix",
     "decide_incremental_action", "build_dependency_graph", "plan_incremental_actions",
+    "match_previous_evidence", "plan_incremental_actions_stable", "derive_reused_evidence",
     "AuditWriterLock", "StateStoreBusyError", "RecoveryBundle",
 ]
 
