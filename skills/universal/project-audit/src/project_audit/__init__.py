@@ -55,4 +55,6 @@ __all__ = [
     "EgressPolicy", "FilesystemAccess", "NetworkAccess", "CredentialAccess", "EgressDestination",
     "TargetMode", "WorkingTreeState",
     "OmniRouteDelegationBackend", "create_local_omniroute_backend",
+    "IncrementalDecision", "DependencyKind", "DependencyNode", "EvidenceDependencyGraph",
+    "decide_incremental_action", "build_dependency_graph", "plan_incremental_actions",
 ]
