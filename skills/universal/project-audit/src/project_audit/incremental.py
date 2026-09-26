@@ -227,12 +227,12 @@ def decide_incremental_action(
 
     # Source changes invalidate reuse and require substantive re-analysis.
     for node in graph.source_nodes:
-        if node.observed_fingerprint != _current_value(node, current_snapshot, auditor):
+        if node.observed_fingerprint != _current_value(node, current_snapshot, auditor, path_aliases):
             return IncrementalDecision.REAUDIT
 
     # Loosely coupled semantic dependency changes require cheap revalidation.
     for node in graph.semantic_nodes:
-        if node.observed_fingerprint != _current_value(node, current_snapshot, auditor):
+        if node.observed_fingerprint != _current_value(node, current_snapshot, auditor, path_aliases):
             return IncrementalDecision.REVALIDATE
 
     # Auditor implementation drift affects the assessment, not the observed fact.
