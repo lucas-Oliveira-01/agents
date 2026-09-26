@@ -211,7 +211,7 @@ class Orchestrator:
         # Cross-object semantic gate: evidence must belong to the exact
         # immutable snapshot referenced by the work item's plan.
         try:
-            plan = self.store.load_plan(work_item.plan_ref)
+            plan = self.store.load_plan(work_item.plan_ref, work_items=[])
             snapshot = self.store.load_snapshot(plan.target_snapshot_ref)
         except Exception as exc:
             raise OrchestratorError(
