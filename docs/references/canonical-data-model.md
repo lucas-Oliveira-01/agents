@@ -1,6 +1,6 @@
 # Canonical Data Model (Orchestrator Layer 2)
 
-*Status: DRAFT (Pre-implementation phase)*
+*Status: IMPLEMENTED — canonical Layer 2 model*
 
 This document defines the semantic ontology of the Orchestrator's internal persisted state (Camada 2). These entities govern the lifecycle, incremental logic, and recovery of the audit process. They are strictly separate from the final Audit Output Contract (Markdown) and the Canonical Normalizer JSON.
 
@@ -114,3 +114,14 @@ recovery_from_ref=<interrupted_run_id>. The interrupted graph remains historical
 A replay is idempotent at the WorkItem boundary: completed successful items are preserved
 and skipped; unfinished or failed items are reconstructed as PLANNED and can execute in
 the new recovery run.
+
+
+## Current implementation alignment
+
+This model is implemented by the post-Phase-10 runtime. Earlier phase records may describe later capabilities as future work; those statements are historical and are not current contracts.
+
+Implemented post-baseline extensions include durable FindingRecord lifecycle persistence and immutable Evidence lineage through `derived_from_evidence_ref` for safe incremental reuse. Cross-run WorkItem matching uses logical identity (auditor + target_surface), never generated UUIDs.
+
+## Phase 11 boundary
+
+Change Impact and Reaudit Necessity are not part of this model yet. Their ontology and propagation rules require a dedicated architectural decision before implementation. No Phase 11 schema field is authorized by this document.
