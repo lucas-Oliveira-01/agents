@@ -13,7 +13,6 @@ from .models import (
     RunPublicationState, WorkItemFailureState,
 )
 from .orchestrator import Orchestrator
-from .planner import build_target_snapshot
 from .incremental import derive_reused_evidence
 from .security_pass import DeterministicSecurityAuditor, SecurityInspectionResult
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
