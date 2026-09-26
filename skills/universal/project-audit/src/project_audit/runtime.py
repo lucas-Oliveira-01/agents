@@ -22,7 +22,7 @@ from .security_runner import SecurityPassResult, execute_security_pass
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 from .verifier import VerificationResult, candidate_identity, consolidated_reviews, verify_semantic_reviews
 from .state_store import AuditWriterLock, StateStore
-from .finding_lifecycle import reconcile_finding_lifecycle
+from .finding_lifecycle import preserve_reused_findings, reconcile_finding_lifecycle
 from .incremental import match_previous_evidence, plan_incremental_actions_stable
 
 
@@ -113,6 +113,7 @@ def _run_full_audit_unlocked(
     orchestrator = Orchestrator(StateStore(resolved_state_dir))
 
     reusable_evidence_by_work_item = None
+    preserved_finding_keys = ()
     if previous_run_ref is not None:
         previous_run = orchestrator.store.load_run(previous_run_ref)
         previous_plan = orchestrator.store.load_plan(previous_run.plan_ref)
@@ -163,6 +164,21 @@ def _run_full_audit_unlocked(
     run = engineering.run
     work_items = list(prepared.work_items)
 
+    if previous_run_ref is not None and reusable_evidence_by_work_item:
+        preserved_finding_keys = preserve_reused_findings(
+            orchestrator.store,
+            run,
+            previous_run_ref,
+            work_items,
+            reusable_evidence_by_work_item,
+        )
+        orchestrator.commit_run(
+            run,
+            prepared.plan,
+            work_items,
+            known_run_ids=orchestrator.store.list_run_ids(),
+        )
+
     # Phase 4: independent verification happens after semantic review and before
     # any report/normalizer consolidation. The verifier receives only persisted
     # Evidence context and the immutable TargetSnapshot, not the model narrative.
@@ -190,6 +206,7 @@ def _run_full_audit_unlocked(
         prepared.plan,
         consolidated,
         verification_results,
+        preserved_finding_keys=preserved_finding_keys,
     )
     normalization = None
     # Render away from final paths. Drift during rendering cannot expose a report.
