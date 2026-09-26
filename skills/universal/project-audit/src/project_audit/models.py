@@ -123,11 +123,27 @@ class EvidenceValidity(str, Enum):
     NOT_DETERMINABLE = "NOT_DETERMINABLE"
 
 
+class FindingStatus(str, Enum):
+    """Epistemic certainty of a finding, independent from lifecycle."""
+    CANDIDATE = "CANDIDATE"
+    PROBABLE = "PROBABLE"
+    CONFIRMED = "CONFIRMED"
+    REJECTED = "REJECTED"
+    NOT_DETERMINABLE = "NOT_DETERMINABLE"
+
+
 class FindingLifecycle(str, Enum):
+    """Historical lifecycle of one logical finding identity.
+
+    Lifecycle is orthogonal to FindingStatus and never treats INVALIDATED as
+    a synonym for FIXED. (ADR-04)
+    """
     NEW = "NEW"
     PERSISTING = "PERSISTING"
+    MODIFIED = "MODIFIED"
     FIXED = "FIXED"
     REGRESSED = "REGRESSED"
+    INVALIDATED = "INVALIDATED"
 
 
 class FilesystemAccess(str, Enum):

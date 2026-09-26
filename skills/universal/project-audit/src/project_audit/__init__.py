@@ -31,7 +31,7 @@ from .models import (
     TargetSnapshot, AuditPlan, AuditWorkItem, Attempt, ExecutionReceipt, Evidence, AuditRun,
     WorkItemAction, ExecutionState, WorkItemFailureState, RunExecutionCompleteness,
     RunCoverageCompleteness, RunFailureState, RunBudgetState, RunPublicationState,
-    EvidenceValidity, FindingLifecycle, FindingFingerprint, Provenance, ExecutionPolicy,
+    EvidenceValidity, FindingStatus, FindingLifecycle, FindingFingerprint, Provenance, ExecutionPolicy,
     EgressPolicy, FilesystemAccess, NetworkAccess, CredentialAccess, EgressDestination,
     TargetMode, WorkingTreeState,
 )
@@ -50,7 +50,7 @@ __all__ = [
     "TargetSnapshot", "AuditPlan", "AuditWorkItem", "Attempt", "ExecutionReceipt", "Evidence", "AuditRun",
     "WorkItemAction", "ExecutionState", "WorkItemFailureState", "RunExecutionCompleteness",
     "RunCoverageCompleteness", "RunFailureState", "RunBudgetState", "RunPublicationState",
-    "EvidenceValidity", "FindingLifecycle", "FindingFingerprint", "Provenance", "ExecutionPolicy",
+    "EvidenceValidity", "FindingStatus", "FindingLifecycle", "FindingFingerprint", "Provenance", "ExecutionPolicy",
     "EgressPolicy", "FilesystemAccess", "NetworkAccess", "CredentialAccess", "EgressDestination",
     "TargetMode", "WorkingTreeState",
     "OmniRouteDelegationBackend", "create_local_omniroute_backend",

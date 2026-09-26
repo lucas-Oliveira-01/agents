@@ -25,6 +25,7 @@ from .models import (
     AuditWorkItem,
     Evidence,
     EgressDestination,
+    ApplicabilityState,
     EvidenceValidity,
     ExecutionState,
     FindingLifecycle,
@@ -240,6 +241,294 @@ def validate_run_previous_ref_distinct_from_recovery(run: AuditRun) -> Validatio
 
 
 # ---------------------------------------------------------------------------
+# Phase 2 — Cross-object semantic invariants
+# ---------------------------------------------------------------------------
+
+
+def _scope_domain(value: str) -> str:
+    """Canonicalize a scope/surface to its top-level audit domain."""
+    return str(value).strip().split("/", 1)[0].upper()
+
+
+def _normalized_scope(values) -> set[str]:
+    return {_scope_domain(v) for v in values if str(v).strip()}
+
+
+def derive_selected_scope(plan: AuditPlan) -> set[str]:
+    """Derive selected scope from applicability, never from an agent assertion."""
+    if not plan.applicability_decisions:
+        return _normalized_scope(plan.resolved_scope)
+    return {
+        _scope_domain(decision.domain)
+        for decision in plan.applicability_decisions
+        if decision.applicable in (
+            ApplicabilityState.APPLICABLE,
+            ApplicabilityState.UNKNOWN,
+        )
+    }
+
+
+def validate_plan_snapshot_consistency(
+    plan: AuditPlan,
+    snapshot: TargetSnapshot,
+) -> ValidationResult:
+    if plan.target_snapshot_ref != snapshot.snapshot_fingerprint:
+        return _error(
+            "PLAN_SNAPSHOT_REF_MISMATCH",
+            f"AuditPlan {plan.plan_id} references snapshot {plan.target_snapshot_ref[:16]}... "
+            f"but supplied snapshot is {snapshot.snapshot_fingerprint[:16]}...",
+        )
+    return _pass("PLAN_SNAPSHOT_REF_VALID", "AuditPlan targets the supplied immutable snapshot.")
+
+
+def validate_plan_scope_resolution(plan: AuditPlan) -> ValidationResult:
+    """resolved_scope must equal applicability-derived selected scope."""
+    resolved = _normalized_scope(plan.resolved_scope)
+    selected = derive_selected_scope(plan)
+    if selected != resolved:
+        return _error(
+            "PLAN_SCOPE_RESOLUTION_MISMATCH",
+            f"AuditPlan {plan.plan_id} resolved_scope does not match applicability-derived scope.",
+            {
+                "selected_scope": sorted(selected),
+                "resolved_scope": sorted(resolved),
+            },
+        )
+    if not plan.applicability_decisions and resolved:
+        return _undeterminable(
+            "PLAN_SCOPE_APPLICABILITY_MISSING",
+            f"AuditPlan {plan.plan_id} has resolved_scope but no applicability decisions; "
+            "scope derivation cannot be independently established.",
+        )
+    return _pass("PLAN_SCOPE_RESOLUTION_VALID", "resolved_scope is derivable from applicability decisions.")
+
+
+def validate_plan_work_item_references(
+    plan: AuditPlan,
+    work_items: List[AuditWorkItem],
+) -> ValidationResult:
+    """Plan and execution view must reference exactly the same WorkItems."""
+    declared_ids = [wi.work_item_id for wi in plan.work_items]
+    actual_ids = [wi.work_item_id for wi in work_items]
+    if len(declared_ids) != len(set(declared_ids)):
+        return _error(
+            "PLAN_DUPLICATE_WORK_ITEM_REF",
+            f"AuditPlan {plan.plan_id} contains duplicate WorkItem references.",
+        )
+    if len(actual_ids) != len(set(actual_ids)):
+        return _error("WORK_ITEM_DUPLICATE_ID", "Execution supplied duplicate WorkItem IDs.")
+    if set(declared_ids) != set(actual_ids):
+        return _error(
+            "PLAN_WORK_ITEM_SET_MISMATCH",
+            f"AuditPlan {plan.plan_id} WorkItem refs do not match the supplied WorkItems.",
+            {"declared": sorted(declared_ids), "actual": sorted(actual_ids)},
+        )
+    invalid_plan_refs = [
+        wi.work_item_id for wi in work_items if wi.plan_ref != plan.plan_id
+    ]
+    if invalid_plan_refs:
+        return _error(
+            "WORK_ITEM_PLAN_REF_MISMATCH",
+            "One or more WorkItems point to a different plan.",
+            {"work_item_ids": invalid_plan_refs, "plan_id": plan.plan_id},
+        )
+    return _pass("PLAN_WORK_ITEM_REFERENCES_VALID", "Plan and WorkItem references are consistent.")
+
+
+def validate_work_item_scope_membership(
+    plan: AuditPlan,
+    work_items: List[AuditWorkItem],
+) -> ValidationResult:
+    """Every informative WorkItem must target a selected/resolved domain."""
+    selected = _normalized_scope(plan.resolved_scope)
+    if not selected:
+        return _undeterminable(
+            "WORK_ITEM_SCOPE_NOT_DETERMINABLE",
+            f"AuditPlan {plan.plan_id} has no resolved scope.",
+        )
+
+    unmatched = []
+    for wi in work_items:
+        domain = _scope_domain(wi.target_surface)
+        if domain not in selected:
+            unmatched.append((wi.work_item_id, domain, wi.target_surface))
+
+    # Generic paths such as src/ do not encode an audit domain and remain
+    # indeterminate rather than being misclassified as a scope violation.
+    informative = [
+        entry for entry in unmatched
+        if entry[2].split("/", 1)[0].upper() not in {"SRC", "ROOT", "PROJECT"}
+    ]
+    if informative:
+        return _error(
+            "WORK_ITEM_OUTSIDE_RESOLVED_SCOPE",
+            "One or more WorkItems target a domain outside the resolved scope.",
+            {
+                "work_items": [
+                    {"work_item_id": wid, "domain": dom, "target_surface": surface}
+                    for wid, dom, surface in informative
+                ],
+                "resolved_scope": sorted(selected),
+            },
+        )
+    return _pass("WORK_ITEM_SCOPE_MEMBERSHIP_VALID", "WorkItems are contained by the resolved scope.")
+
+
+def validate_completed_work_item_has_evidence(
+    work_item: AuditWorkItem,
+    evidence_for_item: List[Evidence],
+) -> ValidationResult:
+    """A successful terminal WorkItem must leave at least one Evidence edge."""
+    if (
+        work_item.execution_state == ExecutionState.TERMINATED
+        and work_item.failure_state == WorkItemFailureState.NONE
+        and not evidence_for_item
+    ):
+        return _error(
+            "WORK_ITEM_COMPLETED_WITHOUT_EVIDENCE",
+            f"WorkItem {work_item.work_item_id} terminated successfully but has no Evidence.",
+        )
+    return _pass("WORK_ITEM_EVIDENCE_LINK_VALID", "WorkItem execution has the required Evidence link.")
+
+
+def validate_evidence_snapshot_consistency(
+    evidence: Evidence,
+    work_item: AuditWorkItem,
+    snapshot: TargetSnapshot,
+) -> ValidationResult:
+    """Evidence must belong to the exact snapshot and WorkItem it claims."""
+    if evidence.work_item_ref != work_item.work_item_id:
+        return _error(
+            "EVIDENCE_WORK_ITEM_MISMATCH",
+            f"Evidence {evidence.evidence_id} references {evidence.work_item_ref}, "
+            f"not WorkItem {work_item.work_item_id}.",
+        )
+    if evidence.target_snapshot_ref != snapshot.snapshot_fingerprint:
+        return _error(
+            "EVIDENCE_SNAPSHOT_MISMATCH",
+            f"Evidence {evidence.evidence_id} references snapshot "
+            f"{evidence.target_snapshot_ref[:16]}... but supplied snapshot is "
+            f"{snapshot.snapshot_fingerprint[:16]}...",
+        )
+    if evidence.raw_output is not None:
+        import hashlib
+        expected = hashlib.sha256(evidence.raw_output.encode("utf-8")).hexdigest()
+        if evidence.raw_output_sha256 != expected:
+            return _error(
+                "EVIDENCE_RAW_OUTPUT_HASH_MISMATCH",
+                f"Evidence {evidence.evidence_id} raw_output_sha256 does not match raw_output.",
+                {"expected": expected, "actual": evidence.raw_output_sha256},
+            )
+    return _pass("EVIDENCE_SNAPSHOT_CONSISTENT", "Evidence belongs to the supplied WorkItem and TargetSnapshot.")
+
+
+def validate_run_work_item_references(
+    run: AuditRun,
+    plan: AuditPlan,
+    work_items: List[AuditWorkItem],
+) -> ValidationResult:
+    """Run refs, plan refs and supplied WorkItems must form one closed set."""
+    actual_ids = [wi.work_item_id for wi in work_items]
+    refs = list(run.work_item_refs)
+    if len(refs) != len(set(refs)):
+        return _error(
+            "RUN_DUPLICATE_WORK_ITEM_REF",
+            f"AuditRun {run.run_id} contains duplicate WorkItem refs.",
+        )
+    if set(refs) != set(actual_ids):
+        return _error(
+            "RUN_WORK_ITEM_SET_MISMATCH",
+            f"AuditRun {run.run_id} refs do not match supplied WorkItems.",
+            {"run_refs": sorted(refs), "actual": sorted(actual_ids)},
+        )
+    if run.plan_ref != plan.plan_id:
+        return _error(
+            "RUN_PLAN_REF_MISMATCH",
+            f"AuditRun {run.run_id} references plan {run.plan_ref}, not {plan.plan_id}.",
+        )
+    if run.target_snapshot_ref != plan.target_snapshot_ref:
+        return _error(
+            "RUN_SNAPSHOT_REF_MISMATCH",
+            f"AuditRun {run.run_id} and AuditPlan {plan.plan_id} reference different snapshots.",
+        )
+    return _pass("RUN_WORK_ITEM_REFERENCES_VALID", "Run, plan, and WorkItems form a closed reference set.")
+
+
+def _is_reusable_item(
+    work_item: AuditWorkItem,
+    evidence_for_item: List[Evidence],
+) -> bool:
+    return (
+        work_item.action == WorkItemAction.REUSE
+        and bool(evidence_for_item)
+        and all(e.validity == EvidenceValidity.VALID for e in evidence_for_item)
+    )
+
+
+def derive_coverage_completeness(
+    plan: AuditPlan,
+    work_items: List[AuditWorkItem],
+    evidence_list: Optional[List[Evidence]] = None,
+) -> RunCoverageCompleteness:
+    """Derive coverage from domain set inclusion, execution and prior evidence."""
+    evidence_by_item: Dict[str, List[Evidence]] = {}
+    for evidence in evidence_list or []:
+        evidence_by_item.setdefault(evidence.work_item_ref, []).append(evidence)
+
+    selected = _normalized_scope(plan.resolved_scope)
+    covered: set[str] = set()
+    blocked: set[str] = set()
+
+    for wi in work_items:
+        domain = _scope_domain(wi.target_surface)
+        item_evidence = evidence_by_item.get(wi.work_item_id, [])
+        reusable = _is_reusable_item(wi, item_evidence)
+        completed = (
+            wi.execution_state == ExecutionState.TERMINATED
+            and wi.failure_state == WorkItemFailureState.NONE
+        )
+        if (reusable or completed) and domain in selected:
+            covered.add(domain)
+        if wi.failure_state == WorkItemFailureState.SAFETY_BLOCK and domain in selected:
+            blocked.add(domain)
+
+    if not selected or not work_items:
+        return RunCoverageCompleteness.NONE
+    if covered >= selected and not blocked:
+        return RunCoverageCompleteness.FULL
+    if not covered:
+        return RunCoverageCompleteness.NONE
+    return RunCoverageCompleteness.PARTIAL
+
+
+def validate_evidence_set_for_run(
+    run: AuditRun,
+    work_items: List[AuditWorkItem],
+    evidence_list: List[Evidence],
+    snapshot: Optional[TargetSnapshot] = None,
+) -> ValidationResult:
+    """Validate every Evidence edge used by the run."""
+    work_item_map = {wi.work_item_id: wi for wi in work_items}
+    for evidence in evidence_list:
+        wi = work_item_map.get(evidence.work_item_ref)
+        if wi is None:
+            return _error(
+                "EVIDENCE_DANGLING_WORK_ITEM_REF",
+                f"Evidence {evidence.evidence_id} references missing WorkItem {evidence.work_item_ref}.",
+            )
+        if snapshot is not None:
+            result = validate_evidence_snapshot_consistency(evidence, wi, snapshot)
+            if result.is_error:
+                return result
+        elif evidence.target_snapshot_ref != run.target_snapshot_ref:
+            return _error(
+                "EVIDENCE_SNAPSHOT_MISMATCH",
+                f"Evidence {evidence.evidence_id} references a snapshot outside the run.",
+            )
+    return _pass("RUN_EVIDENCE_REFERENCES_VALID", "All run Evidence references resolve.")
+
+
+# ---------------------------------------------------------------------------
 # §3 — State Machine & Cross-Object Transitions
 # ---------------------------------------------------------------------------
 
@@ -369,17 +658,80 @@ def validate_finding_lifecycle_transition(
     previous_lifecycle: FindingLifecycle,
     new_lifecycle: FindingLifecycle,
 ) -> ValidationResult:
-    """
-    NEW -> REGRESSED is a semantic error.
-    REGRESSED requires a prior FIXED state.
-    (semantic-validators.md §5)
-    """
-    if new_lifecycle == FindingLifecycle.REGRESSED and previous_lifecycle == FindingLifecycle.NEW:
+    """Validate the explicit FindingLifecycle state machine."""
+    transitions = {
+        FindingLifecycle.NEW: {
+            FindingLifecycle.PERSISTING,
+            FindingLifecycle.MODIFIED,
+            FindingLifecycle.FIXED,
+            FindingLifecycle.INVALIDATED,
+        },
+        FindingLifecycle.PERSISTING: {
+            FindingLifecycle.PERSISTING,
+            FindingLifecycle.MODIFIED,
+            FindingLifecycle.FIXED,
+            FindingLifecycle.INVALIDATED,
+        },
+        FindingLifecycle.MODIFIED: {
+            FindingLifecycle.PERSISTING,
+            FindingLifecycle.MODIFIED,
+            FindingLifecycle.FIXED,
+            FindingLifecycle.INVALIDATED,
+        },
+        FindingLifecycle.FIXED: {
+            FindingLifecycle.FIXED,
+            FindingLifecycle.REGRESSED,
+        },
+        FindingLifecycle.REGRESSED: {
+            FindingLifecycle.PERSISTING,
+            FindingLifecycle.MODIFIED,
+            FindingLifecycle.FIXED,
+            FindingLifecycle.INVALIDATED,
+        },
+        FindingLifecycle.INVALIDATED: {
+            FindingLifecycle.NEW,
+            FindingLifecycle.PERSISTING,
+            FindingLifecycle.MODIFIED,
+        },
+    }
+    allowed = transitions.get(previous_lifecycle, set())
+    if new_lifecycle not in allowed:
+        if new_lifecycle == FindingLifecycle.REGRESSED:
+            return _error(
+                "FINDING_LIFECYCLE_INVALID_REGRESSION",
+                f"Finding cannot transition {previous_lifecycle.value} -> REGRESSED. "
+                "REGRESSED requires a prior FIXED state.",
+            )
+        if new_lifecycle == FindingLifecycle.FIXED and previous_lifecycle == FindingLifecycle.INVALIDATED:
+            return _error(
+                "FINDING_INVALIDATED_NOT_FIXED",
+                "INVALIDATED cannot transition directly to FIXED; invalid evidence is not remediation proof.",
+            )
         return _error(
-            "FINDING_LIFECYCLE_INVALID_REGRESSION",
-            f"Finding cannot transition NEW -> REGRESSED. REGRESSED requires a prior FIXED state.",
+            "FINDING_LIFECYCLE_INVALID_TRANSITION",
+            f"Lifecycle transition {previous_lifecycle.value} -> {new_lifecycle.value} is not permitted.",
         )
-    return _pass("FINDING_LIFECYCLE_TRANSITION_VALID", f"Lifecycle transition {previous_lifecycle} -> {new_lifecycle} is valid.")
+    return _pass(
+        "FINDING_LIFECYCLE_TRANSITION_VALID",
+        f"Lifecycle transition {previous_lifecycle.value} -> {new_lifecycle.value} is valid.",
+    )
+
+
+def validate_finding_lifecycle_sequence(
+    history: List[FindingLifecycle],
+) -> ValidationReport:
+    """Validate a complete lifecycle history from earliest to latest state."""
+    if not history:
+        return ValidationReport([
+            _undeterminable("FINDING_LIFECYCLE_EMPTY", "No lifecycle history supplied.")
+        ])
+    results: List[ValidationResult] = [
+        validate_finding_lifecycle_transition(previous, current)
+        for previous, current in zip(history, history[1:])
+    ]
+    if not results:
+        results.append(_pass("FINDING_LIFECYCLE_SINGLE_STATE", "Single-state lifecycle history is valid."))
+    return ValidationReport(results)
 
 
 # ---------------------------------------------------------------------------
@@ -426,68 +778,64 @@ def validate_coverage_completeness_derivable(
     run: AuditRun,
     plan: AuditPlan,
     work_items: List[AuditWorkItem],
+    evidence_list: Optional[List[Evidence]] = None,
 ) -> ValidationResult:
-    """
-    Coverage completeness must be mathematically derivable, not arbitrarily declared.
-    requested_scope -> applicability -> selected_scope -> completed/reused WorkItems.
-    (semantic-validators.md §6)
-    """
-    # Derive expected coverage from applicability decisions
-    from .models import ApplicabilityState
-    applicable_domains = {
-        d.domain for d in plan.applicability_decisions if d.applicable == ApplicabilityState.APPLICABLE
+    """Coverage is derived from domain set inclusion, not item counts."""
+    selected = _normalized_scope(plan.resolved_scope)
+    if plan.applicability_decisions:
+        derived_selected = derive_selected_scope(plan)
+        if derived_selected != selected:
+            return _error(
+                "PLAN_SCOPE_RESOLUTION_MISMATCH",
+                f"AuditPlan {plan.plan_id} resolved_scope differs from applicability-derived scope.",
+                {
+                    "selected_scope": sorted(derived_selected),
+                    "resolved_scope": sorted(selected),
+                },
+            )
+
+    expected = derive_coverage_completeness(plan, work_items, evidence_list)
+    evidence_by_item: Dict[str, List[Evidence]] = {}
+    for evidence in evidence_list or []:
+        evidence_by_item.setdefault(evidence.work_item_ref, []).append(evidence)
+
+    covered = {
+        _scope_domain(wi.target_surface)
+        for wi in work_items
+        if _scope_domain(wi.target_surface) in selected
+        and (
+            (
+                wi.action == WorkItemAction.REUSE
+                and bool(evidence_by_item.get(wi.work_item_id))
+                and all(
+                    e.validity == EvidenceValidity.VALID
+                    for e in evidence_by_item[wi.work_item_id]
+                )
+            )
+            or (
+                wi.execution_state == ExecutionState.TERMINATED
+                and wi.failure_state == WorkItemFailureState.NONE
+            )
+        )
     }
-    resolved_domains = set(plan.resolved_scope)
 
-    # Completed or reused items
-    terminal_ok_states = {ExecutionState.TERMINATED}
-    completed_items = [
-        wi for wi in work_items
-        if wi.execution_state in terminal_ok_states
-        and wi.failure_state == WorkItemFailureState.NONE
-    ]
-    blocked_items = [
-        wi for wi in work_items
-        if wi.failure_state == WorkItemFailureState.SAFETY_BLOCK
-    ]
-    failed_items = [
-        wi for wi in work_items
-        if wi.failure_state != WorkItemFailureState.NONE
-        and wi.failure_state != WorkItemFailureState.SAFETY_BLOCK
-    ]
-
-    all_blocked = len(blocked_items) == len(work_items) and bool(work_items)
-
-    if all_blocked:
-        # ALL items were blocked — nothing was audited
-        expected_coverage = RunCoverageCompleteness.NONE
-    elif blocked_items or failed_items:
-        # Mixed result: some succeeded, some didn't
-        expected_coverage = RunCoverageCompleteness.PARTIAL
-    elif len(completed_items) >= len(work_items) and work_items:
-        expected_coverage = RunCoverageCompleteness.FULL
-    elif not work_items:
-        expected_coverage = RunCoverageCompleteness.NONE
-    else:
-        expected_coverage = RunCoverageCompleteness.PARTIAL
-
-    if run.coverage_completeness != expected_coverage:
+    if run.coverage_completeness != expected:
         return _error(
             "COVERAGE_COMPLETENESS_MISMATCH",
             f"Run {run.run_id}: declared coverage_completeness={run.coverage_completeness.value} "
-            f"but derived value is {expected_coverage.value}. "
-            "Coverage completeness must be derived, not arbitrarily declared.",
+            f"but derived value is {expected.value}.",
             {
+                "selected_scope": sorted(selected),
+                "covered_scope": sorted(covered),
+                "missing_scope": sorted(selected - covered),
+                "derived": expected.value,
                 "declared": run.coverage_completeness.value,
-                "derived": expected_coverage.value,
-                "completed_items": len(completed_items),
-                "blocked_items": len(blocked_items),
-                "failed_items": len(failed_items),
-                "total_items": len(work_items),
-                "all_blocked": all_blocked,
             },
         )
-    return _pass("COVERAGE_COMPLETENESS_DERIVABLE", "Coverage completeness is consistent with derived value.")
+    return _pass(
+        "COVERAGE_COMPLETENESS_DERIVABLE",
+        f"Coverage is derivable: covered={sorted(covered)}, selected={sorted(selected)}.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -725,6 +1073,49 @@ def can_publish(
 # Composite validators — run full validation suites
 # ---------------------------------------------------------------------------
 
+def validate_state_graph(
+    snapshot: TargetSnapshot,
+    plan: AuditPlan,
+    work_items: List[AuditWorkItem],
+    run: AuditRun,
+    evidence_list: List[Evidence],
+) -> ValidationReport:
+    """Validate the complete Phase 2 state graph without mutation.
+
+    This is the deterministic semantic gateway for the cross-object model:
+    Snapshot -> Plan -> WorkItems -> Attempts -> Run -> Evidence.
+    """
+    results: List[ValidationResult] = [
+        validate_target_snapshot_immutability(snapshot),
+        validate_target_snapshot_fingerprint_matches(snapshot),
+        validate_plan_snapshot_consistency(plan, snapshot),
+        validate_plan_scope_resolution(plan),
+        validate_plan_work_item_references(plan, work_items),
+        validate_work_item_scope_membership(plan, work_items),
+        validate_run_work_item_references(run, plan, work_items),
+        validate_run_not_complete_with_running_items(run, work_items),
+        validate_coverage_not_full_with_blocked_items(run, work_items),
+        validate_coverage_completeness_derivable(run, plan, work_items, evidence_list),
+        validate_evidence_set_for_run(run, work_items, evidence_list, snapshot),
+    ]
+    for work_item in work_items:
+        item_evidence = [
+            evidence for evidence in evidence_list
+            if evidence.work_item_ref == work_item.work_item_id
+        ]
+        results.extend(
+            validate_work_item(
+                work_item,
+                [plan.plan_id],
+                item_evidence,
+            ).results
+        )
+        results.append(
+            validate_completed_work_item_has_evidence(work_item, item_evidence)
+        )
+    return ValidationReport(results)
+
+
 
 def validate_work_item(
     work_item: AuditWorkItem,
@@ -754,10 +1145,13 @@ def validate_run(
     """Run all semantic validators applicable to an AuditRun."""
     known_run_ids = known_run_ids or []
     interrupted_run_ids = interrupted_run_ids or []
+    # Run persistence can occur during intermediate execution states. The
+    # terminal, full graph invariants (scope derivation and coverage derivation)
+    # are enforced by validate_state_graph once all Evidence is available.
     results = [
         validate_run_not_complete_with_running_items(run, work_items),
+        validate_run_work_item_references(run, plan, work_items),
         validate_coverage_not_full_with_blocked_items(run, work_items),
-        validate_coverage_completeness_derivable(run, plan, work_items),
         validate_run_recovery_ref(run, known_run_ids, interrupted_run_ids),
         validate_run_previous_ref_distinct_from_recovery(run),
     ]
