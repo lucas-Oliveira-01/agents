@@ -119,11 +119,22 @@ def _run_full_audit_unlocked(
         previous_plan = orchestrator.store.load_plan(previous_run.plan_ref)
         previous_snapshot = orchestrator.store.load_snapshot(previous_run.target_snapshot_ref)
         previous_work_items = list(previous_plan.work_items)
-        previous_evidence = {}
+        previous_evidence_candidates = {}
         for evidence_id in orchestrator.store.list_evidence_ids():
             evidence = orchestrator.store.load_evidence(evidence_id)
             if evidence.work_item_ref in previous_run.work_item_refs:
-                previous_evidence[evidence.work_item_ref] = evidence
+                previous_evidence_candidates.setdefault(
+                    evidence.work_item_ref, []
+                ).append(evidence)
+
+        # Multiple historical Evidence records for one WorkItem are ambiguous
+        # for automatic reuse. Preserve only one-to-one bindings; ambiguity
+        # fails closed to REAUDIT.
+        previous_evidence = {
+            work_item_ref: candidates[0]
+            for work_item_ref, candidates in previous_evidence_candidates.items()
+            if len(candidates) == 1
+        }
 
         plan_incremental_actions_stable(
             list(prepared.work_items),
