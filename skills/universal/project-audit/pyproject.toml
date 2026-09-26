@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "project-audit"
-version = "0.1.0"
-description = "Core Engine V1 for the project-audit orchestration system."
+version = "0.2.0"
+description = "Swarm-aware project-audit orchestration system with deterministic evidence lifecycle."
 readme = "SKILL.md"
 requires-python = ">=3.9"
 dependencies = [
