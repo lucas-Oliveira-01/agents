@@ -20,6 +20,7 @@ from project_audit.delegation import WorkerPort, DelegationBackend, DelegationRe
 from tests.conftest import make_project_state, make_methodology_state, make_work_item
 from project_audit.models import AuditPlan, WorkingTreeState
 from project_audit.models import (
+    EvidenceValidity,
     EgressDestination,
     EgressPolicy,
     ExecutionPolicy,
@@ -135,7 +136,10 @@ class TestExecuteDelegation:
         items = auditor.generate_work_items(_plan(dummy_snapshot))
         receipt, evidence = auditor.execute(items[0])
         assert receipt.exit_code == 1
-        assert evidence is None
+        assert evidence is not None
+        assert evidence.validity == EvidenceValidity.NOT_DETERMINABLE
+        assert evidence.raw_output == '{"findings": []}'
+        assert evidence.raw_output_sha256
 
 
 # ---------------------------------------------------------------------------
