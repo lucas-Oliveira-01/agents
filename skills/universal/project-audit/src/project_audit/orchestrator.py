@@ -451,16 +451,22 @@ class Orchestrator:
 
         collected_evidence: List[Evidence] = []
 
-        def check_snapshot() -> None:
+        def check_snapshot() -> List[str]:
             if snapshot_provider is not None:
-                self.reconcile_snapshot_drift(
+                return self.reconcile_snapshot_drift(
                     run,
                     plan,
                     work_items,
                     snapshot_provider(),
                 )
-            elif Path(snapshot.project_state.repository_identity).is_dir():
-                self.check_target_unchanged(Path(snapshot.project_state.repository_identity), run, plan, work_items)
+            if Path(snapshot.project_state.repository_identity).is_dir():
+                return self.check_target_unchanged(
+                    Path(snapshot.project_state.repository_identity),
+                    run,
+                    plan,
+                    work_items,
+                )
+            return []
 
         check_snapshot()
         # 4. Execute each WorkItem
@@ -476,7 +482,17 @@ class Orchestrator:
             # Worker executes (isolated output — not yet committed to canonical state)
             receipt, evidence = auditor.execute(work_item, started_at=now)
 
-            check_snapshot()
+            changed_paths = check_snapshot()
+            current_item_drifted = (
+                evidence is not None
+                and self.is_snapshot_node_affected(
+                    changed_paths,
+                    list(evidence.source_refs),
+                )
+            )
+            if current_item_drifted:
+                evidence = replace(evidence, validity=EvidenceValidity.STALE)
+
             # Commit receipt (evidence of execution)
             self.commit_receipt(receipt)
 
@@ -489,12 +505,25 @@ class Orchestrator:
                 attempt.fail(finished_at=now, reason="INFRA_ERROR", receipt_ref=receipt.receipt_id)
                 work_item.terminate(failure_state=WorkItemFailureState.INFRA_ERROR)
             else:
-                # SUCCESS: validate and commit evidence
-                attempt.finish(finished_at=now, exit_code=0, receipt_ref=receipt.receipt_id)
-                self.commit_evidence(evidence, work_item)
-                work_item.artifact_refs.append(f"evidence/{evidence.evidence_id}.json")
-                work_item.terminate(failure_state=WorkItemFailureState.NONE)
-                collected_evidence.append(evidence)
+                if current_item_drifted:
+                    attempt.fail(
+                        finished_at=now,
+                        reason="SNAPSHOT_DRIFT",
+                        receipt_ref=receipt.receipt_id,
+                    )
+                    self.commit_evidence(evidence, work_item)
+                    work_item.artifact_refs.append(f"evidence/{evidence.evidence_id}.json")
+                    work_item.terminate(failure_state=WorkItemFailureState.SNAPSHOT_DRIFT)
+                else:
+                    attempt.finish(
+                        finished_at=now,
+                        exit_code=0,
+                        receipt_ref=receipt.receipt_id,
+                    )
+                    self.commit_evidence(evidence, work_item)
+                    work_item.artifact_refs.append(f"evidence/{evidence.evidence_id}.json")
+                    work_item.terminate(failure_state=WorkItemFailureState.NONE)
+                    collected_evidence.append(evidence)
 
             self.commit_work_item(work_item)
 
@@ -510,6 +539,7 @@ class Orchestrator:
         blocked = [wi for wi in work_items if wi.failure_state == WorkItemFailureState.SAFETY_BLOCK]
         failed = [wi for wi in work_items if wi.failure_state == WorkItemFailureState.INFRA_ERROR]
         semantic_failed = [wi for wi in work_items if wi.failure_state == WorkItemFailureState.SCHEMA_VIOLATION]
+        stale_items = [wi for wi in work_items if wi.failure_state == WorkItemFailureState.SNAPSHOT_DRIFT]
         succeeded = [wi for wi in work_items if wi.failure_state == WorkItemFailureState.NONE
                      and wi.execution_state == ExecutionState.TERMINATED]
 
@@ -517,6 +547,7 @@ class Orchestrator:
         any_failed = bool(failed)
         any_semantic = bool(semantic_failed)
         any_succeeded = bool(succeeded)
+        any_stale = bool(stale_items)
 
         if any_semantic:
             run.execution_completeness = RunExecutionCompleteness.PARTIAL
@@ -529,6 +560,8 @@ class Orchestrator:
             # ALL work items were blocked by policy — nothing executed
             run.execution_completeness = RunExecutionCompleteness.BLOCKED
             run.failure_state = RunFailureState.SAFETY_BLOCK
+        elif any_stale and not any_failed:
+            run.execution_completeness = RunExecutionCompleteness.PARTIAL
         elif (blocked or failed) and any_succeeded:
             # Mixed: some succeeded, some blocked/failed — PARTIAL
             run.execution_completeness = RunExecutionCompleteness.PARTIAL
@@ -549,7 +582,7 @@ class Orchestrator:
         # COMPLETE run has FULL coverage
         if all_blocked:
             run.coverage_completeness = RunCoverageCompleteness.NONE
-        elif blocked or failed:
+        elif blocked or failed or any_stale:
             run.coverage_completeness = RunCoverageCompleteness.PARTIAL
         elif work_items:
             run.coverage_completeness = RunCoverageCompleteness.FULL
