@@ -233,6 +233,17 @@ class FindingFingerprint:
     """Stable identity descriptor for a finding.
     Does NOT embed description, cause, impact, or recommendation (canonical §4)."""
 
+    domain: str
+    control_surface: str
+    defect_type: str
+
+    def to_dict(self) -> dict:
+        return {
+            "domain": self.domain,
+            "control_surface": self.control_surface,
+            "defect_type": self.defect_type,
+        }
+
 
 @dataclass(frozen=True)
 class FindingRecord:
@@ -263,17 +274,6 @@ class FindingRecord:
             "previous_lifecycle": self.previous_lifecycle.value if self.previous_lifecycle else None,
             "severity": self.severity,
             "history": [item.value for item in self.history],
-        }
-
-    domain: str
-    control_surface: str
-    defect_type: str
-
-    def to_dict(self) -> dict:
-        return {
-            "domain": self.domain,
-            "control_surface": self.control_surface,
-            "defect_type": self.defect_type,
         }
 
 
