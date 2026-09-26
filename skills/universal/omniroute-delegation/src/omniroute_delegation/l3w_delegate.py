@@ -190,7 +190,7 @@ class L3WDelegate:
         config = L3WConfig(
             harness_executable=harness,
             repository_root=workspace_dir,
-            persist_workspace=True,
+            persist_workspace=False,
         )
         session = await self.start(config)
         try:
