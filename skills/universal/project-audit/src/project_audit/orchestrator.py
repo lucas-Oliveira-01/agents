@@ -444,7 +444,12 @@ class Orchestrator:
 
         def check_snapshot() -> None:
             if snapshot_provider is not None:
-                self.ensure_snapshot_current(run, plan, work_items, snapshot_provider().snapshot_fingerprint)
+                self.reconcile_snapshot_drift(
+                    run,
+                    plan,
+                    work_items,
+                    snapshot_provider(),
+                )
             elif Path(snapshot.project_state.repository_identity).is_dir():
                 self.check_target_unchanged(Path(snapshot.project_state.repository_identity), run, plan, work_items)
 
