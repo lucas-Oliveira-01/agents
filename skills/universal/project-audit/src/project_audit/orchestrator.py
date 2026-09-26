@@ -70,6 +70,8 @@ from .validators import (
     validate_snapshot,
     validate_work_item,
     validate_evidence_snapshot_consistency,
+    validate_plan_scope_resolution,
+    validate_plan_work_item_references,
 )
 
 logger = logging.getLogger(__name__)
@@ -136,11 +138,26 @@ class Orchestrator:
         """Freeze the plan (if not already frozen), validate, persist."""
         if not plan.is_frozen:
             plan.freeze()
-        # Structural gate (plan_id + work_items refs only)
+        # Structural gate
         errors = validate_audit_plan(plan.to_dict())
         if errors:
             raise SchemaValidationError(
                 f"AuditPlan schema validation failed:\n" + "\n".join(errors)
+            )
+
+        # Phase 2 semantic gate. The snapshot reference is validated when the
+        # snapshot is available in the store; scope and WorkItem closure are
+        # always checked from the plan itself.
+        scope_report = validate_plan_scope_resolution(plan)
+        if scope_report.level.value == "ERROR":
+            raise OrchestratorError(
+                f"AuditPlan semantic validation failed: {scope_report.code}: {scope_report.message}"
+            )
+        refs_report = validate_plan_work_item_references(plan, list(plan.work_items))
+        if refs_report.has_errors:
+            raise OrchestratorError(
+                "AuditPlan semantic validation failed: "
+                + "; ".join(r.code for r in refs_report.errors())
             )
         self.store.save_plan(plan)
         logger.info("Plan frozen and committed: %s", plan.plan_id)
