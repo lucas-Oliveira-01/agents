@@ -136,6 +136,11 @@ def main() -> int:
                     semantic_worker=semantic_worker,
                     semantic_egress_policy=egress_policy,
                     normalize_command=args.normalize_command,
+                    execution_state_path=(
+                        Path(args.output_dir)
+                        if args.output_dir
+                        else discovery.root / ".audit"
+                    ) / "audit_execution_state.json",
                 )
             except AutoFixError as exc:
                 print(f"Auto-fix refused: {exc}", file=sys.stderr)
