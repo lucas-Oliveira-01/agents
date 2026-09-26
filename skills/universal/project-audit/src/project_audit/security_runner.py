@@ -49,6 +49,7 @@ def execute_security_pass(
     inspections = []
     evidences = []
     semantic_reviews = []
+    semantic_partial = False
 
     for item in work_items:
         if not item.target_surface.startswith("SECURITY/"):
@@ -115,6 +116,7 @@ def execute_security_pass(
                 work_items=work_items,
             )
             semantic_reviews.append(semantic_result)
+            semantic_partial = semantic_partial or semantic_result.status == "PARTIAL_COVERAGE"
             if semantic_result.evidence is not None:
                 evidences.append(semantic_result.evidence)
             if semantic_result.status != "COMPLETED":
@@ -151,10 +153,11 @@ def execute_security_pass(
         and item.failure_state == WorkItemFailureState.NONE
     ]
 
-    if semantic_failed:
+    if semantic_partial and not semantic_failed and not failed and not blocked:
         run.execution_completeness = RunExecutionCompleteness.PARTIAL
         run.coverage_completeness = RunCoverageCompleteness.PARTIAL
-        run.failure_state = RunFailureState.SEMANTIC_COVERAGE_FAILED
+        run.failure_state = RunFailureState.NONE
+    elif semantic_failed:
     elif blocked or failed:
         if not succeeded and blocked and not failed:
             run.execution_completeness = RunExecutionCompleteness.BLOCKED
