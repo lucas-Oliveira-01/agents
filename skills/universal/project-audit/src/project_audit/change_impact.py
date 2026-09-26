@@ -78,7 +78,7 @@ class ChangeImpact:
         return any(event.kind == ChangeKind.METHODOLOGY_CHANGE for event in self.events)
 
     @property
-    changed_paths(self) -> Tuple[str, ...]:
+    def changed_paths(self) -> Tuple[str, ...]:
         values = set()
         for event in self.events:
             values.add(event.path)
