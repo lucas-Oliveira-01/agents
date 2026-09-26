@@ -1,12 +1,12 @@
 """Regression tests for L3W sandboxing, memory bubbles, and lifecycle control."""
 
-import asyncio
 import sys
 from pathlib import Path
 
 import pytest
 
 from omniroute_delegation.contracts import DelegateKind, ExecutionState
+from omniroute_delegation.exceptions import SandboxError, SandboxUnavailableError
 from omniroute_delegation.l3w_delegate import L3WConfig, L3WDelegate
 from omniroute_delegation.worker_manager import (
     MemoryMode,
@@ -40,7 +40,7 @@ async def test_workspace_sandbox_never_uses_repository_root(tmp_path: Path):
 async def test_workspace_path_escape_is_rejected(tmp_path: Path):
     sandbox = await WorkspaceSandbox.create(workspace_dir=str(tmp_path / "sandbox"))
     try:
-        with pytest.raises(Exception):
+        with pytest.raises(SandboxError):
             sandbox.assert_inside(str(tmp_path / "outside.txt"))
     finally:
         await sandbox.cleanup()
@@ -128,7 +128,7 @@ async def test_strict_sandbox_fails_closed_when_bwrap_is_missing(monkeypatch, tm
     manager = WorkerManager()
     workspace = await WorkspaceSandbox.create(workspace_dir=str(tmp_path / "workspace"))
 
-    with pytest.raises(Exception):
+    with pytest.raises(SandboxUnavailableError):
         await manager.run(
             command=[sys.executable, "-c", "print('should not run')"],
             workspace=workspace,
