@@ -9,6 +9,7 @@ from .planner import PreparedAudit
 from .discovery import DiscoverySnapshot
 from .security_runner import SecurityPassResult
 from .semantic_auditor import SemanticFindingCandidate, SemanticReviewResult
+from .verifier import VerificationResult
 
 
 def _write(path: Path, content: str, overwrite: bool) -> None:
@@ -175,6 +176,7 @@ def render_report(
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
     semantic_reviews: Iterable[SemanticReviewResult] = (),
+    verification_results: Iterable[VerificationResult] = (),
 ) -> str:
     identity = _identity(prepared, discovery)
     engineering_obs = [o for r in engineering.inspections for o in r.observations]
@@ -291,6 +293,28 @@ def render_report(
         "",
     ])
     semantic_markdown = render_semantic_findings(semantic_reviews)
+    verification_list = list(verification_results)
+    if verification_list:
+        lines.extend([
+            "## 24.1 Independent Verifier",
+            "",
+            "Formal P0/P1 consolidation is gated by independent evidence verification.",
+            "",
+        ])
+        for result in sorted(
+            verification_list,
+            key=lambda item: (item.work_item_ref, item.candidate_id),
+        ):
+            lines.append(
+                "- {} | {} | {} | Evidence={} | {}".format(
+                    result.candidate_id,
+                    result.severity,
+                    result.verdict.value,
+                    result.evidence_ref or "NONE",
+                    "; ".join(result.reasons),
+                )
+            )
+        lines.append("")
     if semantic_markdown:
         lines.extend([semantic_markdown.rstrip(), ""])
     else:
@@ -431,6 +455,7 @@ def render_ledger(
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
     semantic_reviews: Iterable[SemanticReviewResult] = (),
+    verification_results: Iterable[VerificationResult] = (),
 ) -> str:
     lines = [
         "# AUDIT LEDGER",
@@ -445,6 +470,27 @@ def render_ledger(
         "",
     ]
     semantic_markdown = render_semantic_findings(semantic_reviews)
+    verification_list = list(verification_results)
+    if verification_list:
+        lines.extend([
+            "## Independent Verifier",
+            "",
+            "| Candidate | Severity | Verdict | Evidence |",
+            "|---|---|---|---|",
+        ])
+        for result in sorted(
+            verification_list,
+            key=lambda item: (item.work_item_ref, item.candidate_id),
+        ):
+            lines.append(
+                "| {} | {} | {} | {} |".format(
+                    result.candidate_id,
+                    result.severity,
+                    result.verdict.value,
+                    result.evidence_ref or "NONE",
+                )
+            )
+        lines.append("")
     if semantic_markdown:
         lines.extend([semantic_markdown.rstrip(), ""])
 
@@ -475,6 +521,7 @@ def write_audit_artifacts(
     engineering: EngineeringPassResult,
     security: SecurityPassResult,
     semantic_reviews: Iterable[SemanticReviewResult] = (),
+    verification_results: Iterable[VerificationResult] = (),
     overwrite: bool = False,
 ) -> Dict[str, str]:
     root = Path(output_dir)
@@ -495,8 +542,20 @@ def write_audit_artifacts(
     rendered = {
         "inventory": render_inventory(prepared, discovery),
         "coverage": render_coverage(prepared, engineering, security),
-        "report": render_report(prepared, discovery, engineering, security, semantic_reviews),
-        "ledger": render_ledger(engineering, security, semantic_reviews),
+        "report": render_report(
+            prepared,
+            discovery,
+            engineering,
+            security,
+            semantic_reviews,
+            verification_results,
+        ),
+        "ledger": render_ledger(
+            engineering,
+            security,
+            semantic_reviews,
+            verification_results,
+        ),
     }
     for key in ("inventory", "coverage", "report", "ledger"):
         _write(Path(paths[key]), rendered[key], overwrite)

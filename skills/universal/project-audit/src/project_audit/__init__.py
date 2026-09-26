@@ -26,6 +26,7 @@ from .report_writer import write_audit_artifacts
 from .runtime import FullAuditResult, run_full_audit
 from .normalization_runner import NormalizationResult, run_audit_normalize
 from .delegation import WorkerExecution
+from .verifier import IndependentVerifier, VerificationResult, VerificationVerdict, candidate_identity, consolidated_reviews, verify_semantic_reviews
 from .incremental import (IncrementalDecision, DependencyKind, DependencyNode, EvidenceDependencyGraph, decide_incremental_action, build_dependency_graph, plan_incremental_actions)
 from .omniroute_backend import OmniRouteDelegationBackend, create_local_omniroute_backend
 from .models import (
@@ -56,5 +57,6 @@ __all__ = [
     "TargetMode", "WorkingTreeState",
     "OmniRouteDelegationBackend", "create_local_omniroute_backend",
     "IncrementalDecision", "DependencyKind", "DependencyNode", "EvidenceDependencyGraph",
+    "IndependentVerifier", "VerificationResult", "VerificationVerdict", "candidate_identity", "verify_semantic_reviews", "consolidated_reviews",
     "decide_incremental_action", "build_dependency_graph", "plan_incremental_actions",
 ]

@@ -98,6 +98,18 @@ INVALIDATE permanece decisão de nível Evidence. Como o contrato canônico de A
 possui apenas ações executáveis REUSE, REVALIDATE e REAUDIT, uma decisão INVALIDATE
 é vinculada a REAUDIT para impedir o reaproveitamento e forçar nova análise.
 
+
+### Fase 4 — Independent Verifier
+
+Após cada revisão semântica, o Core executa um Verifier independente antes da consolidação dos artifacts.
+O Verifier não consome raw output, provider, model ou narrativa do auditor para decidir a passagem do gate;
+ele verifica exclusivamente a aderência entre candidato, Evidence persistida, WorkItem e TargetSnapshot.
+
+P0/P1 somente podem atravessar o gate quando já são CONFIRMED, HIGH e possuem localização de fonte ancorada
+nas referências da Evidence. Falhas produzem VERIFIED, REJECTED ou NOT_DETERMINABLE; o Verifier jamais promove
+um candidato para CONFIRMED. Candidatos P0/P1 não verificados são removidos do conjunto consolidado que alimenta
+o normalizer, enquanto o resultado da verificação permanece registrado no execution state e no Ledger.
+
 ## 6. O Caminho para `Architecture Frozen`
 
 A implementação física do agente `project-audit` **NÃO DEVE** iniciar até que a seguinte esteira termine:
