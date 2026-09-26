@@ -14,12 +14,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
+from .contracts import ExecutionState
 from .exceptions import (
     MemoryScopeError,
     SandboxError,
     SandboxUnavailableError,
     WorkerManagerError,
-    WorkerTimeoutError,
 )
 
 
@@ -297,9 +297,14 @@ class WorkerManager:
 
         return_code = process.returncode if process.returncode is not None else 1
         timed_out = return_code == 124
-        state = "SUCCESS" if return_code == 0 else "RUNNING"
-        if timed_out:
-            state = "SCHEMA_VIOLATION"
+        if return_code == 0:
+            state = ExecutionState.SUCCESS.value
+        elif timed_out:
+            state = ExecutionState.TIMED_OUT.value
+        elif return_code in (130, 143):
+            state = ExecutionState.CANCELLED.value
+        else:
+            state = ExecutionState.FAILED.value
 
         return WorkerRunResult(
             worker_id=worker_id,
@@ -422,7 +427,7 @@ async def _run_capture(command: Sequence[str]) -> str:
         stderr=asyncio.subprocess.PIPE,
     )
     stdout, stderr = await process.communicate()
-    if process.returncode != 0 and command[:3] != ["git", "-C", str(command[2])]:
+    if process.returncode != 0:
         error = stderr.decode("utf-8", errors="replace").strip()
         raise WorkerManagerError(error or f"Command failed: {' '.join(command)}")
     return stdout.decode("utf-8", errors="replace")
