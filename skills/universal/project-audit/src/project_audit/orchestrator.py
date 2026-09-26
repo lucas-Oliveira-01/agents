@@ -155,7 +155,7 @@ class Orchestrator:
                 f"AuditPlan semantic validation failed: {scope_report.code}: {scope_report.message}"
             )
         refs_report = validate_plan_work_item_references(plan, list(plan.work_items))
-        if refs_report.has_errors:
+        if refs_report.is_error:
             raise OrchestratorError(
                 "AuditPlan semantic validation failed: "
                 + "; ".join(r.code for r in refs_report.errors())
