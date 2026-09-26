@@ -352,6 +352,7 @@ def run_immutable_fix(
     semantic_worker: Any,
     semantic_egress_policy: Any,
     normalize_command: str,
+    execution_state_path: Optional[Path] = None,
 ) -> FixLedger:
     """Execute exactly one verified P0/P1 fix transaction and re-audit it."""
     from .runtime import run_full_audit
@@ -366,7 +367,7 @@ def run_immutable_fix(
     observed = current_snapshot(root, target_mode=source_snapshot.target_mode)
     validate_fix_preconditions(root, source_snapshot, observed)
 
-    state_path = root / ".audit" / "audit_execution_state.json"
+    state_path = execution_state_path or (root / ".audit" / "audit_execution_state.json")
     if not state_path.is_file():
         raise AutoFixError(
             "Immutable auto-fix requires the source run execution state with verifier results."
