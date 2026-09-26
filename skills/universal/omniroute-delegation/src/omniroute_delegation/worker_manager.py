@@ -13,7 +13,7 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Dict, List, Mapping, Optional, Sequence
 
 from .contracts import ExecutionState
 from .exceptions import (
@@ -270,9 +270,11 @@ class WorkerManager:
             policy,
         )
 
-        manifest = Path(
-            tempfile.mkstemp(prefix=f"omniroute-l3w-{worker_id}-", suffix=".json")[1]
+        manifest_fd, manifest_name = tempfile.mkstemp(
+            prefix=f"omniroute-l3w-{worker_id}-", suffix=".json"
         )
+        os.close(manifest_fd)
+        manifest = Path(manifest_name)
         config = {
             "command": sandboxed_command,
             "cwd": str(workspace.root),
