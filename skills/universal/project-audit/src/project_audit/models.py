@@ -24,7 +24,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 # ---------------------------------------------------------------------------
@@ -232,6 +232,38 @@ class Provenance:
 class FindingFingerprint:
     """Stable identity descriptor for a finding.
     Does NOT embed description, cause, impact, or recommendation (canonical §4)."""
+
+
+@dataclass(frozen=True)
+class FindingRecord:
+    """Durable lifecycle record for one canonical FindingFingerprint."""
+
+    finding_key: str
+    fingerprint: FindingFingerprint
+    status: FindingStatus
+    lifecycle: FindingLifecycle
+    run_ref: str
+    evidence_ref: Optional[str]
+    first_seen: datetime
+    last_seen: datetime
+    previous_lifecycle: Optional[FindingLifecycle] = None
+    severity: Optional[str] = None
+    history: Tuple[FindingLifecycle, ...] = ()
+
+    def to_dict(self) -> dict:
+        return {
+            "finding_key": self.finding_key,
+            "fingerprint": self.fingerprint.to_dict(),
+            "status": self.status.value,
+            "lifecycle": self.lifecycle.value,
+            "run_ref": self.run_ref,
+            "evidence_ref": self.evidence_ref,
+            "first_seen": self.first_seen.isoformat(),
+            "last_seen": self.last_seen.isoformat(),
+            "previous_lifecycle": self.previous_lifecycle.value if self.previous_lifecycle else None,
+            "severity": self.severity,
+            "history": [item.value for item in self.history],
+        }
 
     domain: str
     control_surface: str
