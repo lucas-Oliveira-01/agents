@@ -61,6 +61,16 @@ def execute_semantic_review(
         orchestrator.commit_work_item(work_item)
         return result
 
+    if result.status == "SCHEMA_VIOLATION":
+        attempt.fail(
+            finished_at=finished,
+            reason="SCHEMA_VIOLATION",
+            receipt_ref=result.receipt.receipt_id,
+        )
+        work_item.terminate(failure_state=WorkItemFailureState.SCHEMA_VIOLATION)
+        orchestrator.commit_work_item(work_item)
+        return result
+
     if result.status == "INVALID_OUTPUT":
         attempt.fail(
             finished_at=finished,
@@ -68,6 +78,19 @@ def execute_semantic_review(
             receipt_ref=result.receipt.receipt_id,
         )
         work_item.terminate(failure_state=WorkItemFailureState.SCHEMA_VIOLATION)
+        orchestrator.commit_work_item(work_item)
+        return result
+
+    if result.status == "PARTIAL_COVERAGE":
+        if result.evidence is None:
+            raise ValueError("PARTIAL_COVERAGE requires valid evidence.")
+        attempt.finish(
+            finished_at=finished,
+            exit_code=0,
+            receipt_ref=result.receipt.receipt_id,
+        )
+        orchestrator.commit_evidence(result.evidence, work_item)
+        work_item.terminate(failure_state=WorkItemFailureState.NONE)
         orchestrator.commit_work_item(work_item)
         return result
 
