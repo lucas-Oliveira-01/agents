@@ -6,7 +6,11 @@ import pytest
 
 from project_audit.discovery import discover
 from project_audit.engineering_auditor import EngineeringAuditor
-from project_audit.models import EgressDestination, EgressPolicy, EvidenceValidity
+from project_audit.models import (
+    EgressDestination,
+    EgressPolicy,
+    EvidenceValidity,
+)
 from project_audit.orchestrator import Orchestrator
 from project_audit.planner import build_target_snapshot, prepare_audit
 from project_audit.runtime import run_full_audit
@@ -200,11 +204,17 @@ def test_vertical_slice_marks_current_evidence_stale_on_node_drift(tmp_path):
                 0,
             )
 
+    prepared.plan.egress_policy = EgressPolicy(
+        EgressDestination.APPROVED_EXTERNAL,
+        True,
+    )
     auditor = SecurityAuditor(
         WorkerPort(MutatingResponse(), "test"),
         prepared.snapshot,
     )
     items = auditor.generate_work_items(prepared.plan)
+    for item in items:
+        item.data_egress_policy = prepared.plan.egress_policy
     prepared.plan.work_items = items
     store = StateStore(tmp_path / ".audit" / "runs")
 
