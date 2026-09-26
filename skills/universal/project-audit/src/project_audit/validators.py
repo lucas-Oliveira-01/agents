@@ -1056,6 +1056,42 @@ def can_publish(
 # Composite validators — run full validation suites
 # ---------------------------------------------------------------------------
 
+def validate_state_graph(
+    snapshot: TargetSnapshot,
+    plan: AuditPlan,
+    work_items: List[AuditWorkItem],
+    run: AuditRun,
+    evidence_list: List[Evidence],
+) -> ValidationReport:
+    """Validate the complete Phase 2 state graph without mutation.
+
+    This is the deterministic semantic gateway for the cross-object model:
+    Snapshot -> Plan -> WorkItems -> Attempts -> Run -> Evidence.
+    """
+    results: List[ValidationResult] = [
+        validate_target_snapshot_immutability(snapshot),
+        validate_target_snapshot_fingerprint_matches(snapshot),
+        validate_plan_snapshot_consistency(plan, snapshot),
+        validate_plan_scope_resolution(plan),
+        validate_plan_work_item_references(plan, work_items),
+        validate_work_item_scope_membership(plan, work_items),
+        validate_run_work_item_references(run, plan, work_items),
+        validate_run_not_complete_with_running_items(run, work_items),
+        validate_coverage_not_full_with_blocked_items(run, work_items),
+        validate_coverage_completeness_derivable(run, plan, work_items, evidence_list),
+        validate_evidence_set_for_run(run, work_items, evidence_list, snapshot),
+    ]
+    for work_item in work_items:
+        item_evidence = [
+            evidence for evidence in evidence_list
+            if evidence.work_item_ref == work_item.work_item_id
+        ]
+        results.append(validate_work_item(work_item, [plan.plan_id], item_evidence).results[-1])
+        results.append(validate_attempt_ordering(work_item))
+        results.append(validate_work_item_scope_membership(plan, [work_item]))
+    return ValidationReport(results)
+
+
 
 def validate_work_item(
     work_item: AuditWorkItem,
