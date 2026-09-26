@@ -235,7 +235,7 @@ def _application(
         return "FULLSTACK"
     if frontend:
         return "WEB_FRONTEND"
-    if backend or "HTTP" in technology_surfaces:
+    if backend:
         return "WEB_BACKEND"
     if cli:
         return "CLI"
