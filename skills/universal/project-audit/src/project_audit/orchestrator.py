@@ -579,6 +579,20 @@ class Orchestrator:
             recovery_from_ref=recovery_from_ref,
         )
 
+        # Persist the RUNNING anchor before executing any WorkItem.
+        # This makes abrupt process termination recoverable from durable state.
+        self.commit_run(
+            run,
+            plan,
+            work_items,
+            known_run_ids=self.store.list_run_ids(),
+            interrupted_run_ids=(
+                [recovery_from_ref]
+                if recovery_from_ref is not None
+                else None
+            ),
+        )
+
         collected_evidence: List[Evidence] = []
 
         def check_snapshot() -> List[str]:
@@ -601,6 +615,8 @@ class Orchestrator:
         check_snapshot()
         # 4. Execute each WorkItem
         for work_item in work_items:
+            if work_item.execution_state == ExecutionState.TERMINATED:
+                continue
             check_snapshot()
             # Commit initial planned state
             self.commit_work_item(work_item)
