@@ -120,6 +120,7 @@ def test_coverage_is_full_when_every_selected_domain_is_covered(audit_plan, targ
 
 
 def test_reuse_only_counts_with_valid_evidence(audit_plan, target_snapshot):
+    audit_plan.resolved_scope = ["security"]
     item = make_work_item(
         audit_plan.plan_id,
         target_surface="security/authentication",
@@ -130,10 +131,16 @@ def test_reuse_only_counts_with_valid_evidence(audit_plan, target_snapshot):
         work_item_ref=item.work_item_id,
     )
 
-    assert derive_coverage_completeness(audit_plan, [item], [evidence]) == RunCoverageCompleteness.PARTIAL
+    assert item.action == WorkItemAction.REUSE
+    assert evidence.validity == EvidenceValidity.VALID
+    assert derive_coverage_completeness(
+        audit_plan, [item], [evidence]
+    ) == RunCoverageCompleteness.FULL
 
     invalid = dataclasses.replace(evidence, validity=EvidenceValidity.INVALID)
-    assert derive_coverage_completeness(audit_plan, [item], [invalid]) == RunCoverageCompleteness.PARTIAL
+    assert derive_coverage_completeness(
+        audit_plan, [item], [invalid]
+    ) == RunCoverageCompleteness.NONE
 
 
 def test_evidence_snapshot_mismatch_is_rejected(target_snapshot, work_item):
