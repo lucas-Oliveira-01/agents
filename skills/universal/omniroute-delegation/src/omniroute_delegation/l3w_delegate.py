@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Mapping, Optional, Sequence
+from typing import Dict, List, Mapping, Optional, Sequence
 
 from pydantic import BaseModel, Field
 
@@ -38,6 +38,8 @@ class L3WConfig(BaseModel):
         default_factory=lambda: ["PATH", "HOME", "USER", "LANG", "LC_ALL"]
     )
     memory_write_paths: List[str] = Field(default_factory=list)
+    memory_mounts: Dict[str, str] = Field(default_factory=dict)
+    memory_sandbox_path: str = "/l3w-memory"
     strict_sandbox: bool = True
     use_bwrap: bool = True
     sandbox_read_only_paths: List[str] = Field(default_factory=list)
@@ -139,6 +141,7 @@ class L3WDelegate:
                 else None,
                 cleanup=effective.cleanup_memory,
                 consolidate=effective.consolidate_memory,
+                sandbox_mount=effective.memory_sandbox_path,
             )
         )
         base_environment = _base_environment(effective.inherit_environment)
@@ -220,4 +223,5 @@ def _build_policy(config: L3WConfig, memory: MemoryScope) -> SandboxPolicy:
         use_bwrap=config.use_bwrap,
         writable_paths=tuple(dict.fromkeys(writable)),
         additional_read_only_paths=tuple(config.sandbox_read_only_paths),
+        writable_bindings={**config.memory_mounts, **({str(memory.root_dir): config.memory_sandbox_path} if memory.root_dir else {})},
     )
