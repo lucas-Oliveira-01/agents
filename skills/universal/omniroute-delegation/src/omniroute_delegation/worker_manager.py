@@ -168,12 +168,27 @@ class WorkspaceSandbox:
 
         git_root = await _git_toplevel(source)
         if git_root:
-            await _run_checked(
-                ["git", "-C", str(git_root), "worktree", "add", "--detach", str(root), "HEAD"]
+            status = await _run_capture(
+                ["git", "-C", str(git_root), "status", "--porcelain=v1", "--untracked-files=all"]
             )
-            return cls(root=root, source_root=git_root, git_worktree=True, temporary=True)
+            if not status.strip():
+                await _run_checked(
+                    ["git", "-C", str(git_root), "worktree", "add", "--detach", str(root), "HEAD"]
+                )
+                return cls(root=root, source_root=git_root, git_worktree=True, temporary=True)
 
-        shutil.copytree(source, root, dirs_exist_ok=True)
+            # A dirty target cannot be represented by a HEAD worktree. For
+            # read-only audit/re-audit orders, copy the current filesystem
+            # state instead, excluding nested Git/audit control planes.
+            shutil.copytree(
+                source,
+                root,
+                dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns(".git", ".audit"),
+            )
+            return cls(root=root, source_root=source, git_worktree=False, temporary=True)
+
+        shutil.copytree(source, root, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".audit"))
         return cls(root=root, source_root=source, git_worktree=False, temporary=True)
 
     def map_source_path(self, candidate: str) -> Path:

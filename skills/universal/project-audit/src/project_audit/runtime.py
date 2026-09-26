@@ -20,7 +20,7 @@ from .planner import PreparedAudit, prepare_audit
 from .report_writer import write_audit_artifacts
 from .security_runner import SecurityPassResult, execute_security_pass
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
-from .verifier import VerificationResult, consolidated_reviews, verify_semantic_reviews
+from .verifier import VerificationResult, candidate_identity, consolidated_reviews, verify_semantic_reviews
 from .state_store import StateStore
 
 
@@ -178,16 +178,38 @@ def run_full_audit(
                             "provider": review.provider,
                             "model": review.model,
                             "raw_output_sha256": review.raw_output_fingerprint,
-                            "verification": [
+                            "candidates": [
                                 {
-                                    "candidate_id": result.candidate_id,
-                                    "severity": result.severity,
-                                    "verdict": result.verdict.value,
-                                    "evidence_ref": result.evidence_ref,
-                                    "reasons": list(result.reasons),
+                                    "candidate_id": candidate_identity(candidate),
+                                    "title": candidate.title,
+                                    "category": candidate.category,
+                                    "subcategory": candidate.subcategory,
+                                    "finding_type": candidate.finding_type,
+                                    "status": candidate.status,
+                                    "severity": candidate.severity,
+                                    "confidence": candidate.confidence,
+                                    "location": candidate.location,
+                                    "evidence": candidate.evidence,
+                                    "description": candidate.description,
+                                    "recommendation": candidate.recommendation,
+                                    "verification": next(
+                                        (
+                                            {
+                                                "verdict": result.verdict.value,
+                                                "evidence_ref": result.evidence_ref,
+                                                "reasons": list(result.reasons),
+                                            }
+                                            for result in verification_results
+                                            if result.candidate_id == candidate_identity(candidate)
+                                        ),
+                                        {
+                                            "verdict": "NOT_DETERMINABLE",
+                                            "evidence_ref": None,
+                                            "reasons": ["No independent verification result was produced."],
+                                        },
+                                    ),
                                 }
-                                for result in verification_results
-                                if result.work_item_ref == review.work_item_ref
+                                for candidate in review.candidates
                             ],
                         }
                         for review in semantic_reviews

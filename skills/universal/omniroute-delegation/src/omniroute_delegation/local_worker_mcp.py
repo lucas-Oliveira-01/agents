@@ -34,6 +34,7 @@ async def dispatch_opencode_worker(
         task,
         target_file=target_file or None,
     )
+    diff = await session.workspace.diff()
     return json.dumps(
         {
             "session_id": session.session_id,
@@ -41,6 +42,7 @@ async def dispatch_opencode_worker(
             "worker_id": result.worker_id,
             "workspace_dir": result.workspace_dir,
             "changed_files": result.changed_files,
+            "diff": diff,
             "output": result.leaf.raw_output if result.leaf else None,
         },
         ensure_ascii=False,
