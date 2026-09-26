@@ -13,6 +13,12 @@ O Project Audit (PA) evoluiu do estágio *Single-Agent MVP* para uma verdadeira 
 **2. Integração Pydantic e Contratos:**
 A comunicação entre as camadas ocorre através dos contratos oficiais `AuditContract` e `LeafContract`. O PA não constrói mais chamadas MCP manuais e nem lida com strings brutas, promovendo tipagem forte end-to-end.
 
+## Phase 8 — Operational Validation
+
+A pós-condição da Phase 7 agora passa por uma camada explícita de aceitação operacional. O branch da Phase 8 adiciona um corpus determinístico, testes de repetição do runtime e um exercício completo do FindingLifecycle.
+
+A suíte também valida uma propriedade necessária para repetibilidade: fingerprints de inspeções determinísticas não dependem de IDs voláteis de WorkItems. O resultado de um mesmo alvo, metodologia e conteúdo observado deve permanecer canonicamente estável entre execuções.
+
 ## Resultados Implementados e Escalabilidade
 
 | Feature | Estado | Descrição Técnica |
