@@ -229,7 +229,7 @@ def _application(
             "springframework", "app.listen", "http.server",
         )
     )
-    cli = bool(re.search(r"(argparse|click|typer|commander)", text, re.IGNORECASE))
+    cli = bool(re.search(r"\b(argparse|click|typer|commander)\b", text, re.IGNORECASE))
 
     if frontend and backend:
         return "FULLSTACK"
