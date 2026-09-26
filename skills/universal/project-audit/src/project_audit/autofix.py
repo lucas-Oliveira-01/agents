@@ -82,9 +82,13 @@ class FixLedger:
         }
 
 
-def current_snapshot(root: Path) -> TargetSnapshot:
+def current_snapshot(
+    root: Path,
+    *,
+    target_mode: TargetMode = TargetMode.WORKTREE,
+) -> TargetSnapshot:
     discovery = discover(str(root))
-    return build_target_snapshot(discovery, target_mode=TargetMode.WORKTREE)
+    return build_target_snapshot(discovery, target_mode=target_mode)
 
 
 def logical_finding_key(
@@ -359,7 +363,7 @@ def run_immutable_fix(
 
     source_run = store.load_run(source_run_id)
     source_snapshot = store.load_snapshot(source_run.target_snapshot_ref)
-    observed = current_snapshot(root)
+    observed = current_snapshot(root, target_mode=source_snapshot.target_mode)
     validate_fix_preconditions(root, source_snapshot, observed)
 
     state_path = root / ".audit" / "audit_execution_state.json"
@@ -428,7 +432,7 @@ def run_immutable_fix(
         # Snapshot B is captured after the patch and before the re-audit. The
         # re-audit itself gets a dedicated state/output namespace so the source
         # run's immutable artifacts are never overwritten.
-        snapshot_b_pre_audit = current_snapshot(root)
+        snapshot_b_pre_audit = current_snapshot(root, target_mode=TargetMode.WORKTREE)
         reaudit_root = root / ".audit" / "fixes" / ledger.fix_id / "reaudit"
         reaudited = run_full_audit(
             str(root),
