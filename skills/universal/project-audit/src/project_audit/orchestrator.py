@@ -18,14 +18,15 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .fake_auditor import FakeAuditor, FakeAuditorResult, FakeAuditorWithSnapshot
 from .models import (
     ApplicabilityDecision,
+    Attempt,
     AuditPlan,
     AuditRun,
     AuditWorkItem,
@@ -88,6 +89,16 @@ class OrchestratorError(RuntimeError):
 
 class SnapshotDriftError(RuntimeError):
     """Raised when snapshot drift is detected during execution (§18)."""
+
+
+@dataclass(frozen=True)
+class RecoveryBundle:
+    """Fresh plan/run/work-item graph reconstructed from an interrupted run."""
+
+    interrupted_run_ref: str
+    plan: AuditPlan
+    work_items: Tuple[AuditWorkItem, ...]
+    run: AuditRun
 
 
 # ---------------------------------------------------------------------------
@@ -418,31 +429,113 @@ class Orchestrator:
     # Recovery (ADR-07): reconstruct state from disk after interruption   #
     # ------------------------------------------------------------------ #
 
-    def recover_run(self, interrupted_run_id: str) -> AuditRun:
+    def recover_run(self, interrupted_run_id: str) -> RecoveryBundle:
         """
-        RECOVERY path (≠ RETRY): reconstruct state from persisted artifacts.
-        The caller must create a new AuditRun with recovery_from_ref pointing
-        to the interrupted run. (ADR-07)
+        RECOVERY path (≠ RETRY): construct a fresh closed Plan → WorkItem → Run
+        graph from durable state. Historical state is never reused as mutable
+        execution state. Completed WorkItems are preserved; unfinished/failed
+        items are replayed from PLANNED in the new recovery graph.
         """
         if not self.store.run_exists(interrupted_run_id):
             raise OrchestratorError(
                 f"Recovery failed: run {interrupted_run_id} not found in store."
             )
+
         interrupted_run = self.store.load_run(interrupted_run_id)
-        
-        from project_audit.models import RunExecutionCompleteness, IllegalStateTransitionError
+        from project_audit.models import IllegalStateTransitionError
         if interrupted_run.execution_completeness == RunExecutionCompleteness.COMPLETE:
             raise IllegalStateTransitionError(
                 f"Cannot recover run {interrupted_run_id} because it is already COMPLETE. "
-                "Recovery is only for interrupted runs (e.g. PARTIAL or RUNNING)."
+                "Recovery is only for interrupted runs."
             )
 
-        logger.info(
-            "Recovery: loaded interrupted run %s (completeness=%s)",
-            interrupted_run_id,
-            interrupted_run.execution_completeness.value,
+        original_plan = self.store.load_plan(interrupted_run.plan_ref)
+        new_plan_id = str(uuid.uuid4())
+        recovery_items = []
+
+        for old_item_id in interrupted_run.work_item_refs:
+            old_item = self.store.load_work_item(old_item_id)
+            completed = (
+                old_item.execution_state == ExecutionState.TERMINATED
+                and old_item.failure_state == WorkItemFailureState.NONE
+            )
+            attempts = [
+                Attempt(
+                    attempt_id=attempt.attempt_id,
+                    started_at=attempt.started_at,
+                    finished_at=attempt.finished_at,
+                    failure_reason=attempt.failure_reason,
+                    receipt_ref=attempt.receipt_ref,
+                )
+                for attempt in old_item.attempts
+            ] if completed else []
+
+            recovery_items.append(
+                AuditWorkItem(
+                    work_item_id=str(uuid.uuid4()),
+                    plan_ref=new_plan_id,
+                    auditor=old_item.auditor,
+                    target_surface=old_item.target_surface,
+                    action=old_item.action,
+                    decision_basis=old_item.decision_basis
+                    + f"; recovery_from={interrupted_run_id}",
+                    effective_execution_policy=old_item.effective_execution_policy,
+                    data_egress_policy=old_item.data_egress_policy,
+                    execution_state=ExecutionState.TERMINATED if completed else ExecutionState.PLANNED,
+                    failure_state=WorkItemFailureState.NONE,
+                    attempts=attempts,
+                    artifact_refs=list(old_item.artifact_refs) if completed else [],
+                )
+            )
+
+        recovery_plan = AuditPlan(
+            plan_id=new_plan_id,
+            target_snapshot_ref=original_plan.target_snapshot_ref,
+            requested_scope=list(original_plan.requested_scope),
+            applicability_decisions=list(original_plan.applicability_decisions),
+            resolved_scope=list(original_plan.resolved_scope),
+            work_items=recovery_items,
+            execution_policy=original_plan.execution_policy,
+            egress_policy=original_plan.egress_policy,
+            budget_envelope=original_plan.budget_envelope,
         )
-        return interrupted_run
+        self.commit_snapshot(self.store.load_snapshot(original_plan.target_snapshot_ref))
+        self.freeze_and_commit_plan(recovery_plan)
+        for item in recovery_items:
+            self.commit_work_item(item)
+
+        recovery_run = AuditRun(
+            run_id=str(uuid.uuid4()),
+            target_snapshot_ref=recovery_plan.target_snapshot_ref,
+            plan_ref=recovery_plan.plan_id,
+            work_item_refs=[item.work_item_id for item in recovery_items],
+            execution_completeness=RunExecutionCompleteness.RUNNING,
+            coverage_completeness=RunCoverageCompleteness.PENDING,
+            failure_state=RunFailureState.NONE,
+            budget_state=RunBudgetState.HEALTHY,
+            publication_state=RunPublicationState.NOT_PUBLISHED,
+            previous_run_ref=None,
+            recovery_from_ref=interrupted_run_id,
+        )
+        self.commit_run(
+            recovery_run,
+            recovery_plan,
+            recovery_items,
+            known_run_ids=self.store.list_run_ids(),
+            interrupted_run_ids=[interrupted_run_id],
+        )
+
+        logger.info(
+            "Recovery bundle created from run %s -> new run %s",
+            interrupted_run_id,
+            recovery_run.run_id,
+        )
+        return RecoveryBundle(
+            interrupted_run_ref=interrupted_run_id,
+            plan=recovery_plan,
+            work_items=tuple(recovery_items),
+            run=recovery_run,
+        )
 
     # ------------------------------------------------------------------ #
     # Vertical Slice: full pipeline in one call (for testing/integration) #
