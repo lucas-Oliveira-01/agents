@@ -58,11 +58,11 @@ class EvidenceImpact:
     change_kinds: Tuple[ChangeKind, ...]
 
     @property
-    has_source_impact(self) -> bool:
+    def has_source_impact(self) -> bool:
         return bool(self.source_paths)
 
     @property
-    has_dependency_impact(self) -> bool:
+    def has_dependency_impact(self) -> bool:
         return bool(self.dependency_paths)
 
 
