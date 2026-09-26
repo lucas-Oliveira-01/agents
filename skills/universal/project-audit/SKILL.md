@@ -82,3 +82,15 @@ The engine must not claim full audit publication merely because PASS 1 completed
 - Semantic escalation is opt-in through the `semantic_worker` API.
 - Supplying a semantic worker without an explicit `semantic_egress_policy` is rejected.
 - Semantic work uses a second `Attempt` on the same `AuditWorkItem`; the item is not reopened after termination.
+
+
+## OmniRoute Swarm Integration
+
+Semantic escalation is provided by the official `omniroute-delegation` skill.
+
+- L2 creates `DelegationTask` payloads and delegates only through `DelegationGateway`.
+- The L2 never calls MCP transport methods directly.
+- `AuditContract.state=PARTIAL_COVERAGE` preserves valid findings and records `raw_errors` without converting the audit into a clean result or discarding evidence.
+- Node-level snapshot drift marks only affected WorkItems and their Evidence as `SNAPSHOT_DRIFT` / `STALE`.
+- Unaffected WorkItems and Evidence remain eligible for continued processing.
+- The audit remains `PARTIAL` when a node becomes stale; global artifact state is not erased.
