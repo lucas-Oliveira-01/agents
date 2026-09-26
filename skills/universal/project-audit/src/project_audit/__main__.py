@@ -19,7 +19,7 @@ import sys
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run or prepare a project-audit single-agent audit")
+    parser = argparse.ArgumentParser(description="Run or prepare a project-audit swarm-aware audit")
     parser.add_argument("--target", default=".", help="Repository/worktree to inspect")
     parser.add_argument(
         "--state-dir",
@@ -172,7 +172,6 @@ def main() -> int:
             normalize=args.normalize,
             normalize_command=args.normalize_command,
             semantic_worker=semantic_worker,
-            # R-01 Fix: Use LOCAL_ONLY to avoid implicit external egress without user flag (we can add a CLI flag later if needed, but for local tests we use APPROVED_EXTERNAL or bypass the check in the gateway). Wait, if I change it to LOCAL_ONLY, the semantic pass will be blocked by `omniroute_backend` unless the data is NOT sensitive. But wait, `run_full_audit` passes EgressPolicy to it. If I set it to LOCAL_ONLY and `allow_sensitive=True`, the worker port will reject it. Let's leave it as APPROVED_EXTERNAL but require an explicit confirmation or just comment it for now. I will leave it APPROVED_EXTERNAL because otherwise the audit won't work locally for our test. BUT Astra marked it as P1 because it is implicit. To fix it properly, I'll add an argument `--allow-external`. Let's just fix the variables here.
             semantic_egress_policy=EgressPolicy(destination=EgressDestination.APPROVED_EXTERNAL if getattr(args, "allow_external", False) else EgressDestination.LOCAL_ONLY, allow_sensitive=True),
         )
         final_run = result.security.run
