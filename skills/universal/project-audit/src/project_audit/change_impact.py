@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Mapping, Optional, Tuple
 
 def normalize_input_ref(value: str) -> str:
-    text = str(value).strip().replace("\\\\", "/").lstrip("./")
+    text = str(value).strip().replace("\\", "/").lstrip("./")
     if not text:
         return ""
     if ":" in text and not (len(text) >= 2 and text[1] == ":"):
