@@ -45,11 +45,13 @@ class MemoryScope:
     bubble_id: Optional[str] = None
     root_dir: Optional[Path] = None
     orders_file: Optional[Path] = None
+    environment: Dict[str, str] = field(default_factory=dict)
 
     def prepare(self, workspace: Path, base_environment: Mapping[str, str]) -> Dict[str, str]:
         env = dict(base_environment)
         if self.config.mode == MemoryMode.GLOBAL:
             env["AI_MEMORY_SCOPE"] = "global"
+            self.environment = env
             return env
 
         self.bubble_id = self.config.bubble_id or f"l3w-{uuid.uuid4().hex[:12]}"
@@ -74,7 +76,11 @@ class MemoryScope:
         (self.root_dir / "scope.json").write_text(
             json.dumps(metadata, indent=2), encoding="utf-8"
         )
+        self.environment = env
         return env
+
+    def environment_overrides(self) -> Dict[str, str]:
+        return dict(self.environment)
 
     def append_order(self, instruction: str, source: str = "l2") -> None:
         if not self.orders_file:
