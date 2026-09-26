@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from .models import AuditWorkItem, Evidence, ExecutionReceipt, ExecutionPolicy, Provenance, EvidenceValidity
+from omniroute_delegation.contracts import AuditContract
 from .validators import validate_egress_policy
 
 
@@ -59,8 +60,9 @@ class DelegationResult:
     status: DelegationStatus
     output_payload: Optional[Dict[str, Any]]
     error_message: Optional[str]
-    provider_info: Optional[str]  # e.g., "omniroute/claude-sonnet-3.5"
+    provider_info: Optional[str]
     usage_tokens: Optional[int]
+    audit_contract: Optional[AuditContract] = None
 
 
 @dataclasses.dataclass(frozen=True)
