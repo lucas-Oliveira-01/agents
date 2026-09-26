@@ -176,6 +176,15 @@ class WorkspaceSandbox:
         shutil.copytree(source, root, dirs_exist_ok=True)
         return cls(root=root, source_root=source, git_worktree=False, temporary=True)
 
+    def map_source_path(self, candidate: str) -> Path:
+        path = Path(candidate).expanduser()
+        if not path.is_absolute() and self.source_root:
+            path = self.source_root / path
+        path = path.resolve()
+        if self.source_root and _is_same_or_inside(path, self.source_root):
+            return self.root / path.relative_to(self.source_root)
+        return self.assert_inside(str(path))
+
     def assert_inside(self, candidate: str) -> Path:
         path = Path(candidate).expanduser().resolve()
         if not _is_same_or_inside(path, self.root):
