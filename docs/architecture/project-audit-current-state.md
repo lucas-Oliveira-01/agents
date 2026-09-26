@@ -25,6 +25,10 @@ A camada de Deterministic Intelligence agora possui um contrato explícito. `pre
 
 Os resultados carregam `classifier_id`, versão, entradas, resultado, confiança, justificativa e provenance. Nenhuma dessas decisões usa LLM, rede ou mutação do projeto.
 
+## Phase 10 — Runtime Incremental Reuse
+
+A matriz incremental agora participa da execução real. WorkItems regenerados são associados por identidade lógica (auditor + target_surface); ausência ou ambiguidade de Evidence falha fechado para REAUDIT. Quando REUSE é provado seguro, o runtime cria uma nova Evidence imutável vinculada ao WorkItem/Snapshot atuais e preserva a linhagem por derived_from_evidence_ref. Findings não corrigidos de superfícies reutilizadas são carregados para a reconciliação de lifecycle, evitando falsos FIXED.
+
 ## Resultados Implementados e Escalabilidade
 
 | Feature | Estado | Descrição Técnica |
