@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, Iterable
 
 from .engineering_runner import EngineeringPassResult
+from .models import WorkItemFailureState
 from .planner import PreparedAudit
 from .discovery import DiscoverySnapshot
 from .security_runner import SecurityPassResult
@@ -76,6 +77,25 @@ def render_inventory(prepared: PreparedAudit, discovery: DiscoverySnapshot) -> s
         lines.append("| {} | {} | {} | {} |".format(
             item.category, item.subcategory, item.state.value, item.reason
         ))
+    stale_items = [
+        item for item in prepared.work_items
+        if item.failure_state == WorkItemFailureState.SNAPSHOT_DRIFT
+    ]
+    if stale_items:
+        lines.extend([
+            "## STALE NODES",
+            "",
+            "The following WorkItems were invalidated locally because their source evidence referenced files that changed during execution.",
+            "",
+            "| WorkItem | Surface | State |",
+            "|---|---|---|",
+        ])
+        lines.extend(
+            "| {} | {} | STALE |".format(item.work_item_id, item.target_surface)
+            for item in stale_items
+        )
+        lines.append("")
+
     lines.extend([
         "",
         "## LIMITATIONS",
@@ -341,10 +361,30 @@ def render_semantic_findings(
         )
     )
 
-    if not candidates:
+    if not candidates and not any(review.raw_errors or review.status != "COMPLETED" for review in reviews):
         return ""
 
-    lines = ["## SEMANTIC FINDINGS", ""]
+    lines = ["## SEMANTIC COVERAGE", ""]
+    review_list = list(reviews)
+    for review in review_list:
+        if review.status == "COMPLETED" and not review.raw_errors:
+            continue
+        lines.extend([
+            "### WorkItem {}".format(review.work_item_ref),
+            "",
+            "Coverage status: {}".format(review.status),
+        ])
+        if review.raw_errors:
+            lines.append("Raw errors:")
+            lines.extend(
+                "- " + str(error).replace("\n", " ")
+                for error in review.raw_errors
+            )
+        lines.append("")
+
+    if candidates:
+        lines.append("## SEMANTIC FINDINGS")
+        lines.append("")
     for index, (_, candidate) in enumerate(candidates, start=1):
         lines.extend([
             "### {} — {}".format(_semantic_finding_id(candidate, index), candidate.title),
