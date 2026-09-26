@@ -10,7 +10,7 @@ from typing import List, Mapping, Optional, Sequence
 from pydantic import BaseModel, Field
 
 from .contracts import AuditContract, DelegateKind, DelegationTask, ExecutionState, LeafContract
-from .exceptions import SandboxError, WorkerManagerError
+from .exceptions import WorkerManagerError
 from .worker_manager import (
     MemoryMode,
     MemoryScope,
@@ -205,7 +205,7 @@ def _build_environment(
     memory: MemoryScope,
 ) -> Mapping[str, str]:
     environment = dict(_base_environment(config.inherit_environment))
-    environment.update(memory.prepare_dummy_environment())
+    environment.update(memory.environment_overrides())
     environment["L3W_EXECUTION_MODE"] = "stateful"
     environment["L3W_WORKSPACE_ROOT"] = "/workspace"
     return environment
