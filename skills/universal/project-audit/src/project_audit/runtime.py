@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import shutil
 import subprocess
@@ -141,7 +142,7 @@ def run_full_audit(
         if evidence is not None:
             evidence = orchestrator.store.load_evidence(evidence.evidence_id)
         persisted_reviews.append(
-            __import__("dataclasses").replace(review, evidence=evidence)
+            dataclasses.replace(review, evidence=evidence)
         )
     verification_results = verify_semantic_reviews(
         tuple(persisted_reviews),
