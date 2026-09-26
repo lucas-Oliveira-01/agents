@@ -21,6 +21,13 @@ from .security_runner import SecurityPassResult, execute_security_pass
 from .semantic_auditor import SemanticAuditor, SemanticFindingCandidate, SemanticReviewResult
 from .semantic_runner import execute_semantic_review
 from .context_builder import ContextBundle, ContextItem, build_context
+from .classification import (
+    ClassificationResult,
+    ProjectProfile,
+    build_classification_results,
+    classify_technology_surfaces,
+    profile_project,
+)
 from .sensitivity import SensitivityAssessment, SensitivityState, aggregate_assessments, assess_text
 from .report_writer import write_audit_artifacts
 from .runtime import FullAuditResult, run_full_audit
@@ -47,6 +54,8 @@ __all__ = [
     "EngineeringPassResult", "execute_engineering_pass",
     "SemanticAuditor", "SemanticFindingCandidate", "SemanticReviewResult", "execute_semantic_review",
     "ContextBundle", "ContextItem", "build_context",
+    "ClassificationResult", "ProjectProfile", "build_classification_results",
+    "classify_technology_surfaces", "profile_project",
     "SensitivityAssessment", "SensitivityState", "aggregate_assessments", "assess_text",
     "WorkerExecution",
     "DeterministicSecurityAuditor", "SecurityInspectionResult", "SecurityObservation", "SecurityPassResult", "execute_security_pass", "write_audit_artifacts", "NormalizationResult", "run_audit_normalize",
