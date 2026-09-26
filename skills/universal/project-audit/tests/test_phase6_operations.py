@@ -91,7 +91,7 @@ def test_recovery_builds_new_closed_graph_without_mutating_original(
     state_store.save_plan(audit_plan)
 
     run = AuditRun(
-        run_id="recovery-source",
+        run_id="2b0d9d3a-52c0-4f37-8acb-67df4a3659c1",
         target_snapshot_ref=target_snapshot.snapshot_fingerprint,
         plan_ref=audit_plan.plan_id,
         work_item_refs=[work_item.work_item_id],
@@ -103,7 +103,7 @@ def test_recovery_builds_new_closed_graph_without_mutating_original(
     )
     state_store.save_run(run)
 
-    bundle = Orchestrator(state_store).recover_run(run.run_id)
+    bundle = Orchestrator(state_store).prepare_recovery(run.run_id)
 
     assert bundle.interrupted_run_ref == run.run_id
     assert bundle.run.run_id != run.run_id
@@ -141,6 +141,9 @@ def test_engineering_run_anchor_survives_worker_exception(tmp_path: Path, audit_
     plan.work_items = [item]
 
     discovery = discover(str(tmp_path))
+    from project_audit.planner import build_target_snapshot
+    matching_snapshot = build_target_snapshot(discovery)
+    plan.target_snapshot_ref = matching_snapshot.snapshot_fingerprint
 
     class ExplodingAuditor:
         def inspect(self, discovery, work_item_id, target_surface):
