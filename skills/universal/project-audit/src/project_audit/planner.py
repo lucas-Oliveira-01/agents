@@ -7,6 +7,7 @@ from typing import Iterable, Tuple
 from .classifiers import ApplicabilityDecision as ClassifiedApplicability
 from .classifiers import ApplicabilityState, FileClassification, classify_task
 from .discovery import DiscoverySnapshot
+from .incremental import IncrementalDecision, plan_incremental_actions
 from .models import (
     ApplicabilityDecision as CanonicalApplicabilityDecision,
     AuditPlan,
@@ -193,3 +194,29 @@ def prepare_audit(
     snapshot = build_target_snapshot(discovery, target_mode=target_mode)
     plan, work_items = build_plan(snapshot, applicability)
     return PreparedAudit(snapshot, plan, work_items, files, applicability)
+
+def apply_incremental_decisions(
+    work_items: Iterable[AuditWorkItem],
+    previous_evidence: dict[str, object],
+    previous_snapshot: TargetSnapshot,
+    current_snapshot: TargetSnapshot,
+) -> Tuple[IncrementalDecision, ...]:
+    """Apply deterministic ADR-04 decisions before a plan is frozen.
+
+    Missing evidence is treated conservatively as REAUDIT. INVALIDATE is an
+    evidence-level result and is bound to executable REAUDIT on the WorkItem.
+    """
+    from .models import Evidence
+
+    typed_evidence = {
+        work_item_id: evidence
+        for work_item_id, evidence in previous_evidence.items()
+        if isinstance(evidence, Evidence)
+    }
+    return plan_incremental_actions(
+        work_items=work_items,
+        evidence_by_work_item=typed_evidence,
+        previous_snapshot=previous_snapshot,
+        current_snapshot=current_snapshot,
+    )
+

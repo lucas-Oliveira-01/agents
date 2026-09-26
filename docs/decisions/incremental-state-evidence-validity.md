@@ -54,3 +54,15 @@ The incremental decision (`REUSE`, `REVALIDATE`, `REAUDIT`, `INVALIDATE`) is cal
 - **Positive:** Massive reduction in LLM token costs through safe `REUSE`.
 - **Positive:** Eliminates false "Fixes" caused by files moving or being deleted.
 - **Negative:** The Orchestrator's planning phase becomes highly complex, as it must compute dependency intersections across `TargetSnapshots`.
+## Phase 3 — Frozen Dependency Evaluation
+
+The deferred dependency-graph mechanism is now deterministic and implemented in `project_audit.incremental`.
+`source_refs` are strong/source dependencies; `dependencies` are semantic dependencies. The algorithm
+compares their exact normalized paths and SHA-256 input fingerprints across immutable TargetSnapshots,
+and separately compares audit contract, policy, and auditor-version methodology nodes.
+
+Decision precedence is immutable: `INVALIDATE > REAUDIT > REVALIDATE > REUSE`.
+Missing dependency context fails safe to `REAUDIT`; deleted current dependencies produce `INVALIDATE`.
+An `INVALIDATE` decision is evidence-level and is bound to executable `REAUDIT` because the canonical
+WorkItem schema does not execute an INVALIDATE action.
+

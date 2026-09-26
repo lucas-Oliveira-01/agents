@@ -1,6 +1,6 @@
 # Audit System Architectural Specification
 
-*Status: DRAFT (Pre-implementation phase)*
+*Status: IMPLEMENTED — core architecture with Phase 3 incremental graph*
 
 Esta especificação consolida as diretrizes para o ecossistema de auditoria baseada em agentes, unificando a orquestração (`project-audit`), infraestrutura de execução (`OmniRoute`), normalização determinística (`audit-normalize`) e estado incremental (`.audit/`).
 
@@ -75,10 +75,28 @@ Para não misturar responsabilidades, o sistema é dividido em três camadas est
 
 ## 5. Indefinições Estruturais
 
-- **Algoritmo Exato do "Evidence Dependency Graph":** A semântica existe (mudança em X invalida Y), mas o mecanismo de descoberta (heurística vs AST) ainda não foi congelado.
 - **Mecanismo de Lock do `.audit/`:** Como garantir o Single-Writer fisicamente.
 
 ---
+
+
+### Fase 3 — Evidence Dependency Graph
+
+O algoritmo incremental agora é congelado em project_audit.incremental:
+
+1. Evidence.source_refs são dependências fortes (SOURCE).
+2. Evidence.dependencies são dependências semânticas desacopladas (SEMANTIC).
+3. Cada aresta é resolvida contra os fingerprints dos inputs do TargetSnapshot que produziu a Evidence.
+4. Fonte/dependência removida ou inexiste no snapshot anterior torna o contexto não determinável e exige REAUDIT; remoção no snapshot atual produz INVALIDATE.
+5. Mudança de fonte exige REAUDIT; mudança de dependência semântica exige REVALIDATE.
+6. Mudança de audit_contract_version ou policy_version exige REAUDIT.
+7. Mudança da versão do auditor exige REVALIDATE.
+8. Sem dependências factuais registradas, a decisão é REAUDIT por fail-safe.
+9. A precedência decisória é fixa: INVALIDATE > REAUDIT > REVALIDATE > REUSE.
+
+INVALIDATE permanece decisão de nível Evidence. Como o contrato canônico de AuditWorkItem
+possui apenas ações executáveis REUSE, REVALIDATE e REAUDIT, uma decisão INVALIDATE
+é vinculada a REAUDIT para impedir o reaproveitamento e forçar nova análise.
 
 ## 6. O Caminho para `Architecture Frozen`
 
