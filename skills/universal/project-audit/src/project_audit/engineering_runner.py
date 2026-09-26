@@ -185,11 +185,14 @@ def execute_engineering_pass(
         for item in work_items
     )
 
-    if semantic_partial and not semantic_failed and not failed and not blocked:
+    if semantic_failed:
+        run.execution_completeness = RunExecutionCompleteness.PARTIAL
+        run.coverage_completeness = RunCoverageCompleteness.PARTIAL
+        run.failure_state = RunFailureState.SEMANTIC_COVERAGE_FAILED
+    elif semantic_partial:
         run.execution_completeness = RunExecutionCompleteness.PARTIAL
         run.coverage_completeness = RunCoverageCompleteness.PARTIAL
         run.failure_state = RunFailureState.NONE
-    elif semantic_failed:
     elif blocked or failed:
         if not succeeded and blocked and not failed:
             run.execution_completeness = RunExecutionCompleteness.BLOCKED
