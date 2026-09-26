@@ -1,12 +1,12 @@
 # Semantic Validators (Orchestrator Layer 2)
 
-*Status: IMPLEMENTED — Phase 2 semantic invariants*
+*Status: IMPLEMENTED — Phase 2 semantic invariants (core subset)*
 
 While JSON Schemas enforce structure (types, required fields), **Semantic Validators** enforce meaning, invariants, and cross-object consistency. They act as the pure, deterministic gateway that prevents the Orchestrator from corrupting the `.audit/runs/` state.
 
 ## Core Properties
 1. **Deterministic & Pure:** No LLMs, no network calls, no heuristics.
-2. **Monotonic Authority:** Validators only return `PASS`, `WARNING`, or `ERROR`. They **never** mutate, silently fix, or epistemically elevate an object (e.g., they cannot change `UNKNOWN` to `VALID`).
+2. **Monotonic Authority:** Validators only return `PASS`, `WARNING`, `ERROR`, or `UNDETERMINABLE`. They **never** mutate, silently fix, or epistemically elevate an object (e.g., they cannot change `UNKNOWN` to `VALID`).
 3. **Strict Epistemology:** Distinguish between `ERROR` (e.g., dangling reference) and `UNDETERMINABLE` (e.g., missing evidence dependency context).
 
 ---
