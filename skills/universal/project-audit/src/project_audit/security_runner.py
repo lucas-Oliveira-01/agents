@@ -42,6 +42,7 @@ def execute_security_pass(
     auditor: Optional[DeterministicSecurityAuditor] = None,
     semantic_worker: Optional[SemanticAuditor] = None,
     reusable_evidence_by_work_item: Optional[dict[str, Evidence]] = None,
+    reuse_path_aliases: Optional[dict[str, str]] = None,
 ) -> SecurityPassResult:
     """Execute the reserved SECURITY/* WorkItems in the existing AuditRun."""
     auditor = auditor or DeterministicSecurityAuditor()
@@ -91,6 +92,7 @@ def execute_security_pass(
                     current_snapshot,
                     item,
                     generated_at=finished,
+                    path_aliases=reuse_path_aliases,
                 )
                 orchestrator.commit_evidence(reused, item)
                 attempt.finish(
