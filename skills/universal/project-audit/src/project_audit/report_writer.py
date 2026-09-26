@@ -347,8 +347,9 @@ def _semantic_finding_id(candidate: SemanticFindingCandidate, sequence: int) -> 
 def render_semantic_findings(
     reviews: Iterable[SemanticReviewResult],
 ) -> str:
+    review_list = list(reviews)
     candidates = []
-    for review in reviews:
+    for review in review_list:
         for candidate in review.candidates:
             candidates.append((review.work_item_ref, candidate))
     candidates.sort(
@@ -361,11 +362,10 @@ def render_semantic_findings(
         )
     )
 
-    if not candidates and not any(review.raw_errors or review.status != "COMPLETED" for review in reviews):
+    if not candidates and not any(review.raw_errors or review.status != "COMPLETED" for review in review_list):
         return ""
 
     lines = ["## SEMANTIC COVERAGE", ""]
-    review_list = list(reviews)
     for review in review_list:
         if review.status == "COMPLETED" and not review.raw_errors:
             continue
