@@ -21,9 +21,11 @@ from .models import (
     RunFailureState,
     RunPublicationState,
     WorkItemFailureState,
+    WorkItemAction,
 )
 from .orchestrator import Orchestrator
 from .planner import build_target_snapshot
+from .incremental import derive_reused_evidence
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 from .semantic_runner import execute_semantic_review
 
@@ -50,6 +52,8 @@ def execute_engineering_pass(
     auditor: Optional[EngineeringAuditor] = None,
     semantic_worker: Optional[SemanticAuditor] = None,
     target_snapshot: Optional[object] = None,
+    previous_run_ref: Optional[str] = None,
+    reusable_evidence_by_work_item: Optional[dict[str, Evidence]] = None,
 ) -> EngineeringPassResult:
     """Execute only non-security WorkItems as PASS 1 of the single-agent audit."""
     auditor = auditor or EngineeringAuditor()
@@ -73,6 +77,7 @@ def execute_engineering_pass(
         failure_state=RunFailureState.NONE,
         budget_state=RunBudgetState.HEALTHY,
         publication_state=RunPublicationState.NOT_PUBLISHED,
+        previous_run_ref=previous_run_ref,
     )
 
     # Persist RUNNING before any WorkItem executes. A process crash after this
@@ -99,6 +104,48 @@ def execute_engineering_pass(
             continue
 
         orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
+
+        if item.action == WorkItemAction.REUSE:
+            prior = (reusable_evidence_by_work_item or {}).get(item.work_item_id)
+            if prior is None:
+                item.action = WorkItemAction.REAUDIT
+                item.decision_basis = "incremental_decision=REAUDIT; reason=reuse_binding_missing"
+            else:
+                orchestrator.commit_work_item(item)
+                started = datetime.now(timezone.utc)
+                attempt = item.start_attempt(started_at=started)
+                orchestrator.commit_work_item(item)
+                finished = datetime.now(timezone.utc)
+                receipt = ExecutionReceipt(
+                    receipt_id=str(uuid.uuid4()),
+                    work_item_ref=item.work_item_id,
+                    command="project-audit-incremental-reuse",
+                    arguments=[item.target_surface],
+                    policy_snapshot=item.effective_execution_policy,
+                    started_at=started,
+                    finished_at=finished,
+                    exit_code=0,
+                    artifact_refs=[],
+                    environment_summary="deterministic-reuse-read-only",
+                )
+                orchestrator.commit_receipt(receipt)
+                reused = derive_reused_evidence(
+                    prior,
+                    snapshot,
+                    item,
+                    generated_at=finished,
+                )
+                orchestrator.commit_evidence(reused, item)
+                attempt.finish(
+                    finished_at=finished,
+                    exit_code=0,
+                    receipt_ref=receipt.receipt_id,
+                )
+                item.terminate(failure_state=WorkItemFailureState.NONE)
+                orchestrator.commit_work_item(item)
+                evidences.append(reused)
+                continue
+
         orchestrator.commit_work_item(item)
         started = datetime.now(timezone.utc)
         attempt = item.start_attempt(started_at=started)

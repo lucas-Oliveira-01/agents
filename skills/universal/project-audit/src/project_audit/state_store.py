@@ -443,6 +443,7 @@ class StateStore:
             model=d.get("model"),
             raw_output=d.get("raw_output"),
             raw_output_sha256=d.get("raw_output_sha256"),
+            derived_from_evidence_ref=d.get("derived_from_evidence_ref"),
         )
 
     # ---- AuditRun ----

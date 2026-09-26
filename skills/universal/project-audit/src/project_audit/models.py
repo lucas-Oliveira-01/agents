@@ -528,6 +528,9 @@ class Evidence:
     model: Optional[str] = None
     raw_output: Optional[str] = None
     raw_output_sha256: Optional[str] = None
+    # New immutable Evidence derived from a prior Evidence during incremental
+    # REUSE. The historical source Evidence remains untouched.
+    derived_from_evidence_ref: Optional[str] = None
 
     def to_dict(self) -> dict:
         d = {
@@ -548,6 +551,8 @@ class Evidence:
             d["raw_output"] = self.raw_output
         if self.raw_output_sha256 is not None:
             d["raw_output_sha256"] = self.raw_output_sha256
+        if self.derived_from_evidence_ref is not None:
+            d["derived_from_evidence_ref"] = self.derived_from_evidence_ref
         return d
 
 

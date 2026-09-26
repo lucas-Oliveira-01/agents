@@ -22,7 +22,8 @@ from .security_runner import SecurityPassResult, execute_security_pass
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 from .verifier import VerificationResult, candidate_identity, consolidated_reviews, verify_semantic_reviews
 from .state_store import AuditWriterLock, StateStore
-from .finding_lifecycle import reconcile_finding_lifecycle
+from .finding_lifecycle import preserve_reused_findings, reconcile_finding_lifecycle
+from .incremental import match_previous_evidence, plan_incremental_actions_stable
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,7 @@ def _run_full_audit_unlocked(
     normalize_command: str = "audit-normalize",
     semantic_worker: Optional[SemanticAuditor] = None,
     semantic_egress_policy: Optional[EgressPolicy] = None,
+    previous_run_ref: Optional[str] = None,
 ) -> FullAuditResult:
     """Execute the complete currently implemented single-agent two-pass runtime."""
     root, vault, resolved_state_dir, resolved_output_dir = audit_paths(target, state_dir, output_dir)
@@ -110,6 +112,53 @@ def _run_full_audit_unlocked(
 
     orchestrator = Orchestrator(StateStore(resolved_state_dir))
 
+    reusable_evidence_by_work_item = None
+    preserved_finding_keys = ()
+    if previous_run_ref is not None:
+        previous_run = orchestrator.store.load_run(previous_run_ref)
+        previous_plan = orchestrator.store.load_plan(previous_run.plan_ref)
+        previous_snapshot = orchestrator.store.load_snapshot(previous_run.target_snapshot_ref)
+        if previous_snapshot.project_state.repository_identity != prepared.snapshot.project_state.repository_identity:
+            raise ValueError(
+                "previous_run_ref belongs to a different repository identity."
+            )
+        if previous_snapshot.target_mode != prepared.snapshot.target_mode:
+            raise ValueError(
+                "previous_run_ref uses a different TargetMode than the current audit."
+            )
+        previous_work_items = list(previous_plan.work_items)
+        previous_evidence_candidates = {}
+        for evidence_id in orchestrator.store.list_evidence_ids():
+            evidence = orchestrator.store.load_evidence(evidence_id)
+            if evidence.work_item_ref in previous_run.work_item_refs:
+                previous_evidence_candidates.setdefault(
+                    evidence.work_item_ref, []
+                ).append(evidence)
+
+        # Multiple historical Evidence records for one WorkItem are ambiguous
+        # for automatic reuse. Preserve only one-to-one bindings; ambiguity
+        # fails closed to REAUDIT.
+        previous_evidence = {
+            work_item_ref: candidates[0]
+            for work_item_ref, candidates in previous_evidence_candidates.items()
+            if len(candidates) == 1
+        }
+
+        plan_incremental_actions_stable(
+            list(prepared.work_items),
+            previous_work_items,
+            previous_evidence,
+            previous_snapshot,
+            prepared.snapshot,
+        )
+        reusable_evidence_by_work_item = dict(
+            match_previous_evidence(
+                prepared.work_items,
+                previous_work_items,
+                previous_evidence,
+            )
+        )
+
     engineering = execute_engineering_pass(
         orchestrator,
         discovery,
@@ -117,6 +166,8 @@ def _run_full_audit_unlocked(
         list(prepared.work_items),
         target_snapshot=prepared.snapshot,
         semantic_worker=semantic_worker,
+        previous_run_ref=previous_run_ref,
+        reusable_evidence_by_work_item=reusable_evidence_by_work_item,
     )
     security = execute_security_pass(
         orchestrator,
@@ -125,11 +176,27 @@ def _run_full_audit_unlocked(
         list(prepared.work_items),
         engineering.run,
         semantic_worker=semantic_worker,
+        reusable_evidence_by_work_item=reusable_evidence_by_work_item,
     )
 
     semantic_reviews = tuple(engineering.semantic_reviews) + tuple(security.semantic_reviews)
     run = engineering.run
     work_items = list(prepared.work_items)
+
+    if previous_run_ref is not None and reusable_evidence_by_work_item:
+        preserved_finding_keys = preserve_reused_findings(
+            orchestrator.store,
+            run,
+            previous_run_ref,
+            work_items,
+            reusable_evidence_by_work_item,
+        )
+        orchestrator.commit_run(
+            run,
+            prepared.plan,
+            work_items,
+            known_run_ids=orchestrator.store.list_run_ids(),
+        )
 
     # Phase 4: independent verification happens after semantic review and before
     # any report/normalizer consolidation. The verifier receives only persisted
@@ -158,6 +225,7 @@ def _run_full_audit_unlocked(
         prepared.plan,
         consolidated,
         verification_results,
+        preserved_finding_keys=preserved_finding_keys,
     )
     normalization = None
     # Render away from final paths. Drift during rendering cannot expose a report.
@@ -304,8 +372,10 @@ def run_full_audit(
     normalize_command: str = "audit-normalize",
     semantic_worker: Optional[SemanticAuditor] = None,
     semantic_egress_policy: Optional[EgressPolicy] = None,
+    previous_run_ref: Optional[str] = None,
 ) -> FullAuditResult:
     """Execute one complete audit while holding the physical audit writer lock."""
+
     root, vault, _, _ = audit_paths(target, state_dir, output_dir)
     with AuditWriterLock(vault / "audit-writer.lock"):
         return _run_full_audit_unlocked(
@@ -318,5 +388,6 @@ def run_full_audit(
             normalize_command=normalize_command,
             semantic_worker=semantic_worker,
             semantic_egress_policy=semantic_egress_policy,
+            previous_run_ref=previous_run_ref,
         )
 
