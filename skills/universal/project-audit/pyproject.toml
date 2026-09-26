@@ -11,13 +11,15 @@ requires-python = ">=3.9"
 dependencies = [
     "jsonschema>=4.18",
     "referencing>=0.35",
-    "omniroute-delegation",
 ]
 
 [project.optional-dependencies]
 test = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+]
+swarm = [
+    "omniroute-delegation",
 ]
 
 [tool.setuptools.packages.find]
