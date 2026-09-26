@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import List, Optional
 
 from .context_builder import build_context
 from .discovery import DiscoverySnapshot
-from .models import AuditPlan, AuditRun, AuditWorkItem, ExecutionState, WorkItemFailureState
+from .models import AuditPlan, AuditRun, AuditWorkItem, EvidenceValidity, ExecutionState, WorkItemFailureState
 from .orchestrator import Orchestrator
 from .planner import build_target_snapshot
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
@@ -36,10 +37,50 @@ def execute_semantic_review(
 
     context = build_context(discovery, work_item.target_surface)
     result = worker.review(work_item, run, context)
-    orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
+    changed_paths = orchestrator.check_target_unchanged(
+        discovery.root, run, plan, work_items
+    )
+
+    if (
+        result.evidence is not None
+        and orchestrator.is_snapshot_node_affected(
+            changed_paths,
+            list(result.evidence.source_refs),
+        )
+    ):
+        stale_evidence = replace(
+            result.evidence,
+            validity=EvidenceValidity.STALE,
+        )
+        result = replace(
+            result,
+            status="STALE",
+            evidence=stale_evidence,
+            raw_errors=tuple(result.raw_errors) + (
+                {
+                    "error_type": "SNAPSHOT_DRIFT",
+                    "message": "Source evidence changed during semantic execution.",
+                    "changed_paths": changed_paths,
+                },
+            ),
+        )
+
     orchestrator.commit_receipt(result.receipt)
 
     finished = datetime.now(timezone.utc)
+
+    if result.status == "STALE":
+        if result.evidence is None:
+            raise ValueError("STALE semantic result requires evidence.")
+        attempt.fail(
+            finished_at=finished,
+            reason="SNAPSHOT_DRIFT",
+            receipt_ref=result.receipt.receipt_id,
+        )
+        orchestrator.commit_evidence(result.evidence, work_item)
+        work_item.terminate(failure_state=WorkItemFailureState.SNAPSHOT_DRIFT)
+        orchestrator.commit_work_item(work_item)
+        return result
 
     if result.status == "BLOCKED":
         attempt.fail(
