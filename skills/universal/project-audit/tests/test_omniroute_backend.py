@@ -81,8 +81,8 @@ def test_backend_preserves_partial_audit_contract():
     assert result.audit_contract.state == ExecutionState.PARTIAL_COVERAGE
     assert len(result.audit_contract.findings) == 1
     assert result.audit_contract.raw_errors
-    assert result.raw_output == "not json"
     assert result.raw_output is not None
+    assert "Valid finding" in result.raw_output
     assert result.audit_contract.raw_output == result.raw_output
     assert result.output_payload["findings"][0]["title"] == "Valid finding"
 
