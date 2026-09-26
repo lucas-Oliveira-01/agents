@@ -1,44 +1,19 @@
 import uuid
 
+from omniroute_delegation.contracts import ExecutionState
 from project_audit.delegation import DelegationRequest, DelegationStatus
 from project_audit.models import CredentialAccess, ExecutionPolicy, FilesystemAccess, NetworkAccess
-from project_audit.omniroute_backend import MCPOmniRouteBackend
+from project_audit.omniroute_backend import OmniRouteDelegationBackend
 
 
-class FakeBuilder:
-    def __init__(self):
-        self.values = {}
+class FakeGateway:
+    def __init__(self, result):
+        self.result = result
+        self.calls = []
 
-    def objective(self, value):
-        self.values["objective"] = value
-        return self
-
-    def constraints(self, value):
-        self.values["constraints"] = value
-        return self
-
-    def context(self, value):
-        self.values["context"] = value
-        return self
-
-    def format(self, value):
-        self.values["format"] = value
-        return self
-
-    def criteria(self, value):
-        self.values["criteria"] = value
-        return self
-
-    def task_id(self, value):
-        self.values["task_id"] = value
-        return self
-
-    def temperature(self, value):
-        self.values["temperature"] = value
-        return self
-
-    def build(self):
-        return self.values
+    def delegate(self, task):
+        self.calls.append(task)
+        return self.result
 
 
 def _request() -> DelegationRequest:
@@ -56,85 +31,63 @@ def _request() -> DelegationRequest:
     )
 
 
-def test_omniroute_backend_builds_current_task_contract():
-    observed = {}
-
-    def mock_client(server, tool, args):
-        observed["server"] = server
-        observed["tool"] = tool
-        observed["args"] = args
-        return {"content": [{"type": "text", "text": '{"findings": []}'}]}
-
-    backend = MCPOmniRouteBackend(mock_client, task_builder_factory=FakeBuilder)
-    result = backend.delegate(_request())
-
-    assert result.status == DelegationStatus.SUCCESS
-    assert observed["server"] == "omnirouter"
-    assert observed["tool"] == "delegate_task"
-    assert observed["args"]["task_id"] == "test-req"
-    assert observed["args"]["temperature"] == 0
-    assert "source" in observed["args"]["context"]
-
-
-def test_omniroute_backend_handles_mcp_error():
-    def mock_client(server, tool, args):
-        return {"isError": True, "error": "Gateway timeout"}
-
-    backend = MCPOmniRouteBackend(mock_client, task_builder_factory=FakeBuilder)
-    result = backend.delegate(_request())
-
-    assert result.status == DelegationStatus.FAILED
-    assert "error" in result.error_message
-    assert result.provider_info == "omniroute/error"
-
-
-def test_omniroute_backend_handles_exceptions_gracefully():
-    def mock_client(server, tool, args):
-        raise ConnectionError("Connection refused")
-
-    backend = MCPOmniRouteBackend(mock_client, task_builder_factory=FakeBuilder)
-    result = backend.delegate(_request())
-
-    assert result.status == DelegationStatus.FAILED
-    assert "Connection refused" in result.error_message
-    assert result.provider_info == "omniroute/exception"
-
-
-def test_omniroute_backend_factory_uses_discovered_schema_filtering() -> None:
-    class FakeClient:
-        def __init__(self):
-            self.called = None
-            self.filtered = None
-
-        def filter_optional_params(self, tool, arguments):
-            self.filtered = dict(arguments)
-            self.filtered.pop("temperature", None)
-            return self.filtered
-
-        def call_tool(self, tool, arguments):
-            self.called = (tool, arguments)
-            return {"content": [{"type": "text", "text": '{"findings": []}'}]}
-
-    from project_audit.omniroute_backend import create_backend_from_mcp_client
-
-    client = FakeClient()
-    backend = create_backend_from_mcp_client(client)
-    result = backend.delegate(_request())
-
-    assert result.status == DelegationStatus.SUCCESS
-    assert client.called is not None
-    assert client.called[0] == "delegate_task"
-    assert "temperature" not in client.called[1]
-
-
-def test_omniroute_backend_factory_rejects_incompatible_client() -> None:
-    from project_audit.omniroute_backend import (
-        OmniRouteBackendConfigurationError,
-        create_backend_from_mcp_client,
+def test_backend_delegates_only_through_gateway():
+    gateway = FakeGateway(
+        {"content": [{"type": "text", "text": '{"findings": []}'}]}
     )
+    backend = OmniRouteDelegationBackend(gateway)
+    result = backend.delegate(_request())
 
-    try:
-        create_backend_from_mcp_client(object())
-    except OmniRouteBackendConfigurationError:
-        return
-    raise AssertionError("incompatible client was accepted")
+    assert result.status == DelegationStatus.SUCCESS
+    assert gateway.calls
+    task = gateway.calls[0]
+    assert task.task_id == "test-req"
+    assert task.temperature == 0
+    assert "print('hello')" in task.context
+
+
+def test_backend_preserves_partial_audit_contract():
+    finding = {
+        "title": "Valid finding",
+        "category": "CODE_QUALITY",
+        "description": "Observed defect.",
+        "severity": "HIGH",
+        "confidence": "HIGH",
+        "type": "BUG",
+        "status": "PROBABLE",
+        "subcategory": "STATIC_REVIEW",
+        "location": {"file": "app.py", "line": 1},
+        "evidence": "Observed evidence.",
+    }
+    payload = {
+        "content": [{
+            "type": "text",
+            "text": (
+                '{"findings": ['
+                + __import__("json").dumps(finding)
+                + ', {"title": "invalid", "category": "CODE_QUALITY"}]}'
+            ),
+        }]
+    }
+
+    backend = OmniRouteDelegationBackend(FakeGateway(payload))
+    result = backend.delegate(_request())
+
+    assert result.status == DelegationStatus.SUCCESS
+    assert result.audit_contract is not None
+    assert result.audit_contract.state == ExecutionState.PARTIAL_COVERAGE
+    assert len(result.audit_contract.findings) == 1
+    assert result.audit_contract.raw_errors
+    assert result.output_payload["findings"][0]["title"] == "Valid finding"
+
+
+def test_backend_surfaces_whole_document_schema_failure():
+    backend = OmniRouteDelegationBackend(
+        FakeGateway({"content": [{"type": "text", "text": "not json"}]})
+    )
+    result = backend.delegate(_request())
+
+    assert result.status == DelegationStatus.FAILED
+    assert result.audit_contract is not None
+    assert result.audit_contract.state == ExecutionState.SCHEMA_VIOLATION
+    assert result.audit_contract.raw_errors
