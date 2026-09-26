@@ -5,10 +5,13 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 from .context_builder import ContextBundle
 from .delegation import DelegationStatus, WorkerPort
+if TYPE_CHECKING:
+    from omniroute_delegation.contracts import AuditContract
+
 from .models import AuditRun, AuditWorkItem, Evidence, EvidenceValidity, Provenance
 from .sensitivity import SensitivityAssessment, SensitivityState, aggregate_assessments, assess_text
 
@@ -58,6 +61,8 @@ class SemanticReviewResult:
     raw_output_fingerprint: Optional[str]
     receipt: object
     evidence: Optional[Evidence]
+    audit_contract: Optional[AuditContract] = None
+    raw_errors: Tuple[Dict[str, Any], ...] = ()
 
 
 class SemanticOutputError(ValueError):
@@ -246,6 +251,8 @@ class SemanticAuditor:
         *,
         declared_sensitivity: Optional[SensitivityState] = None,
     ) -> SemanticReviewResult:
+        from omniroute_delegation.contracts import ExecutionState as DelegationExecutionState
+
         actual_assessments = tuple(
             assess_text(item.content, item.path)
             for item in context.items
@@ -278,6 +285,8 @@ class SemanticAuditor:
         delegated_evidence = execution.evidence
         delegated_result = execution.result
 
+        audit_contract = delegated_result.audit_contract if delegated_result is not None else None
+
         if receipt.exit_code == 126:
             return SemanticReviewResult(
                 work_item.work_item_id,
@@ -288,6 +297,8 @@ class SemanticAuditor:
                 None,
                 receipt,
                 None,
+                audit_contract=audit_contract,
+                raw_errors=tuple(audit_contract.raw_errors if audit_contract is not None else ()),
             )
 
         if receipt.exit_code != 0 or delegated_evidence is None:
@@ -300,6 +311,23 @@ class SemanticAuditor:
                 None,
                 receipt,
                 None,
+                audit_contract=audit_contract,
+                raw_errors=tuple(audit_contract.raw_errors if audit_contract is not None else ()),
+            )
+
+        coverage_status = audit_contract.state if audit_contract is not None else None
+        if coverage_status == DelegationExecutionState.SCHEMA_VIOLATION:
+            return SemanticReviewResult(
+                work_item.work_item_id,
+                work_item.target_surface,
+                "SCHEMA_VIOLATION",
+                sensitivity,
+                tuple(),
+                self._fingerprint(delegated_evidence),
+                receipt,
+                None,
+                audit_contract=audit_contract,
+                raw_errors=tuple(audit_contract.raw_errors),
             )
 
         try:
@@ -307,8 +335,7 @@ class SemanticAuditor:
                 raise SemanticOutputError("semantic worker returned no output payload")
             candidates = _parse_output(delegated_result.output_payload)
             _validate_candidates_against_context(candidates, context)
-        except SemanticOutputError as e:
-            print(f"DEBUG SCHEMA VIOLATION: {e}")
+        except SemanticOutputError:
             return SemanticReviewResult(
                 work_item.work_item_id,
                 work_item.target_surface,
@@ -318,6 +345,8 @@ class SemanticAuditor:
                 self._fingerprint(delegated_evidence),
                 receipt,
                 None,
+                audit_contract=audit_contract,
+                raw_errors=tuple(audit_contract.raw_errors if audit_contract is not None else ()),
             )
 
         evidence = Evidence(
@@ -333,12 +362,16 @@ class SemanticAuditor:
         return SemanticReviewResult(
             work_item.work_item_id,
             work_item.target_surface,
-            "COMPLETED",
+            "PARTIAL_COVERAGE"
+            if coverage_status == DelegationExecutionState.PARTIAL_COVERAGE
+            else "COMPLETED",
             sensitivity,
             candidates,
             self._fingerprint(delegated_evidence),
             receipt,
             evidence,
+            audit_contract=audit_contract,
+            raw_errors=tuple(audit_contract.raw_errors if audit_contract is not None else ()),
         )
 
     @staticmethod

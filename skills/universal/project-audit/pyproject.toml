@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "project-audit"
-version = "0.1.0"
-description = "Core Engine V1 for the project-audit orchestration system."
+version = "0.2.0"
+description = "Swarm-aware project-audit orchestration system with deterministic evidence lifecycle."
 readme = "SKILL.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -17,6 +17,9 @@ dependencies = [
 test = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+]
+swarm = [
+    "omniroute-delegation",
 ]
 
 [tool.setuptools.packages.find]
@@ -34,3 +37,6 @@ python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[tool.uv.sources]
+omniroute-delegation = { path = "../omniroute-delegation" }

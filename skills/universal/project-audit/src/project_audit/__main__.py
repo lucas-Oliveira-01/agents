@@ -7,7 +7,7 @@ from .classifiers import classify_applicability, classify_files, classify_stack
 from .discovery import discover
 from .models import TargetMode
 from .normalization_runner import run_audit_normalize
-from .orchestrator import Orchestrator, SnapshotDriftError
+from .orchestrator import Orchestrator
 from .planner import prepare_audit
 from .runtime import run_full_audit, audit_paths, initialize_audit_repository
 from .state_store import StateStore
@@ -19,7 +19,7 @@ import sys
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run or prepare a project-audit single-agent audit")
+    parser = argparse.ArgumentParser(description="Run or prepare a project-audit swarm-aware audit")
     parser.add_argument("--target", default=".", help="Repository/worktree to inspect")
     parser.add_argument(
         "--state-dir",
@@ -124,7 +124,7 @@ def main() -> int:
                 print(f"Error reading JSON findings: {e}", file=sys.stderr)
                 return 1
 
-            print("Scanning for P1/P0 findings to auto-fix...")
+            print("Scanning for P0/P1 findings to auto-fix...")
             import asyncio
             try:
                 from omniroute_delegation.local_worker_mcp import dispatch_opencode_worker
@@ -140,7 +140,11 @@ def main() -> int:
                     print(f"Auto-fixing {cand.get('severity')}: {title}")
                     loc_dict = cand.get("location", {}) or {}
                     loc = loc_dict.get("file", "") if isinstance(loc_dict, dict) else ""
-                    task = f"Corrija o problema: {title}. Descrição: {cand.get('description', '')}. Recomendação: {cand.get('recommendation', '')}"
+                    task = (
+                        f"Fix the confirmed finding: {title}. "
+                        f"Description: {cand.get('description', '')}. "
+                        f"Recommendation: {cand.get('recommendation', '')}"
+                    )
 
                     async def run_dispatch():
                         res = await dispatch_opencode_worker(
@@ -149,11 +153,11 @@ def main() -> int:
                             workspace_dir=str(discovery.root),
                             isolated_memory=True
                         )
-                        print(f"Worker process dispatched for {title}")
+                        print(f"L3W worker dispatched for {title}")
                     asyncio.run(run_dispatch())
 
             if p1_count > 0:
-                print(f"Dispatched {p1_count} workers for P0/P1 auto-fixing in background!")
+                print(f"Dispatched {p1_count} L3W workers for confirmed P0/P1 auto-fixes.")
             else:
                 print("No P0/P1 confirmed findings required auto-fix.")
             return 0
@@ -168,7 +172,6 @@ def main() -> int:
             normalize=args.normalize,
             normalize_command=args.normalize_command,
             semantic_worker=semantic_worker,
-            # R-01 Fix: Use LOCAL_ONLY to avoid implicit external egress without user flag (we can add a CLI flag later if needed, but for local tests we use APPROVED_EXTERNAL or bypass the check in the gateway). Wait, if I change it to LOCAL_ONLY, the semantic pass will be blocked by `omniroute_backend` unless the data is NOT sensitive. But wait, `run_full_audit` passes EgressPolicy to it. If I set it to LOCAL_ONLY and `allow_sensitive=True`, the worker port will reject it. Let's leave it as APPROVED_EXTERNAL but require an explicit confirmation or just comment it for now. I will leave it APPROVED_EXTERNAL because otherwise the audit won't work locally for our test. BUT Astra marked it as P1 because it is implicit. To fix it properly, I'll add an argument `--allow-external`. Let's just fix the variables here.
             semantic_egress_policy=EgressPolicy(destination=EgressDestination.APPROVED_EXTERNAL if getattr(args, "allow_external", False) else EgressDestination.LOCAL_ONLY, allow_sensitive=True),
         )
         final_run = result.security.run
@@ -179,7 +182,7 @@ def main() -> int:
         print(f"coverage={final_run.coverage_completeness.value}")
         print(f"run={final_run.run_id}")
         print(f"snapshot={final_run.target_snapshot_ref}")
-        print(f"artifacts={len(result.artifacts)}"); print(f"DEBUG_ARTIFACTS: {result.artifacts}")
+        print(f"artifacts={len(result.artifacts)}")
         print(f"output_dir={args.output_dir or str(result.discovery.root / '.audit')}")
         
         if final_run.failure_state.value == "SEMANTIC_COVERAGE_FAILED":
@@ -200,7 +203,7 @@ def main() -> int:
 
 
     finally:
-        # R-09 Fix: Close MCP client
+        # Release the MCP transport owned by the Gateway-backed backend.
         if mcp_client is not None:
             import asyncio
             try:

@@ -22,7 +22,7 @@
     },
     "failure_state": {
       "type": "string",
-      "enum": ["NONE", "INFRA_ERROR", "SAFETY_BLOCK", "SCHEMA_VIOLATION", "TIMEOUT", "BUDGET_EXHAUSTED"]
+      "enum": ["NONE", "INFRA_ERROR", "SAFETY_BLOCK", "SCHEMA_VIOLATION", "TIMEOUT", "BUDGET_EXHAUSTED", "SNAPSHOT_DRIFT"]
     },
     "attempts": {
       "type": "array",

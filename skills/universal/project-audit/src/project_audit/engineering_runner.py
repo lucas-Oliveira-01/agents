@@ -80,6 +80,7 @@ def execute_engineering_pass(
     inspections = []
     evidences = []
     semantic_reviews = []
+    semantic_partial = False
 
     for item in work_items:
         if item.target_surface.startswith("SECURITY/"):
@@ -92,7 +93,13 @@ def execute_engineering_pass(
         orchestrator.commit_work_item(item)
 
         result = auditor.inspect(discovery, item.work_item_id, item.target_surface)
-        orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
+        changed_paths = orchestrator.check_target_unchanged(
+            discovery.root, run, plan, work_items
+        )
+        current_item_drifted = orchestrator.is_snapshot_node_affected(
+            changed_paths,
+            list(result.source_refs),
+        )
         finished = datetime.now(timezone.utc)
 
         receipt = ExecutionReceipt(
@@ -115,7 +122,7 @@ def execute_engineering_pass(
             work_item_ref=item.work_item_id,
             source_refs=result.source_refs,
             dependencies=(),
-            validity=EvidenceValidity.VALID,
+            validity=EvidenceValidity.STALE if current_item_drifted else EvidenceValidity.VALID,
             provenance=Provenance(
                 actor=auditor.ACTOR,
                 generated_at=finished,
@@ -123,17 +130,24 @@ def execute_engineering_pass(
             fingerprint=result.fingerprint,
         )
 
-        attempt.finish(
-            finished_at=finished,
-            exit_code=0,
-            receipt_ref=receipt.receipt_id,
-        )
         orchestrator.commit_evidence(evidence, item)
 
         needs_semantic = any(
             getattr(observation, "state", None) == "NOT_DETERMINABLE"
             for observation in result.observations
         )
+        if current_item_drifted:
+            attempt.fail(
+                finished_at=finished,
+                reason="SNAPSHOT_DRIFT",
+                receipt_ref=receipt.receipt_id,
+            )
+            item.terminate(failure_state=WorkItemFailureState.SNAPSHOT_DRIFT)
+            orchestrator.commit_work_item(item)
+            inspections.append(result)
+            evidences.append(evidence)
+            continue
+
         if semantic_worker is not None and needs_semantic:
             semantic_result = execute_semantic_review(
                 orchestrator,
@@ -145,6 +159,7 @@ def execute_engineering_pass(
                 work_items=work_items,
             )
             semantic_reviews.append(semantic_result)
+            semantic_partial = semantic_partial or semantic_result.status == "PARTIAL_COVERAGE"
             if semantic_result.evidence is not None:
                 evidences.append(semantic_result.evidence)
             if semantic_result.status != "COMPLETED":
@@ -153,6 +168,11 @@ def execute_engineering_pass(
                 continue
 
         if item.execution_state != ExecutionState.TERMINATED:
+            attempt.finish(
+                finished_at=finished,
+                exit_code=0,
+                receipt_ref=receipt.receipt_id,
+            )
             item.terminate(failure_state=WorkItemFailureState.NONE)
             orchestrator.commit_work_item(item)
 
@@ -166,11 +186,15 @@ def execute_engineering_pass(
     blocked = [item for item in executed_items if item.failure_state == WorkItemFailureState.SAFETY_BLOCK]
     failed = [
         item for item in executed_items
-        if item.failure_state not in {WorkItemFailureState.NONE, WorkItemFailureState.SAFETY_BLOCK, WorkItemFailureState.SCHEMA_VIOLATION}
+        if item.failure_state not in {WorkItemFailureState.NONE, WorkItemFailureState.SAFETY_BLOCK, WorkItemFailureState.SCHEMA_VIOLATION, WorkItemFailureState.SNAPSHOT_DRIFT}
     ]
     semantic_failed = [
         item for item in executed_items
         if item.failure_state == WorkItemFailureState.SCHEMA_VIOLATION
+    ]
+    stale_items = [
+        item for item in executed_items
+        if item.failure_state == WorkItemFailureState.SNAPSHOT_DRIFT
     ]
     succeeded = [
         item for item in executed_items
@@ -187,6 +211,10 @@ def execute_engineering_pass(
         run.execution_completeness = RunExecutionCompleteness.PARTIAL
         run.coverage_completeness = RunCoverageCompleteness.PARTIAL
         run.failure_state = RunFailureState.SEMANTIC_COVERAGE_FAILED
+    elif (semantic_partial or stale_items) and not failed and not blocked:
+        run.execution_completeness = RunExecutionCompleteness.PARTIAL
+        run.coverage_completeness = RunCoverageCompleteness.PARTIAL
+        run.failure_state = RunFailureState.NONE
     elif blocked or failed:
         if not succeeded and blocked and not failed:
             run.execution_completeness = RunExecutionCompleteness.BLOCKED

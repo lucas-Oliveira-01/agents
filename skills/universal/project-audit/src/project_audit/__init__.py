@@ -1,5 +1,5 @@
 """
-project_audit — Core Engine V1
+project_audit — Swarm-aware audit orchestration
 """
 
 from .classifiers import (
@@ -26,7 +26,7 @@ from .report_writer import write_audit_artifacts
 from .runtime import FullAuditResult, run_full_audit
 from .normalization_runner import NormalizationResult, run_audit_normalize
 from .delegation import WorkerExecution
-from .omniroute_backend import MCPOmniRouteBackend, create_backend_from_mcp_client, create_local_omniroute_backend
+from .omniroute_backend import OmniRouteDelegationBackend, create_local_omniroute_backend
 from .models import (
     TargetSnapshot, AuditPlan, AuditWorkItem, Attempt, ExecutionReceipt, Evidence, AuditRun,
     WorkItemAction, ExecutionState, WorkItemFailureState, RunExecutionCompleteness,
@@ -53,5 +53,5 @@ __all__ = [
     "EvidenceValidity", "FindingLifecycle", "FindingFingerprint", "Provenance", "ExecutionPolicy",
     "EgressPolicy", "FilesystemAccess", "NetworkAccess", "CredentialAccess", "EgressDestination",
     "TargetMode", "WorkingTreeState",
-    "MCPOmniRouteBackend", "create_backend_from_mcp_client", "create_local_omniroute_backend",
+    "OmniRouteDelegationBackend", "create_local_omniroute_backend",
 ]
