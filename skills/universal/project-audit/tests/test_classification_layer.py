@@ -65,7 +65,7 @@ def test_project_profile_is_deterministic(tmp_path):
     assert first == second
     assert isinstance(first, ProjectProfile)
     assert first.application == "FULLSTACK"
-    assert first.network == "OUTBOUND_REST"
+    assert first.network == "INBOUND_AND_OUTBOUND"
     assert first.frontend == "WEB"
     assert first.container == "DOCKER"
     assert first.ci == "GITHUB_ACTIONS"
@@ -142,3 +142,13 @@ def test_classification_layer_preserves_uncertain_applicability(tmp_path):
         for item in prepared.work_items
         if item.target_surface.split("/", 1)[0] in {domain.split("/", 1)[0] for domain in uncertain_domains}
     )
+
+
+def test_outbound_http_does_not_imply_web_backend(tmp_path):
+    _write(tmp_path, "src/client.py", "import requests\ndef load():\n    return requests.get('https://example.com')\n")
+
+    snapshot = discover(str(tmp_path))
+    profile = profile_project(snapshot, classify_files(snapshot), classify_stack(snapshot))
+
+    assert profile.application == "LIBRARY"
+    assert profile.network == "OUTBOUND_REST"
