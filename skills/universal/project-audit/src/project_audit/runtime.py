@@ -118,6 +118,14 @@ def _run_full_audit_unlocked(
         previous_run = orchestrator.store.load_run(previous_run_ref)
         previous_plan = orchestrator.store.load_plan(previous_run.plan_ref)
         previous_snapshot = orchestrator.store.load_snapshot(previous_run.target_snapshot_ref)
+        if previous_snapshot.project_state.repository_identity != prepared.snapshot.project_state.repository_identity:
+            raise ValueError(
+                "previous_run_ref belongs to a different repository identity."
+            )
+        if previous_snapshot.target_mode != prepared.snapshot.target_mode:
+            raise ValueError(
+                "previous_run_ref uses a different TargetMode than the current audit."
+            )
         previous_work_items = list(previous_plan.work_items)
         previous_evidence_candidates = {}
         for evidence_id in orchestrator.store.list_evidence_ids():
