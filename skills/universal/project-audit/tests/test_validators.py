@@ -520,19 +520,19 @@ class TestPublicationEligibility:
         assert "PUBLISH_ARTIFACTS_MISSING" in error_codes
 
     def test_snapshot_drift_blocks_publication(self, audit_plan, target_snapshot, work_item):
-        run = self._make_run(audit_plan, target_snapshot)
+        run = self._make_run(audit_plan, target_snapshot, work_item_ref=work_item.work_item_id)
         report = can_publish(run, [work_item], [], "d" * 64, audit_plan)
         error_codes = [r.code for r in report.errors()]
         assert "SNAPSHOT_DRIFT_DETECTED" in error_codes
 
     def test_incomplete_execution_blocks_publication(self, audit_plan, target_snapshot, work_item):
-        run = self._make_run(audit_plan, target_snapshot, RunExecutionCompleteness.PARTIAL)
+        run = self._make_run(audit_plan, target_snapshot, RunExecutionCompleteness.PARTIAL, work_item_ref=work_item.work_item_id)
         report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         error_codes = [r.code for r in report.errors()]
         assert "PUBLISH_EXECUTION_INCOMPLETE" in error_codes
 
     def test_failed_work_items_block_publication(self, audit_plan, target_snapshot, work_item):
-        run = self._make_run(audit_plan, target_snapshot)
+        run = self._make_run(audit_plan, target_snapshot, work_item_ref=work_item.work_item_id)
         work_item.execution_state = ExecutionState.TERMINATED
         work_item.failure_state = WorkItemFailureState.INFRA_ERROR
         report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
@@ -540,7 +540,7 @@ class TestPublicationEligibility:
         assert "PUBLISH_HAS_FAILED_ITEMS" in error_codes
 
     def test_run_with_failure_state_blocks_publication(self, audit_plan, target_snapshot, work_item):
-        run = self._make_run(audit_plan, target_snapshot)
+        run = self._make_run(audit_plan, target_snapshot, work_item_ref=work_item.work_item_id)
         run.failure_state = RunFailureState.SNAPSHOT_DRIFT
         report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         error_codes = [r.code for r in report.errors()]
