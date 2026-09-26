@@ -13,6 +13,9 @@ class ExecutionState(str, Enum):
     RUNNING = "RUNNING"
     PARTIAL_COVERAGE = "PARTIAL_COVERAGE"
     SCHEMA_VIOLATION = "SCHEMA_VIOLATION"
+    FAILED = "FAILED"
+    TIMED_OUT = "TIMED_OUT"
+    CANCELLED = "CANCELLED"
     SUCCESS = "SUCCESS"
 
 
@@ -112,7 +115,7 @@ class L3WDelegate:
 
     kind = DelegateKind.L3W
 
-    def execute(
+    async def execute(
         self,
         task: DelegationTask,
         workspace_dir: str,
