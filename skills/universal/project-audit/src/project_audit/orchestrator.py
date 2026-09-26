@@ -69,6 +69,7 @@ from .validators import (
     validate_run,
     validate_snapshot,
     validate_work_item,
+    validate_evidence_snapshot_consistency,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,11 +182,21 @@ class Orchestrator:
                 f"Evidence {evidence.evidence_id} schema validation failed:\n"
                 + "\n".join(errors)
             )
-        # Evidence work_item_ref must match
-        if evidence.work_item_ref != work_item.work_item_id:
+        # Cross-object semantic gate: evidence must belong to the exact
+        # immutable snapshot referenced by the work item's plan.
+        try:
+            plan = self.store.load_plan(work_item.plan_ref)
+            snapshot = self.store.load_snapshot(plan.target_snapshot_ref)
+        except Exception as exc:
             raise OrchestratorError(
-                f"Evidence {evidence.evidence_id} work_item_ref mismatch: "
-                f"{evidence.work_item_ref} != {work_item.work_item_id}"
+                f"Evidence {evidence.evidence_id} cannot be committed without "
+                "resolvable plan/snapshot context."
+            ) from exc
+
+        semantic = validate_evidence_snapshot_consistency(evidence, work_item, snapshot)
+        if semantic.is_error:
+            raise OrchestratorError(
+                f"Evidence semantic validation failed: {semantic.code}: {semantic.message}"
             )
         self.store.save_evidence(evidence)
         logger.debug("Evidence committed: %s", evidence.evidence_id)
