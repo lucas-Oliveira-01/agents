@@ -130,11 +130,6 @@ def execute_engineering_pass(
             fingerprint=result.fingerprint,
         )
 
-        attempt.finish(
-            finished_at=finished,
-            exit_code=0,
-            receipt_ref=receipt.receipt_id,
-        )
         orchestrator.commit_evidence(evidence, item)
 
         needs_semantic = any(
@@ -173,6 +168,11 @@ def execute_engineering_pass(
                 continue
 
         if item.execution_state != ExecutionState.TERMINATED:
+            attempt.finish(
+                finished_at=finished,
+                exit_code=0,
+                receipt_ref=receipt.receipt_id,
+            )
             item.terminate(failure_state=WorkItemFailureState.NONE)
             orchestrator.commit_work_item(item)
 
