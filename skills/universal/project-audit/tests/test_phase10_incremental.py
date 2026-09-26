@@ -53,9 +53,11 @@ def test_stable_incremental_binding_survives_regenerated_work_item_ids(
         work_item_id="00000000-0000-0000-0000-000000000002",
         target_surface="CODE_QUALITY/GENERAL",
     )
-    evidence = make_evidence(
-        target_snapshot_ref=previous_snapshot.snapshot_fingerprint,
-        work_item_ref=previous.work_item_id,
+    evidence = dataclasses.replace(
+        make_evidence(
+            target_snapshot_ref=previous_snapshot.snapshot_fingerprint,
+            work_item_ref=previous.work_item_id,
+        ),
         source_refs=("src/app.py:1",),
         dependencies=(),
     )
