@@ -429,7 +429,15 @@ class Orchestrator:
     # Recovery (ADR-07): reconstruct state from disk after interruption   #
     # ------------------------------------------------------------------ #
 
-    def recover_run(self, interrupted_run_id: str) -> RecoveryBundle:
+    def recover_run(self, interrupted_run_id: str) -> AuditRun:
+        """Load an interrupted run from durable state for reconciliation."""
+        if not self.store.run_exists(interrupted_run_id):
+            raise OrchestratorError(
+                f"Recovery failed: run {interrupted_run_id} not found in store."
+            )
+        return self.store.load_run(interrupted_run_id)
+
+    def prepare_recovery(self, interrupted_run_id: str) -> RecoveryBundle:
         """
         RECOVERY path (≠ RETRY): construct a fresh closed Plan → WorkItem → Run
         graph from durable state. Historical state is never reused as mutable
