@@ -62,7 +62,36 @@ def render_inventory(prepared: PreparedAudit, discovery: DiscoverySnapshot) -> s
         "- Snapshot fingerprint: {}".format(prepared.snapshot.snapshot_fingerprint),
         "- Working tree state: {}".format(prepared.snapshot.project_state.working_tree_state.value),
         "",
-        "## THREAT MODEL",
+        "## PROJECT PROFILE",
+        "",
+        "| Field | Value |",
+        "|---|---|",
+    ]
+    if prepared.project_profile is not None:
+        profile = prepared.project_profile
+        lines.extend(
+            [
+                "| Complexity | {} |".format(profile.complexity),
+                "| Application | {} |".format(profile.application),
+                "| Persistence | {} |".format(profile.persistence),
+                "| Network | {} |".format(profile.network),
+                "| Auth | {} |".format(profile.auth),
+                "| Frontend | {} |".format(profile.frontend),
+                "| Container | {} |".format(profile.container),
+                "| CI | {} |".format(profile.ci),
+                "| Risk surfaces | {} |".format(", ".join(profile.risk_surfaces) or "NONE"),
+                "| Technology surfaces | {} |".format(", ".join(profile.technology_surfaces) or "NONE"),
+                "| Profile fingerprint | {} |".format(profile.fingerprint),
+            ]
+        )
+    else:
+        lines.append("| Profile | NOT_AVAILABLE |")
+    lines.extend(
+        [
+            "",
+            "## THREAT MODEL",
+        ]
+    )
         "",
         "- Assets: source code, configuration, dependency/build metadata, documentation, and audit evidence.",
         "- Actors: NOT_DETERMINABLE from deterministic repository inspection.",
