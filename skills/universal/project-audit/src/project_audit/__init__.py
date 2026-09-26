@@ -1,5 +1,5 @@
 """
-project_audit — Core Engine V1
+project_audit — Swarm-aware audit orchestration
 """
 
 from .classifiers import (
