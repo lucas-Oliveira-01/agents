@@ -74,7 +74,7 @@ class ChangeImpact:
     rename_map: Mapping[str, str]
 
     @property
-    methodology_changed(self) -> bool:
+    def methodology_changed(self) -> bool:
         return any(event.kind == ChangeKind.METHODOLOGY_CHANGE for event in self.events)
 
     @property
