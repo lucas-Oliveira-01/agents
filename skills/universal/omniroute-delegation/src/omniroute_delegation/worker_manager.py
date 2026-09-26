@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import ctypes
 import json
 import os
 import shutil
@@ -223,6 +224,16 @@ class WorkerRunResult:
     timed_out: bool = False
 
 
+def _watchdog_preexec() -> None:
+    if os.name != "posix":
+        return
+    try:
+        libc = ctypes.CDLL(None)
+        libc.prctl(1, 15, 0, 0, 0)
+    except Exception:
+        return
+
+
 class WorkerManager:
     """Launches and supervises L3W workers through a parent-death-aware watchdog."""
 
@@ -285,6 +296,7 @@ class WorkerManager:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             start_new_session=True,
+            preexec_fn=_watchdog_preexec if os.name == "posix" else None,
         )
         self._active[worker_id] = process
 
