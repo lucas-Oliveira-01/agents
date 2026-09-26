@@ -79,6 +79,30 @@ class TestStateStoreRoundtrip:
         assert loaded.attempts[0].attempt_id == attempt.attempt_id
         assert loaded.execution_state == ExecutionState.TERMINATED
 
+    def test_evidence_roundtrip_preserves_phase1_semantic_provenance(self, state_store, evidence):
+        raw = "{\"findings\":[]}"
+        from hashlib import sha256
+        enriched = evidence.__class__(
+            evidence_id=evidence.evidence_id,
+            target_snapshot_ref=evidence.target_snapshot_ref,
+            work_item_ref=evidence.work_item_ref,
+            source_refs=evidence.source_refs,
+            dependencies=evidence.dependencies,
+            validity=evidence.validity,
+            provenance=evidence.provenance,
+            fingerprint=evidence.fingerprint,
+            provider="fake-provider",
+            model="fake-model",
+            raw_output=raw,
+            raw_output_sha256=sha256(raw.encode("utf-8")).hexdigest(),
+        )
+        state_store.save_evidence(enriched)
+        loaded = state_store.load_evidence(enriched.evidence_id)
+        assert loaded.provider == enriched.provider
+        assert loaded.model == enriched.model
+        assert loaded.raw_output == raw
+        assert loaded.raw_output_sha256 == enriched.raw_output_sha256
+
     def test_evidence_roundtrip(self, state_store, evidence):
         state_store.save_evidence(evidence)
         loaded = state_store.load_evidence(evidence.evidence_id)
