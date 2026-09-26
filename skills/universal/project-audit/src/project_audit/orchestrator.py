@@ -72,6 +72,7 @@ from .validators import (
     validate_evidence_snapshot_consistency,
     validate_plan_scope_resolution,
     validate_plan_work_item_references,
+    validate_plan_snapshot_consistency,
 )
 
 logger = logging.getLogger(__name__)
@@ -159,6 +160,14 @@ class Orchestrator:
                 "AuditPlan semantic validation failed: "
                 + "; ".join(r.code for r in refs_report.errors())
             )
+        if self.store.snapshot_exists(plan.target_snapshot_ref):
+            snapshot = self.store.load_snapshot(plan.target_snapshot_ref)
+            snapshot_report = validate_plan_snapshot_consistency(plan, snapshot)
+            if snapshot_report.is_error:
+                raise OrchestratorError(
+                    f"AuditPlan semantic validation failed: "
+                    f"{snapshot_report.code}: {snapshot_report.message}"
+                )
         self.store.save_plan(plan)
         logger.info("Plan frozen and committed: %s", plan.plan_id)
         return plan
