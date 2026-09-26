@@ -150,5 +150,7 @@ def create_local_omniroute_backend(
     from omniroute_delegation.mcp_client import MCPClient
 
     client = MCPClient(mcp_url=mcp_url, timeout=timeout)
+    client.initialize()
+    client.discover_tools()
     gateway = DelegationGateway(client)
     return OmniRouteDelegationBackend(gateway), client
