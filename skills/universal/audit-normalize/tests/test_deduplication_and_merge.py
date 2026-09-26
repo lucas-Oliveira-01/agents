@@ -53,7 +53,7 @@ Recommendation: Enforce strict origin checking in production
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -155,7 +155,7 @@ Description: The remember-me cookie is created without the HttpOnly attribute.
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 

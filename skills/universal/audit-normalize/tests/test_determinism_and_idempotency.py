@@ -57,7 +57,7 @@ Location: PedidoService.java:303-307
             schema_path=schema_path,
             base_dir=tmp_dir,
         )
-        assert res1["overall_status"] == "VALID"
+        assert res1["schema_validity"] == "VALID"
 
         # Run 2
         res2 = normalize(
@@ -66,7 +66,7 @@ Location: PedidoService.java:303-307
             schema_path=schema_path,
             base_dir=tmp_dir,
         )
-        assert res2["overall_status"] == "VALID"
+        assert res2["schema_validity"] == "VALID"
 
         with open(os.path.join(out1, "report_data.json")) as f:
             d1 = json.load(f)

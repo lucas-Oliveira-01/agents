@@ -183,7 +183,9 @@ def test_semantic_auditor_rejects_invalid_worker_output(tmp_path: Path) -> None:
     result = auditor.review(work_item, _run_for(prepared, work_item), build_context(discovery, work_item.target_surface))
 
     assert result.status == "INVALID_OUTPUT"
-    assert result.evidence is None
+    assert result.evidence is not None
+    assert result.evidence.raw_output is not None
+    assert result.evidence.raw_output_sha256 is not None
 
 
 def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path) -> None:
@@ -307,7 +309,9 @@ def test_semantic_auditor_rejects_location_outside_context(tmp_path: Path) -> No
     )
 
     assert result.status == "INVALID_OUTPUT"
-    assert result.evidence is None
+    assert result.evidence is not None
+    assert result.evidence.raw_output is not None
+    assert result.evidence.raw_output_sha256 is not None
 
 
 def test_semantic_auditor_rejects_location_beyond_context_lines(tmp_path: Path) -> None:
@@ -349,4 +353,6 @@ def test_semantic_auditor_rejects_location_beyond_context_lines(tmp_path: Path) 
     )
 
     assert result.status == "INVALID_OUTPUT"
-    assert result.evidence is None
+    assert result.evidence is not None
+    assert result.evidence.raw_output is not None
+    assert result.evidence.raw_output_sha256 is not None

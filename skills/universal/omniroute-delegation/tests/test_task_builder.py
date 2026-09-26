@@ -237,7 +237,7 @@ class TestCredentialScanning:
                 TaskBuilder()
                 .objetivo("Test")
                 .restricoes("None")
-                .contexto("api_key=sk-secretkey12345678901234")
+                .contexto('api_key="q9M2vH7kX4pL8zN3sT6wR1yU5aB8cD2e"')
                 .build()
             )
 

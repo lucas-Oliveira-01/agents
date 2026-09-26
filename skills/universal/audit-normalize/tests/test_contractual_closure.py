@@ -52,7 +52,7 @@ Description: Control with no explicit status provided.
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "INVALID"
+        assert result["schema_validity"] == "INVALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -167,7 +167,7 @@ Description: Control with non-canonical status.
         assert "HALF_ACTIVE" in descriptions
 
         # Schema validation is INVALID because category cannot be represented as valid enum without inventing
-        assert result["overall_status"] == "INVALID"
+        assert result["schema_validity"] == "INVALID"
         assert result["validations"]["schema_validation"]["status"] == "FAIL"
 
 
@@ -437,7 +437,7 @@ Description: Test finding.
         with open(val_file, "r", encoding="utf-8") as f:
             persisted = json.load(f)
 
-        for field in ("overall_status", "errors", "warnings", "validations", "metrics_summary", "snapshot_id", "sources_processed"):
+        for field in ("schema_validity", "execution_validity", "coverage_validity", "security_verdict", "errors", "warnings", "validations", "metrics_summary", "snapshot_id", "sources_processed"):
             assert persisted[field] == val_report[field]
 
 
@@ -964,7 +964,7 @@ def test_applicability_and_inspections_unmapped_taxonomy_cosmology():
         assert "COSMOLOGY" in descriptions
 
         # 4. Because category is required enum and cannot be represented validly without inventing, schema validator declares INVALID
-        assert res["overall_status"] == "INVALID"
+        assert res["schema_validity"] == "INVALID"
         assert res["validations"]["schema_validation"]["status"] == "FAIL"
 
 
@@ -999,7 +999,7 @@ def test_applicability_and_inspections_canonical_category_maintains_schema_valid
         assert len(data["inspections"]) == 1
         assert data["inspections"][0]["category"] == "SECURITY"
 
-        assert res["overall_status"] == "VALID"
+        assert res["schema_validity"] == "VALID"
         assert res["validations"]["schema_validation"]["status"] == "PASS"
 
 
@@ -1022,9 +1022,9 @@ def test_persisted_validation_report_negative_tamper_detection():
         # 1. Tamper overall_status
         with open(val_report_file, "w") as f:
             tampered = dict(val_report)
-            tampered["overall_status"] = "TAMPERED_STATUS"
+            tampered["schema_validity"] = "TAMPERED_STATUS"
             json.dump(tampered, f)
-        with pytest.raises(RuntimeError, match="overall_status"):
+        with pytest.raises(RuntimeError, match="schema_validity"):
             verify_persisted_validation_report(val_report, val_report_file)
 
         # 2. Tamper counts

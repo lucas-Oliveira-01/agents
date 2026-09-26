@@ -64,6 +64,9 @@ class DelegationResult:
     provider_info: Optional[str]
     usage_tokens: Optional[int]
     audit_contract: Optional["AuditContract"] = None
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    raw_output: Optional[str] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -158,14 +161,26 @@ class WorkerPort:
             environment_summary=f"WorkerPort: {self.actor_identity} | error: {result.error_message}" if result.error_message else None,
         )
 
-        # 2. Build Evidence on success
+        # 2. Persist semantic transport evidence even for failed/schema-blocked
+        # attempts, provided we have a snapshot identity. This prevents the
+        # auditor from losing the exact model response when parsing fails.
         evidence = None
-        if result.status == DelegationStatus.SUCCESS and result.output_payload and target_snapshot_ref:
+        raw_output = result.raw_output
+        if raw_output is None and result.audit_contract is not None:
+            raw_output = result.audit_contract.raw_output
+        if raw_output is None and result.output_payload is not None:
+            raw_output = json.dumps(
+                result.output_payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+
+        if target_snapshot_ref and raw_output is not None:
             import hashlib
-            
-            # Deterministic serialization for fingerprint
-            raw = json.dumps(result.output_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            fp = hashlib.sha256(raw).hexdigest()
+
+            raw_bytes = raw_output.encode("utf-8")
+            fp = hashlib.sha256(raw_bytes).hexdigest()
 
             source_refs = ()
             target_ref = context_payload.get("target")
@@ -180,10 +195,13 @@ class WorkerPort:
                 dependencies=(),
                 validity=EvidenceValidity.NOT_DETERMINABLE,
                 provenance=Provenance(
-                    actor=f"{self.actor_identity} via {result.provider_info or 'unknown'}",
+                    actor=f"{self.actor_identity} via {result.provider_info or result.provider or 'unknown'}",
                     generated_at=finished_at,
                 ),
                 fingerprint=fp,
+                provider=result.provider or result.provider_info,
+                model=result.model,
+                raw_output=raw_output,
+                raw_output_sha256=fp,
             )
-
         return WorkerExecution(receipt, evidence, result)

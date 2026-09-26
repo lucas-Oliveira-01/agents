@@ -76,7 +76,7 @@ Recommendation: Utilize JPA Criteria API or parameterized queries.
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -133,7 +133,7 @@ Recommendation: Disallow the 'none' algorithm explicitly in JJWT parser configur
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 

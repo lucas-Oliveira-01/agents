@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import tempfile
@@ -134,9 +135,38 @@ def run_full_audit(
             str(staging), prepared, discovery, engineering, security,
             semantic_reviews=semantic_reviews,
         )
+        execution_state_path = staging / "audit_execution_state.json"
+        execution_state_path.write_text(
+            json.dumps(
+                {
+                    "run_id": run.run_id,
+                    "target_snapshot_ref": run.target_snapshot_ref,
+                    "execution_completeness": run.execution_completeness.value,
+                    "coverage_completeness": run.coverage_completeness.value,
+                    "failure_state": run.failure_state.value,
+                    "semantic_required": semantic_worker is not None,
+                    "semantic_reviews": [
+                        {
+                            "work_item_ref": review.work_item_ref,
+                            "target_surface": review.target_surface,
+                            "status": review.status,
+                            "provider": review.provider,
+                            "model": review.model,
+                            "raw_output_sha256": review.raw_output_fingerprint,
+                        }
+                        for review in semantic_reviews
+                    ],
+                },
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
         orchestrator.check_target_unchanged(root, run, prepared.plan, work_items)
         artifact_map = {key: str(resolved_output_dir / Path(path).name) for key, path in staged.items()}
-        final_paths = [Path(path) for path in artifact_map.values()]
+        state_destination = resolved_output_dir / "audit_execution_state.json"
+        final_paths = [Path(path) for path in artifact_map.values()] + [state_destination]
         normalized_dir = resolved_output_dir / "normalized"
         if normalized_dir.exists() and normalized_dir.is_symlink():
             if not normalized_dir.resolve().is_relative_to(resolved_output_dir.resolve()):
@@ -159,13 +189,17 @@ def run_full_audit(
             orchestrator.check_target_unchanged(root, run, prepared.plan, work_items)
             for key, source in staged.items():
                 Path(source).replace(artifact_map[key])
+            execution_state_path_final = state_destination
+            execution_state_path.replace(execution_state_path_final)
             if normalize:
                 normalization = run_audit_normalize(
                     list(artifact_map.values()), str(normalized_dir),
-                    base_dir=str(root), command=normalize_command,
+                    base_dir=str(root),
+                    command=normalize_command,
+                    execution_state_path=str(execution_state_path_final),
                 )
             orchestrator.check_target_unchanged(root, run, prepared.plan, work_items)
-            run.artifact_refs = list(artifact_map.values())
+            run.artifact_refs = list(artifact_map.values()) + [str(state_destination)]
             if normalization is not None and normalization.status.startswith("COMPLETED"):
                 run.artifact_refs.extend(str(path) for path in final_paths[4:])
             orchestrator.commit_run(
@@ -186,7 +220,7 @@ def run_full_audit(
         prepared=prepared,
         engineering=engineering,
         security=security,
-        artifacts=tuple(artifact_map.values()),
+        artifacts=tuple(list(artifact_map.values()) + [str(state_destination)]),
         normalization=normalization,
         semantic_reviews=semantic_reviews,
     )

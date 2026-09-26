@@ -367,12 +367,15 @@ def render_semantic_findings(
 
     lines = ["## SEMANTIC COVERAGE", ""]
     for review in review_list:
-        if review.status == "COMPLETED" and not review.raw_errors:
+        if review.status == "COMPLETED" and not review.raw_errors and not review.candidates:
             continue
         lines.extend([
             "### WorkItem {}".format(review.work_item_ref),
             "",
             "Coverage status: {}".format(review.status),
+            "Provider: {}".format(review.provider or "UNREPORTED"),
+            "Model: {}".format(review.model or "UNREPORTED"),
+            "Raw output SHA-256: {}".format(review.raw_output_fingerprint or "UNREPORTED"),
         ])
         if review.raw_errors:
             lines.append("Raw errors:")
@@ -380,6 +383,14 @@ def render_semantic_findings(
                 "- " + str(error).replace("\n", " ")
                 for error in review.raw_errors
             )
+        if review.raw_output is not None:
+            lines.extend([
+                "",
+                "Raw model output:",
+                "~~~text",
+                review.raw_output,
+                "~~~",
+            ])
         lines.append("")
 
     if candidates:

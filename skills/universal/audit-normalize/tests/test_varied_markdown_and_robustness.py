@@ -75,7 +75,7 @@ Description: O serviço de usuários utiliza Argon2id para hash seguro de creden
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 

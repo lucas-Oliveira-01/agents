@@ -63,6 +63,9 @@ class SemanticReviewResult:
     evidence: Optional[Evidence]
     audit_contract: Optional[AuditContract] = None
     raw_errors: Tuple[Dict[str, Any], ...] = ()
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    raw_output: Optional[str] = None
 
 
 class SemanticOutputError(ValueError):
@@ -286,6 +289,21 @@ class SemanticAuditor:
         delegated_result = execution.result
 
         audit_contract = delegated_result.audit_contract if delegated_result is not None else None
+        provider = (
+            (delegated_result.provider if delegated_result is not None else None)
+            or (audit_contract.provider if audit_contract is not None else None)
+            or (delegated_evidence.provider if delegated_evidence is not None else None)
+        )
+        model = (
+            (delegated_result.model if delegated_result is not None else None)
+            or (audit_contract.model if audit_contract is not None else None)
+            or (delegated_evidence.model if delegated_evidence is not None else None)
+        )
+        raw_output = (
+            (delegated_result.raw_output if delegated_result is not None else None)
+            or (audit_contract.raw_output if audit_contract is not None else None)
+            or (delegated_evidence.raw_output if delegated_evidence is not None else None)
+        )
 
         if receipt.exit_code == 126:
             return SemanticReviewResult(
@@ -296,9 +314,12 @@ class SemanticAuditor:
                 tuple(),
                 None,
                 receipt,
-                None,
+                delegated_evidence,
                 audit_contract=audit_contract,
                 raw_errors=tuple(audit_contract.raw_errors if audit_contract is not None else ()),
+                provider=provider,
+                model=model,
+                raw_output=raw_output,
             )
 
         if receipt.exit_code != 0 or delegated_evidence is None:
@@ -308,11 +329,14 @@ class SemanticAuditor:
                 "FAILED",
                 sensitivity,
                 tuple(),
-                None,
+                self._fingerprint(delegated_evidence) if delegated_evidence else None,
                 receipt,
-                None,
+                delegated_evidence,
                 audit_contract=audit_contract,
                 raw_errors=tuple(audit_contract.raw_errors if audit_contract is not None else ()),
+                provider=provider,
+                model=model,
+                raw_output=raw_output,
             )
 
         coverage_status = audit_contract.state if audit_contract is not None else None
@@ -325,9 +349,12 @@ class SemanticAuditor:
                 tuple(),
                 self._fingerprint(delegated_evidence),
                 receipt,
-                None,
+                delegated_evidence,
                 audit_contract=audit_contract,
                 raw_errors=tuple(audit_contract.raw_errors),
+                provider=provider,
+                model=model,
+                raw_output=raw_output,
             )
 
         try:
@@ -335,7 +362,13 @@ class SemanticAuditor:
                 raise SemanticOutputError("semantic worker returned no output payload")
             candidates = _parse_output(delegated_result.output_payload)
             _validate_candidates_against_context(candidates, context)
-        except SemanticOutputError:
+        except SemanticOutputError as exc:
+            errors = list(audit_contract.raw_errors if audit_contract is not None else ())
+            errors.append({
+                "error_type": type(exc).__name__,
+                "message": str(exc),
+                "raw": raw_output,
+            })
             return SemanticReviewResult(
                 work_item.work_item_id,
                 work_item.target_surface,
@@ -344,9 +377,12 @@ class SemanticAuditor:
                 tuple(),
                 self._fingerprint(delegated_evidence),
                 receipt,
-                None,
+                delegated_evidence,
                 audit_contract=audit_contract,
-                raw_errors=tuple(audit_contract.raw_errors if audit_contract is not None else ()),
+                raw_errors=tuple(errors),
+                provider=provider,
+                model=model,
+                raw_output=raw_output,
             )
 
         evidence = Evidence(
@@ -358,6 +394,10 @@ class SemanticAuditor:
             validity=EvidenceValidity.VALID,
             provenance=Provenance(actor=self.ACTOR, generated_at=datetime.now(timezone.utc)),
             fingerprint=self._fingerprint(delegated_evidence),
+            provider=provider,
+            model=model,
+            raw_output=raw_output,
+            raw_output_sha256=self._hash_raw_output(raw_output),
         )
         return SemanticReviewResult(
             work_item.work_item_id,
@@ -372,7 +412,16 @@ class SemanticAuditor:
             evidence,
             audit_contract=audit_contract,
             raw_errors=tuple(audit_contract.raw_errors if audit_contract is not None else ()),
+            provider=provider,
+            model=model,
+            raw_output=raw_output,
         )
+
+    @staticmethod
+    def _hash_raw_output(raw_output: Optional[str]) -> Optional[str]:
+        if raw_output is None:
+            return None
+        return hashlib.sha256(raw_output.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _fingerprint(evidence: Evidence) -> str:

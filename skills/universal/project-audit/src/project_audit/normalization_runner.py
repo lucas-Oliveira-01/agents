@@ -22,11 +22,14 @@ def run_audit_normalize(
     base_dir: Optional[str] = None,
     command: str = "audit-normalize",
     timeout_seconds: int = 300,
+    execution_state_path: Optional[str] = None,
 ) -> NormalizationResult:
-    """Invoke audit-normalize only on the Markdown artifacts from this audit run."""
+    """Invoke audit-normalize on this run's Markdown artifacts and execution-state sidecar."""
     argv = [command, "-i"] + list(input_paths) + ["-o", output_dir]
     if base_dir is not None:
         argv.extend(["--base-dir", base_dir])
+    if execution_state_path is not None:
+        argv.extend(["--execution-state", execution_state_path])
 
     try:
         completed = subprocess.run(

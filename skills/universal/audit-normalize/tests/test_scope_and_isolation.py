@@ -45,7 +45,7 @@ def test_scope_no_audit_on_source_code():
         )
 
         # Must report absence of audit markdown sources and refuse to audit
-        assert result["overall_status"] == "INVALID"
+        assert result["schema_validity"] == "INVALID"
         assert result["sources_processed"] == 0
         assert any("No candidate Markdown audit sources found" in err for err in result["errors"])
         # Must not generate report_data.json
@@ -87,7 +87,7 @@ Recommendation: Restrict allowed origins to trusted domains.
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -119,7 +119,7 @@ def test_absence_of_findings_does_not_create_finding():
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 

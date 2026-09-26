@@ -474,9 +474,15 @@ class Evidence:
     validity: EvidenceValidity
     provenance: Provenance
     fingerprint: str  # sha256 of the observation content
+    # Semantic transport provenance. These remain optional because deterministic
+    # Evidence has no LLM output to persist.
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    raw_output: Optional[str] = None
+    raw_output_sha256: Optional[str] = None
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "evidence_id": self.evidence_id,
             "target_snapshot_ref": self.target_snapshot_ref,
             "work_item_ref": self.work_item_ref,
@@ -486,6 +492,15 @@ class Evidence:
             "provenance": self.provenance.to_dict(),
             "fingerprint": self.fingerprint,
         }
+        if self.provider is not None:
+            d["provider"] = self.provider
+        if self.model is not None:
+            d["model"] = self.model
+        if self.raw_output is not None:
+            d["raw_output"] = self.raw_output
+        if self.raw_output_sha256 is not None:
+            d["raw_output_sha256"] = self.raw_output_sha256
+        return d
 
 
 # ---------------------------------------------------------------------------

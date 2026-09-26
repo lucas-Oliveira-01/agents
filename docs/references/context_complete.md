@@ -500,7 +500,7 @@ O arquivo `report_data.json` deve ser estritamente reprodutível byte a byte par
 * Codificação compulsória em UTF-8 com terminação de linha LF (`\n`).
 * Ordenação canônica obrigatória de chaves de dicionários JSON.
 * Ordenação determinística de coleções (fontes por `source_id`, achados por `finding.id`, controles por `control.id`).
-* O resultado da validação final deve ser explicitamente classificado em: `VALID`, `VALID_WITH_WARNINGS` ou `INVALID`.
+* A validação final deve expor independentemente `schema_validity`, `execution_validity`, `coverage_validity` e `security_verdict`; nenhum campo isolado pode autorizar um veredito de segurança limpo.
 
 ---
 

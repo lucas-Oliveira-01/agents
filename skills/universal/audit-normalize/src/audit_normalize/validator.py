@@ -63,6 +63,7 @@ class AuditDataValidator:
         self,
         report_data: Dict[str, Any],
         base_dir: Optional[str] = None,
+        execution_state: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Execute full validation suite: schema, semantics, referential, and integrity."""
         errors: List[str] = []
@@ -94,24 +95,102 @@ class AuditDataValidator:
             else:
                 warnings.append(msg)
 
-        if errors:
-            overall_status = "INVALID"
-        elif warnings:
-            overall_status = "VALID_WITH_WARNINGS"
-        else:
-            overall_status = "VALID"
+        validations = {
+            "schema_validation": {"status": "PASS" if schema_ok else "FAIL", "errors": schema_errs},
+            "semantic_validation": {"status": "PASS" if sem_ok else "FAIL", "errors": sem_errs, "warnings": sem_warns},
+            "referential_validation": {"status": "PASS" if ref_ok else "FAIL", "errors": ref_errs},
+            "integrity_validation": {"status": "PASS" if int_ok else "FAIL", "errors": int_errs},
+        }
+
+        dimensions = self._derive_validation_dimensions(
+            report_data=report_data,
+            execution_state=execution_state,
+            schema_ok=schema_ok,
+            validations=validations,
+            errors=errors,
+        )
 
         return {
-            "overall_status": overall_status,
-            "validations": {
-                "schema_validation": {"status": "PASS" if schema_ok else "FAIL", "errors": schema_errs},
-                "semantic_validation": {"status": "PASS" if sem_ok else "FAIL", "errors": sem_errs, "warnings": sem_warns},
-                "referential_validation": {"status": "PASS" if ref_ok else "FAIL", "errors": ref_errs},
-                "integrity_validation": {"status": "PASS" if int_ok else "FAIL", "errors": int_errs},
-            },
+            **dimensions,
+            "validations": validations,
             "errors": errors,
             "warnings": warnings,
             "metrics_summary": report_data.get("metrics", {}),
+        }
+
+    @staticmethod
+    def _derive_validation_dimensions(
+        report_data: Dict[str, Any],
+        execution_state: Optional[Dict[str, Any]],
+        schema_ok: bool,
+        validations: Dict[str, Any],
+        errors: List[str],
+    ) -> Dict[str, str]:
+        """Derive independent audit states; never collapse execution failure into CLEAN."""
+        schema_validity = "VALID" if schema_ok else "INVALID"
+
+        if execution_state is None:
+            execution_validity = "UNKNOWN"
+            coverage_validity = "UNKNOWN"
+            semantic_required = True
+            semantic_complete = False
+        else:
+            failure = execution_state.get("failure_state", "NONE")
+            execution_state_value = execution_state.get("execution_completeness", "UNKNOWN")
+            if execution_state_value == "COMPLETE" and failure == "NONE":
+                execution_validity = "COMPLETE"
+            elif failure == "SAFETY_BLOCK":
+                execution_validity = "BLOCKED"
+            elif failure in {"INFRA_ERROR", "SEMANTIC_COVERAGE_FAILED", "BUDGET_EXHAUSTED"}:
+                execution_validity = "FAILED"
+            else:
+                execution_validity = "INCOMPLETE"
+
+            coverage_value = execution_state.get("coverage_completeness", "UNKNOWN")
+            coverage_validity = {
+                "FULL": "FULL",
+                "PARTIAL": "PARTIAL",
+                "NONE": "NONE",
+                "PENDING": "UNKNOWN",
+            }.get(coverage_value, "UNKNOWN")
+
+            semantic_required = bool(execution_state.get("semantic_required", True))
+            reviews = execution_state.get("semantic_reviews", [])
+            if not semantic_required:
+                # No semantic worker was requested for this run, so semantic
+                # completeness is not a prerequisite for a deterministic audit.
+                semantic_complete = True
+            else:
+                semantic_complete = bool(
+                    reviews
+                    and all(item.get("status") == "COMPLETED" for item in reviews)
+                )
+
+        all_validation_axes_pass = all(
+            axis.get("status") == "PASS"
+            for axis in validations.values()
+        ) and not errors
+
+        findings_total = len(report_data.get("findings", []))
+
+        if (
+            schema_validity != "VALID"
+            or execution_validity != "COMPLETE"
+            or coverage_validity != "FULL"
+            or not all_validation_axes_pass
+            or not semantic_complete
+        ):
+            security_verdict = "INCOMPLETE"
+        elif findings_total:
+            security_verdict = "COMPLETE_FINDINGS"
+        else:
+            security_verdict = "COMPLETE_CLEAN"
+
+        return {
+            "schema_validity": schema_validity,
+            "execution_validity": execution_validity,
+            "coverage_validity": coverage_validity,
+            "security_verdict": security_verdict,
         }
 
     def validate_schema(self, report_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
@@ -355,8 +434,10 @@ def main():
     res = validator.validate_all(report_data, base_dir=args.base_dir)
 
     print(json.dumps(res, indent=2, ensure_ascii=False))
-    if res["overall_status"] == "INVALID":
+    if res["schema_validity"] == "INVALID":
         sys.exit(1)
+    if res["security_verdict"] == "INCOMPLETE":
+        sys.exit(3)
     sys.exit(0)
 
 

@@ -10,6 +10,8 @@ import shutil
 import sys
 from typing import Any, Dict, List, Optional
 
+from jsonschema import Draft202012Validator
+
 from .merger import merge_and_resolve_controls, merge_and_resolve_findings, resolve_target_project
 from .metrics import compute_metrics
 from .parser import (
@@ -21,6 +23,46 @@ from .parser import (
     extract_raw_target_projects,
 )
 from .validator import AuditDataValidator, get_default_schema_path
+
+
+def get_default_validation_report_schema_path() -> str:
+    """Resolve the schema for validation_report.json."""
+    package_ref = os.path.abspath(
+        os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..",
+            "..",
+            "references",
+            "validation_report.schema.json",
+        )
+    )
+    if os.path.isfile(package_ref):
+        return package_ref
+    cwd_ref = os.path.abspath("references/validation_report.schema.json")
+    return cwd_ref
+
+
+def _validate_validation_report_schema(
+    report: Dict[str, Any],
+) -> None:
+    """Validate the validator's own output contract before it is persisted."""
+    schema_path = get_default_validation_report_schema_path()
+    if not os.path.isfile(schema_path):
+        raise FileNotFoundError(
+            f"Validation report schema not found at: {schema_path}"
+        )
+    with open(schema_path, "r", encoding="utf-8") as sf:
+        schema = json.load(sf)
+    validator = Draft202012Validator(schema)
+    errors = list(validator.iter_errors(report))
+    if errors:
+        details = "; ".join(
+            f"{' -> '.join(str(p) for p in err.path) or 'root'}: {err.message}"
+            for err in errors
+        )
+        raise RuntimeError(
+            "Generated validation_report.json violates its own schema: " + details
+        )
 
 
 def compute_sha256(data: bytes) -> str:
@@ -122,6 +164,7 @@ def normalize(
     schema_path: Optional[str] = None,
     base_dir: Optional[str] = None,
     strict: bool = False,
+    execution_state_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Execute the end-to-end normalization pipeline."""
     if base_dir:
@@ -148,7 +191,10 @@ def normalize(
         print("[audit-normalize] No valid Markdown audit sources found.", file=sys.stderr)
         print("[audit-normalize] Prohibited from performing source code auditing or synthesizing audit results.", file=sys.stderr)
         return {
-            "overall_status": "INVALID",
+            "schema_validity": "INVALID",
+            "execution_validity": "UNKNOWN",
+            "coverage_validity": "UNKNOWN",
+            "security_verdict": "INCOMPLETE",
             "errors": ["No candidate Markdown audit sources found. audit-normalize does not audit projects."],
             "warnings": [],
             "sources_processed": 0,
@@ -229,7 +275,15 @@ def normalize(
         schema_data = json.load(sf)
 
     validator = AuditDataValidator(schema_data)
-    val_report = validator.validate_all(report_data, base_dir=calc_base_dir)
+    execution_state = None
+    if execution_state_path:
+        with open(execution_state_path, "r", encoding="utf-8") as ef:
+            execution_state = json.load(ef)
+    val_report = validator.validate_all(
+        report_data,
+        base_dir=calc_base_dir,
+        execution_state=execution_state,
+    )
     val_report["sources_processed"] = len(sources)
     val_report["snapshot_id"] = snapshot["snapshot_id"]
     val_report["schema_version"] = report_data.get("schema_version", "1.0")
@@ -254,6 +308,10 @@ def normalize(
         "source_manifest": manifest_file,
         "report_data_schema": schema_dest_file,
     }
+
+    # Validate the validation report itself before persistence. A malformed
+    # validator result is a platform error, never a successful audit result.
+    _validate_validation_report_schema(val_report)
 
     # Write artifacts and explicitly close
     with open(report_data_file, "w", encoding="utf-8") as f:
@@ -286,7 +344,10 @@ def verify_persisted_validation_report(val_report: Dict[str, Any], val_report_fi
         persisted_val_report = json.load(f)
 
     for check_field in (
-        "overall_status",
+        "schema_validity",
+        "execution_validity",
+        "coverage_validity",
+        "security_verdict",
         "errors",
         "warnings",
         "validations",
@@ -333,6 +394,11 @@ def main():
         action="store_true",
         help="Fail if any warning is detected.",
     )
+    parser.add_argument(
+        "--execution-state",
+        default=None,
+        help="Path to the Project Audit execution-state sidecar used to derive execution, coverage, and security verdicts.",
+    )
 
     args = parser.parse_args()
 
@@ -342,11 +408,15 @@ def main():
         schema_path=args.schema,
         base_dir=args.base_dir,
         strict=args.strict,
+        execution_state_path=args.execution_state,
     )
 
     # Concise report output per v8_current.md L1533-1558 / NCS-0057
     print("==================================================")
-    print(f"Status: {val_report['overall_status']}")
+    print(f"Schema validity: {val_report['schema_validity']}")
+    print(f"Execution validity: {val_report['execution_validity']}")
+    print(f"Coverage validity: {val_report['coverage_validity']}")
+    print(f"Security verdict: {val_report['security_verdict']}")
     print(f"Fontes processadas: {val_report.get('sources_processed', 0)}")
     print(f"Snapshot ID: {val_report.get('snapshot_id', 'N/A')}")
     metrics = val_report.get("metrics_summary", {})
@@ -363,11 +433,11 @@ def main():
             print(f"  - {k}: {p}")
     print("==================================================")
 
-    if val_report["overall_status"] == "INVALID":
+    if val_report["schema_validity"] == "INVALID":
         for err in val_report.get("errors", []):
             print(f"ERROR: {err}", file=sys.stderr)
         sys.exit(1)
-    elif args.strict and val_report["overall_status"] == "VALID_WITH_WARNINGS":
+    elif args.strict and val_report["schema_validity"] == "VALID" and val_report.get("warnings"):
         for w in val_report.get("warnings", []):
             print(f"WARNING: {w}", file=sys.stderr)
         sys.exit(2)
