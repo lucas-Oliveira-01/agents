@@ -21,7 +21,7 @@ async def dispatch_opencode_worker(
     """Run one supervised OpenCode L3W order and return a JSON receipt."""
     delegate = L3WDelegate()
     config = L3WConfig(
-        workspace_dir=workspace_dir or None,
+        repository_root=workspace_dir or None,
         memory_mode=MemoryMode.BUBBLE if isolated_memory else MemoryMode.GLOBAL,
         timeout_seconds=timeout_seconds,
         strict_sandbox=True,
