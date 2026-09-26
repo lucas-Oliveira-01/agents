@@ -296,7 +296,7 @@ def render_report(
     verification_list = list(verification_results)
     if verification_list:
         lines.extend([
-            "## 24. Independent Verifier",
+            "## 24.1 Independent Verifier",
             "",
             "Formal P0/P1 consolidation is gated by independent evidence verification.",
             "",
