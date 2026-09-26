@@ -93,7 +93,13 @@ def execute_engineering_pass(
         orchestrator.commit_work_item(item)
 
         result = auditor.inspect(discovery, item.work_item_id, item.target_surface)
-        orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
+        changed_paths = orchestrator.check_target_unchanged(
+            discovery.root, run, plan, work_items
+        )
+        current_item_drifted = orchestrator.is_snapshot_node_affected(
+            changed_paths,
+            list(result.source_refs),
+        )
         finished = datetime.now(timezone.utc)
 
         receipt = ExecutionReceipt(
@@ -116,7 +122,7 @@ def execute_engineering_pass(
             work_item_ref=item.work_item_id,
             source_refs=result.source_refs,
             dependencies=(),
-            validity=EvidenceValidity.VALID,
+            validity=EvidenceValidity.STALE if current_item_drifted else EvidenceValidity.VALID,
             provenance=Provenance(
                 actor=auditor.ACTOR,
                 generated_at=finished,
@@ -135,6 +141,18 @@ def execute_engineering_pass(
             getattr(observation, "state", None) == "NOT_DETERMINABLE"
             for observation in result.observations
         )
+        if current_item_drifted:
+            attempt.fail(
+                finished_at=finished,
+                reason="SNAPSHOT_DRIFT",
+                receipt_ref=receipt.receipt_id,
+            )
+            item.terminate(failure_state=WorkItemFailureState.SNAPSHOT_DRIFT)
+            orchestrator.commit_work_item(item)
+            inspections.append(result)
+            evidences.append(evidence)
+            continue
+
         if semantic_worker is not None and needs_semantic:
             semantic_result = execute_semantic_review(
                 orchestrator,
