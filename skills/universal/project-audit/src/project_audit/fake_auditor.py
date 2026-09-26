@@ -107,7 +107,6 @@ class FakeAuditor:
         # SUCCESS: produce deterministic Evidence
         # The fingerprint is derived from work_item_id to ensure determinism
         observation_content = {
-            "work_item_id": work_item.work_item_id,
             "auditor": work_item.auditor,
             "target_surface": work_item.target_surface,
             "fake_observation": "deterministic_observation_v1",

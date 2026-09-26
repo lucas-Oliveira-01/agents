@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "purpose": "Phase 8 deterministic evaluation corpus",
+  "projects": [
+    {
+      "id": "clean-project",
+      "expected_min_files": 4,
+      "files": {
+        "README.md": "# Golden Clean Project\n\nA small deterministic Python project.\n",
+        "pyproject.toml": "[project]\nname = \"golden-clean\"\nversion = \"0.1.0\"\nrequires-python = \">=3.9\"\n",
+        "src/app.py": "def add(left, right):\n    return left + right\n",
+        "tests/test_app.py": "from src.app import add\n\ndef test_add():\n    assert add(2, 3) == 5\n"
+      }
+    },
+    {
+      "id": "security-vulnerable",
+      "expected_min_files": 3,
+      "must_contain": [".env", "src/auth.py"],
+      "files": {
+        ".env": "API_KEY = \"not-a-real-secret-but-secret-shaped-value\"\n",
+        "README.md": "# Golden Security Corpus\n",
+        "src/auth.py": "def authenticate(password):\n    return password == \"hard-coded-password\"\n"
+      }
+    },
+    {
+      "id": "partial-coverage",
+      "expected_min_files": 3,
+      "files": {
+        "README.md": "# Partial Coverage\n\nSemantic completeness is intentionally not represented by this corpus case.\n",
+        "src/unknown.ext": "opaque project content\n",
+        "notes.txt": "not enough context for semantic conclusions\n"
+      }
+    },
+    {
+      "id": "snapshot-drift",
+      "expected_min_files": 3,
+      "files": {
+        "README.md": "# Snapshot Drift Fixture\n",
+        "src/service.py": "def handle(request):\n    return request\n",
+        "src/config.py": "SETTING = \"stable\"\n"
+      }
+    },
+    {
+      "id": "auto-fix",
+      "expected_min_files": 3,
+      "files": {
+        "README.md": "# Auto Fix Fixture\n",
+        "src/service.py": "def vulnerable(value):\n    return value\n",
+        "tests/test_service.py": "def test_vulnerable():\n    assert vulnerable(1) == 1\n"
+      }
+    }
+  ]
+}

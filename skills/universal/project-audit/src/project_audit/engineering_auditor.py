@@ -334,8 +334,8 @@ def _inspect_surface(
             )
         )
 
+    # Fingerprint the observed audit content, not the volatile WorkItem identity.
     canonical = {
-        "work_item_ref": work_item_ref,
         "target_surface": target_surface,
         "observations": [
             {
