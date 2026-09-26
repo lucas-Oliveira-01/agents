@@ -2,11 +2,18 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Iterable, Tuple
+from typing import Iterable, Optional, Tuple
 
 from .classifiers import ApplicabilityDecision as ClassifiedApplicability
 from .classifiers import ApplicabilityState, FileClassification, classify_task
+from .classification import (
+    ClassificationResult,
+    ProjectProfile,
+    build_classification_results,
+    profile_project,
+)
 from .discovery import DiscoverySnapshot
+from .classifiers import classify_stack
 from .incremental import IncrementalDecision, plan_incremental_actions
 from .models import (
     ApplicabilityDecision as CanonicalApplicabilityDecision,
@@ -39,6 +46,8 @@ class PreparedAudit:
     work_items: Tuple[AuditWorkItem, ...]
     file_classifications: Tuple[FileClassification, ...]
     applicability: Tuple[ClassifiedApplicability, ...]
+    project_profile: Optional[ProjectProfile] = None
+    classification_results: Tuple[ClassificationResult, ...] = ()
 
 
 def _working_tree_state(snapshot: DiscoverySnapshot) -> WorkingTreeState:
@@ -193,7 +202,25 @@ def prepare_audit(
 
     snapshot = build_target_snapshot(discovery, target_mode=target_mode)
     plan, work_items = build_plan(snapshot, applicability)
-    return PreparedAudit(snapshot, plan, work_items, files, applicability)
+    stack = classify_stack(discovery)
+    project_profile = profile_project(discovery, files, stack)
+    classification_results = build_classification_results(
+        discovery,
+        files,
+        stack,
+        applicability,
+        work_items,
+        project_profile,
+    )
+    return PreparedAudit(
+        snapshot,
+        plan,
+        work_items,
+        files,
+        applicability,
+        project_profile,
+        classification_results,
+    )
 
 def apply_incremental_decisions(
     work_items: Iterable[AuditWorkItem],

@@ -19,6 +19,12 @@ A pós-condição da Phase 7 agora passa por uma camada explícita de aceitaçã
 
 A suíte também valida uma propriedade necessária para repetibilidade: fingerprints de inspeções determinísticas não dependem de IDs voláteis de WorkItems. O resultado de um mesmo alvo, metodologia e conteúdo observado deve permanecer canonicamente estável entre execuções.
 
+## Phase 9 — Explicit Deterministic Classification Layer
+
+A camada de Deterministic Intelligence agora possui um contrato explícito. `prepare_audit()` materializa um `ProjectProfile` e registros imutáveis `ClassificationResult` antes do planejamento, cobrindo classificação de arquivos, stack, superfícies tecnológicas, aplicabilidade e tipo de tarefa.
+
+Os resultados carregam `classifier_id`, versão, entradas, resultado, confiança, justificativa e provenance. Nenhuma dessas decisões usa LLM, rede ou mutação do projeto.
+
 ## Resultados Implementados e Escalabilidade
 
 | Feature | Estado | Descrição Técnica |
