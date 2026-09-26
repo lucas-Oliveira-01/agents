@@ -85,7 +85,7 @@ def _inspection_signature(result) -> Tuple[object, ...]:
                 tuple(
                     (
                         observation.code,
-                        observation.category,
+                        getattr(observation, "category", None),
                         observation.subcategory,
                         observation.state,
                         observation.summary,
