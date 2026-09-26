@@ -4,6 +4,8 @@ import dataclasses
 import uuid
 from datetime import timedelta
 
+import pytest
+
 from project_audit.models import (
     AuditRun,
     EvidenceValidity,
@@ -27,6 +29,8 @@ from project_audit.validators import (
     validate_run_work_item_references,
     validate_state_graph,
 )
+from project_audit.orchestrator import Orchestrator, OrchestratorError
+from project_audit.state_store import StateStore
 from tests.conftest import FIXED_TS, make_evidence, make_work_item
 
 
@@ -189,3 +193,21 @@ def test_lifecycle_sequence_is_validated():
         FindingLifecycle.REGRESSED,
     ])
     assert invalid.has_errors
+
+
+def test_orchestrator_rejects_evidence_from_different_snapshot(
+    tmp_path, audit_plan, target_snapshot, work_item
+):
+    store = StateStore(tmp_path / "audit-store")
+    orchestrator = Orchestrator(store)
+    orchestrator.commit_snapshot(target_snapshot)
+    audit_plan.work_items = [work_item]
+    orchestrator.freeze_and_commit_plan(audit_plan)
+    orchestrator.commit_work_item(work_item)
+
+    bad = make_evidence(
+        target_snapshot_ref="d" * 64,
+        work_item_ref=work_item.work_item_id,
+    )
+    with pytest.raises(OrchestratorError, match="EVIDENCE_SNAPSHOT_MISMATCH"):
+        orchestrator.commit_evidence(bad, work_item)
