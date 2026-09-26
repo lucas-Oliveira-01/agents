@@ -268,6 +268,13 @@ class Orchestrator:
         """Report whether the aggregate fingerprint changed."""
         return run.target_snapshot_ref != current_fingerprint
 
+    def is_snapshot_node_affected(
+        self,
+        changed_paths: List[str],
+        source_refs: List[str],
+    ) -> bool:
+        return self._paths_overlap(changed_paths, source_refs)
+
     def reconcile_snapshot_drift(
         self,
         run: AuditRun,
