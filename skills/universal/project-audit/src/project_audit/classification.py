@@ -16,6 +16,7 @@ from typing import Iterable, Optional, Tuple
 
 from .classifiers import (
     ApplicabilityDecision,
+    ApplicabilityState,
     FileClassification,
     FileKind,
     TaskClassification,
@@ -421,7 +422,7 @@ def build_classification_results(
                 "1",
                 refs,
                 decision.state.value,
-                "HIGH" if decision.state != decision.state.NOT_DETERMINABLE else "MEDIUM",
+                "HIGH" if decision.state != ApplicabilityState.NOT_DETERMINABLE else "MEDIUM",
                 decision.reason,
             )
         )
