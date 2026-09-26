@@ -26,6 +26,7 @@ from enum import Enum
 from typing import Iterable, Mapping, Optional, Tuple
 import uuid
 
+from .change_impact import ChangeImpact, ChangeKind, build_change_impact
 from .models import (
     AuditWorkItem,
     Evidence,
@@ -172,10 +173,12 @@ def _current_value(
     node: DependencyNode,
     snapshot: TargetSnapshot,
     auditor: str,
+    path_aliases: Optional[Mapping[str, str]] = None,
 ) -> Optional[str]:
     inputs = _snapshot_inputs(snapshot)
     if node.kind in (DependencyKind.SOURCE, DependencyKind.SEMANTIC):
-        return inputs.get(node.key)
+        key = (path_aliases or {}).get(node.key, node.key)
+        return inputs.get(key)
     if node.kind == DependencyKind.METHODOLOGY_CONTRACT:
         return snapshot.methodology_state.audit_contract_version
     if node.kind == DependencyKind.METHODOLOGY_POLICY:
@@ -190,6 +193,8 @@ def decide_incremental_action(
     previous_snapshot: TargetSnapshot,
     current_snapshot: TargetSnapshot,
     auditor: str,
+    *,
+    path_aliases: Optional[Mapping[str, str]] = None,
 ) -> IncrementalDecision:
     """Apply the frozen ADR-04 precedence:
     INVALIDATE > REAUDIT > REVALIDATE > REUSE.
@@ -209,7 +214,7 @@ def decide_incremental_action(
         if node.kind in (DependencyKind.SOURCE, DependencyKind.SEMANTIC):
             if node.observed_fingerprint is None:
                 return IncrementalDecision.REAUDIT
-            if _current_value(node, current_snapshot, auditor) is None:
+            if _current_value(node, current_snapshot, auditor, path_aliases) is None:
                 return IncrementalDecision.INVALIDATE
 
     # Breaking methodology invalidates the old assessment's compatibility.
