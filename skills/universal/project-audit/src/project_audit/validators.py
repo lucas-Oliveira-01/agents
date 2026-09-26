@@ -1086,9 +1086,13 @@ def validate_state_graph(
             evidence for evidence in evidence_list
             if evidence.work_item_ref == work_item.work_item_id
         ]
-        results.append(validate_work_item(work_item, [plan.plan_id], item_evidence).results[-1])
-        results.append(validate_attempt_ordering(work_item))
-        results.append(validate_work_item_scope_membership(plan, [work_item]))
+        results.extend(
+            validate_work_item(
+                work_item,
+                [plan.plan_id],
+                item_evidence,
+            ).results
+        )
     return ValidationReport(results)
 
 
