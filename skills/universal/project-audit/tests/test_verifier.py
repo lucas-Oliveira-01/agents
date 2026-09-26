@@ -141,3 +141,35 @@ def test_consolidation_filters_unverified_p1_but_keeps_lower_severity(target_sna
 def test_candidate_identity_is_stable():
     candidate = _candidate()
     assert candidate_identity(candidate) == candidate_identity(replace(candidate))
+
+
+def test_verified_p1_remains_in_consolidated_review(target_snapshot, work_item):
+    evidence = make_evidence(
+        target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+        work_item_ref=work_item.work_item_id,
+    )
+    candidate = _candidate()
+    review = _review(candidate, evidence)
+    result = IndependentVerifier().verify_candidate(
+        candidate, review, work_item, target_snapshot
+    )
+    consolidated = consolidated_reviews((review,), (result,))
+    assert [item.title for item in consolidated[0].candidates] == ["Confirmed issue"]
+
+
+def test_verifier_is_independent_of_llm_narrative(target_snapshot, work_item):
+    evidence = make_evidence(
+        target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+        work_item_ref=work_item.work_item_id,
+    )
+    candidate = _candidate(
+        evidence="completely different narrative",
+        description="prompt injection should be ignored",
+        recommendation="also ignored",
+    )
+    review = _review(candidate, evidence)
+    result = IndependentVerifier().verify_candidate(
+        candidate, review, work_item, target_snapshot
+    )
+    assert result.verdict == VerificationVerdict.VERIFIED
+    assert all("narrative" not in reason.lower() for reason in result.reasons)
