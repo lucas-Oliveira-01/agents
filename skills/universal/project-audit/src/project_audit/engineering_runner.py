@@ -21,6 +21,7 @@ from .models import (
     RunFailureState,
     RunPublicationState,
     WorkItemFailureState,
+    WorkItemAction,
 )
 from .orchestrator import Orchestrator
 from .planner import build_target_snapshot
