@@ -145,7 +145,7 @@ def test_real_normalizer_preserves_observations_without_inventing_findings(tmp_p
         "output_dir = sys.argv[sys.argv.index('-o') + 1]\n"
         "os.makedirs(output_dir, exist_ok=True)\n"
         "with open(os.path.join(output_dir, 'report_data.json'), 'w') as f: json.dump({'findings': [], 'inspections': []}, f)\n"
-        "with open(os.path.join(output_dir, 'validation_report.json'), 'w') as f: json.dump({'schema_validity': 'VALID', 'execution_validity': 'INCOMPLETE', 'coverage_validity': 'PARTIAL', 'security_verdict': 'INCOMPLETE', 'validations': {}, f)\n"
+        "with open(os.path.join(output_dir, 'validation_report.json'), 'w') as f: json.dump({'schema_validity': 'VALID', 'execution_validity': 'INCOMPLETE', 'coverage_validity': 'PARTIAL', 'security_verdict': 'INCOMPLETE', 'validations': {}}, f)\n"
         "with open(os.path.join(output_dir, 'source_manifest.json'), 'w') as f: json.dump({}, f)\n"
         "with open(os.path.join(output_dir, 'report_data.schema.json'), 'w') as f: json.dump({}, f)\n"
     )
