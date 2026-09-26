@@ -226,66 +226,147 @@ class Orchestrator:
     # Snapshot drift detection (§18)                                      #
     # ------------------------------------------------------------------ #
 
-    def detect_snapshot_drift(
-        self, run: AuditRun, current_fingerprint: str
-    ) -> bool:
-        """
-        Detect if the project changed since the run started.
-        Returns True if drift detected (execution must stop).
-        """
-        if run.target_snapshot_ref != current_fingerprint:
-            logger.error(
-                "SNAPSHOT DRIFT: run %s was started against %s, "
-                "current snapshot is %s",
-                run.run_id,
-                run.target_snapshot_ref[:16],
-                current_fingerprint[:16],
-            )
-            return True
+    @staticmethod
+    def _tracked_input_map(snapshot: TargetSnapshot) -> Dict[str, str]:
+        return {
+            item.path: item.fingerprint
+            for item in snapshot.project_state.tracked_input_fingerprints
+        }
+
+    @staticmethod
+    def _paths_overlap(changed_paths: List[str], source_refs: List[str]) -> bool:
+        normalized_changed = {Path(path).as_posix().lstrip("./") for path in changed_paths}
+        normalized_sources = {Path(path).as_posix().lstrip("./") for path in source_refs}
+        for changed in normalized_changed:
+            for source in normalized_sources:
+                if changed == source:
+                    return True
+                if changed.startswith(source.rstrip("/") + "/"):
+                    return True
+                if source.startswith(changed.rstrip("/") + "/"):
+                    return True
         return False
 
+    def _changed_snapshot_nodes(
+        self,
+        previous: TargetSnapshot,
+        current: TargetSnapshot,
+    ) -> List[str]:
+        previous_map = self._tracked_input_map(previous)
+        current_map = self._tracked_input_map(current)
+        return sorted(
+            path
+            for path in set(previous_map) | set(current_map)
+            if previous_map.get(path) != current_map.get(path)
+        )
+
+    def detect_snapshot_drift(
+        self,
+        run: AuditRun,
+        current_fingerprint: str,
+    ) -> bool:
+        """Report whether the aggregate fingerprint changed."""
+        return run.target_snapshot_ref != current_fingerprint
+
+    def reconcile_snapshot_drift(
+        self,
+        run: AuditRun,
+        plan: AuditPlan,
+        work_items: List[AuditWorkItem],
+        current_snapshot: TargetSnapshot,
+    ) -> List[str]:
+        """Invalidate only WorkItems whose evidence references changed input nodes."""
+        original_snapshot = self.store.load_snapshot(run.target_snapshot_ref)
+        if original_snapshot.snapshot_fingerprint == current_snapshot.snapshot_fingerprint:
+            return []
+
+        changed_paths = self._changed_snapshot_nodes(original_snapshot, current_snapshot)
+        if not changed_paths:
+            logger.warning(
+                "Snapshot aggregate changed for run %s without a tracked input change; "
+                "preserving node evidence because no affected file was identified.",
+                run.run_id,
+            )
+            return []
+
+        stale_work_item_ids: List[str] = []
+        for work_item in work_items:
+            evidence_for_item = [
+                self.store.load_evidence(evidence_id)
+                for evidence_id in self.store.list_evidence_ids()
+                if self.store.load_evidence(evidence_id).work_item_ref == work_item.work_item_id
+            ]
+            source_refs: List[str] = []
+            for evidence in evidence_for_item:
+                source_refs.extend(evidence.source_refs)
+                if self._paths_overlap(changed_paths, list(evidence.source_refs)):
+                    self.store.save_evidence(
+                        replace(evidence, validity=EvidenceValidity.STALE)
+                    )
+
+            if self._paths_overlap(changed_paths, source_refs):
+                work_item.failure_state = WorkItemFailureState.SNAPSHOT_DRIFT
+                stale_work_item_ids.append(work_item.work_item_id)
+                self.commit_work_item(work_item)
+
+        if stale_work_item_ids:
+            run.execution_completeness = RunExecutionCompleteness.PARTIAL
+            run.coverage_completeness = RunCoverageCompleteness.PARTIAL
+            run.publication_state = RunPublicationState.NOT_PUBLISHED
+            logger.warning(
+                "Snapshot drift for run %s affected WorkItems: %s; changed nodes: %s",
+                run.run_id,
+                stale_work_item_ids,
+                changed_paths,
+            )
+            self.commit_run(
+                run,
+                plan,
+                work_items,
+                known_run_ids=self.store.list_run_ids(),
+            )
+
+        return changed_paths
+
     def ensure_snapshot_current(
-        self, run: AuditRun, plan: AuditPlan, work_items: List[AuditWorkItem],
+        self,
+        run: AuditRun,
+        plan: AuditPlan,
+        work_items: List[AuditWorkItem],
         current_fingerprint: str,
     ) -> None:
-        """Fail closed for the whole run; keep stale diagnostics, reuse nothing."""
-        if (run.failure_state != RunFailureState.SNAPSHOT_DRIFT
-                and not self.detect_snapshot_drift(run, current_fingerprint)):
+        """Backward-compatible aggregate check without global invalidation."""
+        if not self.detect_snapshot_drift(run, current_fingerprint):
             return
-        run.failure_state = RunFailureState.SNAPSHOT_DRIFT
-        run.publication_state = RunPublicationState.NOT_PUBLISHED
-        run.artifact_refs.clear()
-        run.execution_completeness = RunExecutionCompleteness.PARTIAL
-        blocked = [i for i in work_items if i.failure_state == WorkItemFailureState.SAFETY_BLOCK]
-        complete = [i for i in work_items if i.execution_state == ExecutionState.TERMINATED
-                    and i.failure_state == WorkItemFailureState.NONE]
-        if not work_items or len(blocked) == len(work_items):
-            run.coverage_completeness = RunCoverageCompleteness.NONE
-        elif len(complete) == len(work_items):
-            run.coverage_completeness = RunCoverageCompleteness.FULL
-        else:
-            run.coverage_completeness = RunCoverageCompleteness.PARTIAL
-        for evidence_id in self.store.list_evidence_ids():
-            evidence = self.store.load_evidence(evidence_id)
-            if evidence.work_item_ref in run.work_item_refs:
-                self.store.save_evidence(replace(evidence, validity=EvidenceValidity.STALE))
-        self.commit_run(run, plan, work_items, known_run_ids=self.store.list_run_ids())
-        raise SnapshotDriftError("SNAPSHOT_DRIFT: audit is STALE; a full re-run is required.")
+        current = self.store.load_snapshot(current_fingerprint)
+        self.reconcile_snapshot_drift(run, plan, work_items, current)
 
     def check_target_unchanged(
-        self, root: Path, run: AuditRun, plan: AuditPlan, work_items: List[AuditWorkItem],
-    ) -> None:
+        self,
+        root: Path,
+        run: AuditRun,
+        plan: AuditPlan,
+        work_items: List[AuditWorkItem],
+    ) -> List[str]:
         from .discovery import discover
         from .planner import build_target_snapshot
 
         snapshot = self.store.load_snapshot(run.target_snapshot_ref)
         try:
             current = build_target_snapshot(discover(str(root)), snapshot.target_mode)
-        except (OSError, ValueError):
-            # Missing/unreadable input cannot establish snapshot identity.
-            self.ensure_snapshot_current(run, plan, work_items, "UNREADABLE")
-            return
-        self.ensure_snapshot_current(run, plan, work_items, current.snapshot_fingerprint)
+        except (OSError, ValueError) as exc:
+            run.failure_state = RunFailureState.SNAPSHOT_DRIFT
+            run.publication_state = RunPublicationState.NOT_PUBLISHED
+            self.commit_run(
+                run,
+                plan,
+                work_items,
+                known_run_ids=self.store.list_run_ids(),
+            )
+            raise SnapshotDriftError(
+                "SNAPSHOT_DRIFT: current target state could not be inspected safely."
+            ) from exc
+        return self.reconcile_snapshot_drift(run, plan, work_items, current)
 
     # ------------------------------------------------------------------ #
     # Recovery (ADR-07): reconstruct state from disk after interruption   #
