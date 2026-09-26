@@ -75,6 +75,14 @@ def execute_engineering_pass(
         publication_state=RunPublicationState.NOT_PUBLISHED,
     )
 
+    # Persist RUNNING before any WorkItem executes. A process crash after this
+    # point leaves a durable recovery anchor instead of an invisible run.
+    orchestrator.commit_run(
+        run,
+        plan,
+        work_items,
+        known_run_ids=orchestrator.store.list_run_ids(),
+    )
     orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
 
     inspections = []
@@ -84,6 +92,10 @@ def execute_engineering_pass(
 
     for item in work_items:
         if item.target_surface.startswith("SECURITY/"):
+            continue
+        if item.execution_state == ExecutionState.TERMINATED:
+            # Recovery/replay is idempotent: completed WorkItems are not
+            # executed again unless a new explicit retry transaction is created.
             continue
 
         orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
