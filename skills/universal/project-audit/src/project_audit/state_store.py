@@ -314,6 +314,10 @@ class StateStore:
             validity=EvidenceValidity(d["validity"]),
             provenance=_load_provenance(d["provenance"]),
             fingerprint=d["fingerprint"],
+            provider=d.get("provider"),
+            model=d.get("model"),
+            raw_output=d.get("raw_output"),
+            raw_output_sha256=d.get("raw_output_sha256"),
         )
 
     # ---- AuditRun ----
