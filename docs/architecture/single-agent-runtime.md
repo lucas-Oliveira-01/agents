@@ -1,6 +1,6 @@
 # Project-Audit Single-Agent Runtime — Phase 1
 
-**Status:** PHASE 2 IMPLEMENTED — SEMANTIC/FINDING PHASE PENDING
+**Status:** HISTORICAL PHASE RECORD — superseded by the post-Phase-10 runtime state
 
 ## Scope
 
@@ -100,3 +100,6 @@ text flow:
 context -> sensitivity UNKNOWN -> egress.allow_sensitive=false -> BLOCKED
 
 A semantic call requires an already-authorized WorkerPort backend and an explicit policy capable of allowing the classified data. OmniRoute remains an infrastructure gateway; project-audit does not select provider or concrete model.
+
+
+> This document describes the early Single-Agent Phase 1/2 boundary. It is retained as implementation history. Statements listing later capabilities as "not implemented" are historical and must not be read as the current runtime state.

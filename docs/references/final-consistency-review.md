@@ -1,6 +1,6 @@
 # Final Consistency Review (Orchestrator Architecture)
 
-*Status: DRAFT (Pre-implementation phase)*
+*Status: CLOSED — historical pre-implementation review*
 
 This document is the final cross-check before generating physical JSON Schemas. It ensures no contradictions exist between the ADRs (04-07), the Canonical Data Model, and the Semantic Validators.
 
@@ -43,3 +43,6 @@ There is zero ambiguity in these terminal terms:
 
 ## Conclusion
 The architecture is internally consistent. No architectural decisions are left implicit. The Semantic Validators perfectly bridge the gap between ADR intent and the Canonical Data Model structure. The next step is to mechanically derive the strict (`additionalProperties: false`) JSON schemas for Layer 2.
+
+
+> **Current-state note:** This document records the pre-schema consistency checkpoint. It is retained for architectural provenance and is not an alternative current contract. Post-freeze behavior is governed by the implemented code, accepted ADRs, and the Phase 7–10 architecture records.
