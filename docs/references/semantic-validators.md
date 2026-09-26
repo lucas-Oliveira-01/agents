@@ -99,7 +99,7 @@ The writer boundary is now physical, not merely conventional:
 - The lock file is diagnostic only; recovery never infers staleness from its PID contents.
 - Canonical state writes fsync the temporary file before atomic replacement and fsync the parent directory when supported.
 - AuditRun=RUNNING is persisted before the first WorkItem executes.
-- Orchestrator.recover_run() reconstructs a fresh Plan/WorkItem/Run graph with recovery_from_ref instead of mutating the interrupted run.
+- Orchestrator.prepare_recovery() reconstructs a fresh Plan/WorkItem/Run graph with recovery_from_ref instead of mutating the interrupted run.
 - Completed WorkItems are preserved on replay; unresolved items return to PLANNED.
 - A completed WorkItem is not executed again during replay, preventing accidental duplicate execution.
 
