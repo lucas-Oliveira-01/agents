@@ -68,6 +68,7 @@ class WorkItemFailureState(str, Enum):
     SCHEMA_VIOLATION = "SCHEMA_VIOLATION"
     TIMEOUT = "TIMEOUT"
     BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
+    SNAPSHOT_DRIFT = "SNAPSHOT_DRIFT"
 
 
 class RunExecutionCompleteness(str, Enum):
