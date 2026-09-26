@@ -358,11 +358,11 @@ class SmokeTestRunner:
             return
 
         task_text = (
-            "Objetivo: Confirmar conectividade e funcionamento básico.\n"
-            "Restrições: Responda apenas com a frase exata solicitada.\n"
-            "Contexto: Este é um smoke test de diagnóstico.\n"
-            "Formato esperado: Texto puro, uma linha.\n"
-            "Critérios de sucesso: Resposta contém a frase 'SMOKE_OK'."
+            "Objective: Confirmar conectividade e funcionamento básico.\n"
+            "Constraints: Responda apenas com a frase exata solicitada.\n"
+            "Context: Este é um smoke test de diagnóstico.\n"
+            "Expected format: Texto puro, uma linha.\n"
+            "Success criteria: Resposta contém a frase 'SMOKE_OK'."
         )
 
         # Build minimal arguments — only include params confirmed by schema

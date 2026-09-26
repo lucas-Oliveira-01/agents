@@ -74,11 +74,11 @@ class TestDelegationTaskValid:
         result = validator.validate_delegation_task(
             {
                 "task": (
-                    "Objetivo: test\n"
-                    "Restrições: none\n"
-                    "Contexto: none\n"
-                    "Formato esperado: text\n"
-                    "Critérios de sucesso: correct"
+                    "Objective: test\n"
+                    "Constraints: none\n"
+                    "Context: none\n"
+                    "Expected format: text\n"
+                    "Success criteria: correct"
                 ),
                 "profile": "coding",
                 "context": "some context",
@@ -94,11 +94,11 @@ class TestDelegationTaskValid:
         result = validator.validate_delegation_task(
             {
                 "task": (
-                    "Objetivo: test\n"
-                    "Restrições: none\n"
-                    "Contexto: none\n"
-                    "Formato esperado: text\n"
-                    "Critérios de sucesso: correct"
+                    "Objective: test\n"
+                    "Constraints: none\n"
+                    "Context: none\n"
+                    "Expected format: text\n"
+                    "Success criteria: correct"
                 ),
                 "cache_mode": "deterministic",
                 "cache_key": "abc123",
@@ -133,17 +133,17 @@ class TestDelegationTaskInvalid:
     def validator(self) -> SchemaValidator:
         return SchemaValidator(str(REFERENCES_DIR))
 
-    def test_missing_tarefa(self, validator: SchemaValidator):
+    def test_missing_task(self, validator: SchemaValidator):
         result = validator.validate_delegation_task({})
         assert not result.is_valid
         assert any("task" in e.lower() for e in result.errors)
 
-    def test_empty_tarefa(self, validator: SchemaValidator):
+    def test_empty_task(self, validator: SchemaValidator):
         result = validator.validate_delegation_task({"task": ""})
         assert not result.is_valid
 
     @pytest.mark.parametrize("value", [None, True])
-    def test_invalid_tarefa_type_returns_result(self, validator: SchemaValidator, value):
+    def test_invalid_task_type_returns_result(self, validator: SchemaValidator, value):
         result = validator.validate_delegation_task({"task": value})
         assert not result.is_valid
         assert result.errors
@@ -231,22 +231,22 @@ class TestSemanticRules:
         )
         assert result.is_valid  # Not an error, just a warning
         assert len(result.warnings) > 0
-        assert any("Objetivo" in w for w in result.warnings)
+        assert any("Objective" in w for w in result.warnings)
 
     def test_complete_task_no_warning(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(
             {
                 "task": (
-                    "Objetivo: do something\n"
-                    "Restrições: none\n"
-                    "Contexto: here\n"
-                    "Formato esperado: text\n"
-                    "Critérios de sucesso: done"
+                    "Objective: do something\n"
+                    "Constraints: none\n"
+                    "Context: here\n"
+                    "Expected format: text\n"
+                    "Success criteria: done"
                 ),
             }
         )
         assert result.is_valid
-        assert not any("Objetivo" in w for w in result.warnings)
+        assert not any("Objective" in w for w in result.warnings)
 
     def test_deterministic_nonzero_temperature_warning(self, validator: SchemaValidator):
         result = validator.validate_delegation_task(

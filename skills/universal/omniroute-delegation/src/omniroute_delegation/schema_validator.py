@@ -142,17 +142,17 @@ class SchemaValidator:
                     "Do not combine deterministic caching with session continuity."
                 )
 
-        # Rule: tarefa should contain structured sections
-        tarefa = params.get("task", "")
-        if isinstance(tarefa, str) and tarefa:
+        # Rule: task should contain structured sections
+        task = params.get("task", "")
+        if isinstance(task, str) and task:
             expected_sections = [
-                "Objetivo:",
-                "Restrições:",
-                "Contexto:",
-                "Formato esperado:",
-                "Critérios de sucesso:",
+                "Objective:",
+                "Constraints:",
+                "Context:",
+                "Expected format:",
+                "Success criteria:",
             ]
-            missing = [s for s in expected_sections if s not in tarefa]
+            missing = [s for s in expected_sections if s not in task]
             if missing:
                 warnings.append(
                     f"Task description is missing recommended sections: {missing}. "

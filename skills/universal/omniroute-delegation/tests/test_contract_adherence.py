@@ -214,7 +214,7 @@ class TestContextEfficiency:
             .formato("JSON array of objects")
             .build()
         )
-        assert "Formato esperado: JSON array of objects" in task["task"]
+        assert "Expected format: JSON array of objects" in task["task"]
 
 
 # ===========================================================================
@@ -268,10 +268,10 @@ class TestRecursionGuard:
             .restricoes("Do not execute commands, do not use tools, do not delegate")
             .build()
         )
-        tarefa = task["task"]
-        assert "Restrições:" in tarefa
+        task = task["task"]
+        assert "Constraints:" in task
         # The restriction text should be preserved
-        assert "não" in tarefa.lower() or "do not" in tarefa.lower()
+        assert "não" in task.lower() or "do not" in task.lower()
 
 
 # ===========================================================================
@@ -331,7 +331,7 @@ class TestParameterSchemaCompliance:
 class TestSchemaStructuralValidation:
     """Contract: JSON schemas enforce the contract structure."""
 
-    def test_delegation_schema_requires_tarefa(self):
+    def test_delegation_schema_requires_task(self):
         validator = SchemaValidator(str(REFERENCES_DIR))
         schema = validator.delegation_schema
         assert "task" in schema.get("required", [])

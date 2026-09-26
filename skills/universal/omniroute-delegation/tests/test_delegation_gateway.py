@@ -14,9 +14,9 @@ def ready_client(arguments):
     client = MagicMock(spec=MCPClient)
     client.session.is_initialized = True
     client.session.tools = {
-        "delegar_tarefa": ToolSchema.from_mcp(
+        "delegate_task": ToolSchema.from_mcp(
             {
-                "name": "delegar_tarefa",
+                "name": "delegate_task",
                 "description": "Delegate",
                 "inputSchema": {
                     "type": "object",
@@ -24,14 +24,14 @@ def ready_client(arguments):
                         "task": {"type": "string"},
                         "profile": {"type": "string"},
                     },
-                    "required": ["task"],
+                    "required": ["task", "context"],
                     "additionalProperties": False,
                 },
             }
         )
     }
     client.session.has_tool.return_value = True
-    client.session.get_tool.return_value = client.session.tools["delegar_tarefa"]
+    client.session.get_tool.return_value = client.session.tools["delegate_task"]
     client.validate_tool_params.return_value = []
     client.call_tool.return_value = {"content": [{"type": "text", "text": "ok"}]}
     return client
@@ -79,25 +79,25 @@ def test_gateway_supports_legacy_wire_aliases():
     client.session.is_initialized = True
     tool = ToolSchema.from_mcp(
         {
-            "name": "delegar_tarefa",
+            "name": "delegate_task",
             "description": "Delegate",
             "inputSchema": {
                 "type": "object",
-                "properties": {"tarefa": {"type": "string"}},
-                "required": ["tarefa"],
+                "properties": {"task": {"type": "string"}, "context": {"type": "string"}},
+                "required": ["task", "context"],
             },
         }
     )
     client.session.has_tool.return_value = True
     client.session.get_tool.return_value = tool
-    client.session.tools = {"delegar_tarefa": tool}
+    client.session.tools = {"delegate_task": tool}
     client.validate_tool_params.return_value = []
     client.call_tool.return_value = {"ok": True}
 
     result = DelegationGateway(client).delegate(DelegationTask(task="Review code"))
 
     assert result == {"ok": True}
-    assert client.call_tool.call_args.args[1] == {"tarefa": "Review code"}
+    assert client.call_tool.call_args.args[1] == {"task": "Review code"}
 
 
 def test_gateway_requires_discovered_tool():

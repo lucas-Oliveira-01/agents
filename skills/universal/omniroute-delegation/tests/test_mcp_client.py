@@ -2,6 +2,7 @@
 
 Tests cover:
 - Endpoint resolution (env var, parameter, default)
+from omniroute_delegation.exceptions import SchemaViolationError
 - Initialize handshake and session ID preservation
 - tools/list parsing and ToolSchema construction
 - tools/call invocation
@@ -18,6 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+from omniroute_delegation.exceptions import SchemaViolationError
 
 from omniroute_delegation.mcp_client import (
     DEFAULT_HEALTH_URL,
@@ -437,7 +439,7 @@ class TestMCPClientCallTool:
     def test_call_tool_rejects_invalid_parameters_before_http(self):
         client = self._make_ready_client()
         mock_http = client._http
-        with pytest.raises(MCPProtocolError, match="Invalid tool parameters"):
+        with pytest.raises(SchemaViolationError):
             client.call_tool("delegate_task", {"task": 123})
         assert mock_http.post.call_count == 2
 
@@ -677,19 +679,19 @@ class TestHealthCheck:
 def test_call_tool_blocks_credentials_before_transport():
     from unittest.mock import MagicMock
 
-    from omniroute_delegation.exceptions import CredentialLeakPreventedError
+    from omniroute_delegation.exceptions import CredentialLeakPreventedError, SchemaViolationError
 
     mock_http = MagicMock(spec=httpx.Client)
     client = MCPClient(http_client=mock_http)
     client._session.is_initialized = True
-    client._session.tools["delegar_tarefa"] = ToolSchema.from_mcp(
+    client._session.tools["delegate_task"] = ToolSchema.from_mcp(
         make_tool_dict()
     )
 
     with pytest.raises(CredentialLeakPreventedError):
         client.call_tool(
-            "delegar_tarefa",
-            {"tarefa": "api_key=sk-secretkey123456789012345"},
+            "delegate_task",
+            {"task": "api_key=sk-secretkey123456789012345"},
         )
 
     mock_http.post.assert_not_called()

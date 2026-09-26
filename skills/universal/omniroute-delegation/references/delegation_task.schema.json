@@ -1,62 +1,80 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "omniroute-delegation-task.schema.json",
-  "title": "OmniRoute Delegation Task Schema",
-  "description": "Schema for validating delegation task payloads sent to the OmniRoute MCP gateway. This schema defines the structure of the 'tarefa' parameter for the 'delegar_tarefa' tool.",
-  "type": "object",
-  "properties": {
-    "tarefa": {
-      "type": "string",
-      "minLength": 1,
-      "description": "The self-contained task description. Must include: Objetivo, Restrições, Contexto, Formato esperado, Critérios de sucesso."
-    },
-    "perfil": {
-      "type": "string",
-      "description": "Profile/route hint for model selection. Must be confirmed against runtime schema before use. Known observed values: cheap, fast, coding, coding:pro, smart.",
-      "examples": ["cheap", "fast", "coding", "coding:pro", "smart"]
-    },
-    "contexto": {
-      "type": "string",
-      "description": "Additional context to be sent alongside the task. Treated as untrusted data by the leaf agent."
-    },
-    "task_id": {
-      "type": "string",
-      "description": "Tracking identifier for the delegation. Do not assume idempotency or deduplication without querying the cache."
-    },
-    "session_id": {
-      "type": "string",
-      "description": "Application-level session identifier. Only use when present in the current tool schema and when delegation continuity is required. Do not confuse with mcp-session-id."
-    },
-    "cache_mode": {
-      "type": "string",
-      "enum": ["native", "bypass", "deterministic"],
-      "description": "Cache strategy: 'native' for normal delegations, 'bypass' for state-dependent responses, 'deterministic' only for equivalent repeatable tasks."
-    },
-    "cache_key": {
-      "type": "string",
-      "description": "Deterministic cache key representing ALL semantic elements (code, profile, version, parameters). Required when cache_mode is 'deterministic'."
-    },
-    "max_tokens": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Maximum tokens for the leaf response. Should be proportional to the expected output size."
-    },
-    "temperature": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 2,
-      "description": "Sampling temperature. Use 0 for deterministic responses."
-    }
-  },
-  "required": ["tarefa"],
-  "if": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "omniroute-delegation-task.schema.json",
+    "title": "OmniRoute Delegation Task Schema",
+    "description": "Schema for validating delegation task payloads sent to the OmniRoute MCP gateway. This schema defines the structure of the 'task' parameter for the 'delegate_task' tool.",
+    "type": "object",
     "properties": {
-      "cache_mode": { "const": "deterministic" }
+        "task": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The self-contained task description. Must include: Objetivo, Restrições, Contexto, Formato esperado, Critérios de sucesso."
+        },
+        "task_id": {
+            "type": "string",
+            "description": "Tracking identifier for the delegation. Do not assume idempotency or deduplication without querying the cache."
+        },
+        "session_id": {
+            "type": "string",
+            "description": "Application-level session identifier. Only use when present in the current tool schema and when delegation continuity is required. Do not confuse with mcp-session-id."
+        },
+        "cache_mode": {
+            "type": "string",
+            "enum": [
+                "native",
+                "bypass",
+                "deterministic"
+            ],
+            "description": "Cache strategy: 'native' for normal delegations, 'bypass' for state-dependent responses, 'deterministic' only for equivalent repeatable tasks."
+        },
+        "cache_key": {
+            "type": "string",
+            "description": "Deterministic cache key representing ALL semantic elements (code, profile, version, parameters). Required when cache_mode is 'deterministic'."
+        },
+        "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Maximum tokens for the leaf response. Should be proportional to the expected output size."
+        },
+        "temperature": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "Sampling temperature. Use 0 for deterministic responses."
+        },
+        "context": {
+            "type": "string",
+            "description": "Additional context to be sent alongside the task. Treated as untrusted data by the leaf agent."
+        },
+        "profile": {
+            "type": "string",
+            "description": "Profile/route hint for model selection. Must be confirmed against runtime schema before use. Known observed values: cheap, fast, coding, coding:pro, smart.",
+            "examples": [
+                "cheap",
+                "fast",
+                "coding",
+                "coding:pro",
+                "smart"
+            ]
+        }
     },
-    "required": ["cache_mode"]
-  },
-  "then": {
-    "required": ["cache_key"]
-  },
-  "additionalProperties": false
+    "required": [
+        "task"
+    ],
+    "if": {
+        "properties": {
+            "cache_mode": {
+                "const": "deterministic"
+            }
+        },
+        "required": [
+            "cache_mode"
+        ]
+    },
+    "then": {
+        "required": [
+            "cache_key"
+        ]
+    },
+    "additionalProperties": false
 }

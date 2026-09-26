@@ -34,11 +34,11 @@ _CREDENTIAL_PATTERNS = [
 ]
 
 # Task template
-_TASK_TEMPLATE = """Objetivo: {objective}
-Restrições: {constraints}
-Contexto: {context}
-Formato esperado: {format}
-Critérios de sucesso: {criteria}"""
+_TASK_TEMPLATE = """Objective: {objective}
+Constraints: {constraints}
+Context: {context}
+Expected format: {format}
+Success criteria: {criteria}"""
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ class TaskBuilder:
         if not self._constraints.strip():
             raise ValueError("'restricoes' is required for every delegation task.")
 
-        # Build tarefa string
+        # Build task string
         task = _TASK_TEMPLATE.format(
             objective=self._objective,
             constraints=self._constraints,

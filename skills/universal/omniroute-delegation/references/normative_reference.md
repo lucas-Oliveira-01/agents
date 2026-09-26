@@ -88,11 +88,11 @@ Before delegating, evaluate:
 Every delegated task MUST be self-contained:
 
 ```
-Objetivo: [clear goal statement]
-Restrições: [constraints and limitations]
-Contexto: [minimal sufficient context]
-Formato esperado: [explicit output format]
-Critérios de sucesso: [measurable success criteria]
+Objective: [clear goal statement]
+Constraints: [constraints and limitations]
+Context: [minimal sufficient context]
+Expected format: [explicit output format]
+Success criteria: [measurable success criteria]
 ```
 
 ### 4.3 Leaf Agent Constraints

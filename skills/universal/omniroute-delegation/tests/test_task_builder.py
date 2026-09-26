@@ -31,8 +31,8 @@ class TestTaskConstruction:
     def test_minimal_task(self):
         task = TaskBuilder().objetivo("Analyze code").restricoes("Do not execute").build()
         assert "task" in task
-        assert "Objetivo: Analyze code" in task["task"]
-        assert "Restrições: Do not execute" in task["task"]
+        assert "Objective: Analyze code" in task["task"]
+        assert "Constraints: Do not execute" in task["task"]
 
     def test_full_task(self):
         task = (
@@ -49,7 +49,7 @@ class TestTaskConstruction:
             .temperature(0)
             .build()
         )
-        assert task["task"].startswith("Objetivo: Review function")
+        assert task["task"].startswith("Objective: Review function")
         assert task["profile"] == "coding"
         assert task["task_id"] == "task-001"
         assert task["cache_mode"] == "native"
@@ -66,12 +66,12 @@ class TestTaskConstruction:
             .criterios("Correct")
             .build()
         )
-        tarefa = task["task"]
-        assert "Objetivo:" in tarefa
-        assert "Restrições:" in tarefa
-        assert "Contexto:" in tarefa
-        assert "Formato esperado:" in tarefa
-        assert "Critérios de sucesso:" in tarefa
+        task = task["task"]
+        assert "Objective:" in task
+        assert "Constraints:" in task
+        assert "Context:" in task
+        assert "Expected format:" in task
+        assert "Success criteria:" in task
 
     def test_default_contexto(self):
         task = TaskBuilder().objetivo("Test").restricoes("None").build()

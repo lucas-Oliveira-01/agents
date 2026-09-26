@@ -17,7 +17,7 @@ class DelegationGateway:
     construction, credential scanning, schema validation, and dispatch.
     """
 
-    TOOL_NAME = "delegar_tarefa"
+    TOOL_NAME = "delegate_task"
 
     def __init__(
         self,
@@ -56,7 +56,7 @@ class DelegationGateway:
             raise SchemaViolationError("Required delegation tool is unavailable.")
 
         aliases = {
-            "task": ("task", "tarefa"),
+            "task": ("task", "task"),
             "profile": ("profile", "perfil"),
             "context": ("context", "contexto"),
         }
