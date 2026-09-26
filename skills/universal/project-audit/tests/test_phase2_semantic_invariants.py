@@ -96,13 +96,22 @@ def test_coverage_is_full_when_every_selected_domain_is_covered(audit_plan, targ
     derived = derive_coverage_completeness(audit_plan, [security, code])
     assert derived == RunCoverageCompleteness.FULL
 
+    security_evidence = make_evidence(
+        target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+        work_item_ref=security.work_item_id,
+    )
+    code_evidence = make_evidence(
+        target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+        work_item_ref=code.work_item_id,
+    )
+    audit_plan.work_items = [security, code]
     run = _run(audit_plan, target_snapshot, [security, code], derived)
     assert validate_state_graph(
         target_snapshot,
         audit_plan,
         [security, code],
         run,
-        [],
+        [security_evidence, code_evidence],
     ).has_errors is False
 
 
