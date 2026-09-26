@@ -404,50 +404,62 @@ def plan_incremental_actions_stable(
     previous_evidence: Mapping[str, Evidence],
     previous_snapshot: TargetSnapshot,
     current_snapshot: TargetSnapshot,
+    change_impact: Optional[ChangeImpact] = None,
 ) -> Tuple[IncrementalBinding, ...]:
     """Apply the deterministic incremental matrix across regenerated WorkItems."""
     current = tuple(current_work_items)
+    previous = tuple(previous_work_items)
     evidence_by_current = match_previous_evidence(
-        current, previous_work_items, previous_evidence
+        current, previous, previous_evidence
     )
-    previous_by_current = {
-        current_item.work_item_id: previous
-        for current_item in current
-        for previous in previous_work_items
-        if stable_work_item_key(current_item) == stable_work_item_key(previous)
-    }
+    previous_index = {}
+    for item in previous:
+        previous_index.setdefault(stable_work_item_key(item), []).append(item)
 
+    impact = change_impact or build_change_impact(previous_snapshot, current_snapshot)
     bindings = []
+
     for item in current:
         evidence = evidence_by_current.get(item.work_item_id)
-        previous = previous_by_current.get(item.work_item_id)
+        matches = previous_index.get(stable_work_item_key(item), [])
+        previous_item = matches[0] if len(matches) == 1 else None
+
         if evidence is None:
             decision = IncrementalDecision.REAUDIT
             item.action = WorkItemAction.REAUDIT
             item.decision_basis = (
-                "incremental_decision=REAUDIT; reason=missing_or_ambiguous_prior_evidence"
+                "incremental_decision=REAUDIT; impact=unproven_prior_evidence;"
+                " reason=missing_or_ambiguous_prior_evidence"
             )
             bindings.append(
                 IncrementalBinding(
                     item.work_item_id,
-                    previous.work_item_id if previous is not None else None,
+                    previous_item.work_item_id if previous_item is not None else None,
                     None,
                     decision,
                 )
             )
             continue
 
-        decision = decide_incremental_action(
+        necessity = assess_reaudit_necessity(
             evidence,
+            impact,
             previous_snapshot,
             current_snapshot,
             item.auditor,
         )
+        decision = necessity.decision
         bind_decision_to_work_item(item, decision)
+        impact_label = ",".join(necessity.change_kinds) if necessity.change_kinds else "NONE"
+        path_label = ",".join(necessity.impacted_paths) if necessity.impacted_paths else "NONE"
+        item.decision_basis = (
+            f"incremental_decision={decision.value}; impact={impact_label}; "
+            f"paths={path_label}; reason={','.join(necessity.reasons)}"
+        )
         bindings.append(
             IncrementalBinding(
                 item.work_item_id,
-                previous.work_item_id if previous is not None else None,
+                previous_item.work_item_id if previous_item is not None else None,
                 evidence.evidence_id,
                 decision,
             )
