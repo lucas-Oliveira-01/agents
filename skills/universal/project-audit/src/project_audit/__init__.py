@@ -54,7 +54,7 @@ __all__ = [
     "WorkItemAction", "ExecutionState", "WorkItemFailureState", "RunExecutionCompleteness",
     "RunCoverageCompleteness", "RunFailureState", "RunBudgetState", "RunPublicationState",
     "EvidenceValidity", "FindingStatus", "FindingLifecycle", "FindingFingerprint", "Provenance", "ExecutionPolicy",
-    "EgressPolicy", "FilesystemAccess", "NetworkAccess", "CredentialAccess", "EgressDestination",
+    "EgressPolicy", "FilesystemAccess", "NetworkAccess", "CredentialAccess", "EgressDestination", "FindingRecord",
     "TargetMode", "WorkingTreeState",
     "OmniRouteDelegationBackend", "create_local_omniroute_backend",
     "IncrementalDecision", "DependencyKind", "DependencyNode", "EvidenceDependencyGraph",
