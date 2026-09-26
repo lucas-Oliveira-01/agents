@@ -86,9 +86,10 @@ def execute_security_pass(
                     environment_summary="deterministic-reuse-read-only",
                 )
                 orchestrator.commit_receipt(receipt)
+                current_snapshot = orchestrator.store.load_snapshot(run.target_snapshot_ref)
                 reused = derive_reused_evidence(
                     prior,
-                    build_target_snapshot(discovery),
+                    current_snapshot,
                     item,
                     generated_at=finished,
                 )
