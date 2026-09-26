@@ -196,10 +196,6 @@ def execute_engineering_pass(
         item for item in executed_items
         if item.failure_state == WorkItemFailureState.SNAPSHOT_DRIFT
     ]
-    stale_items = [
-        item for item in executed_items
-        if item.failure_state == WorkItemFailureState.SNAPSHOT_DRIFT
-    ]
     succeeded = [
         item for item in executed_items
         if item.execution_state == ExecutionState.TERMINATED
