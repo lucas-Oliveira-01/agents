@@ -30,7 +30,7 @@ class OmniRouteDelegationBackend(DelegationBackend):
     def delegate(self, request: DelegationRequest) -> DelegationResult:
         from omniroute_delegation.contracts import DelegationTask
         from omniroute_delegation.exceptions import (CredentialLeakPreventedError, DelegationError, SchemaViolationError, SemanticCoverageFailedError)
-        from omniroute_delegation.semantic_parser import SemanticRecoveryLoop, extract_json
+        from omniroute_delegation.semantic_parser import SemanticRecoveryLoop
 
         task = DelegationTask.model_validate(self._build_task_payload(request))
 
@@ -104,6 +104,9 @@ class OmniRouteDelegationBackend(DelegationBackend):
 
     @staticmethod
     def _extract_semantic_payload(result: Any) -> Any:
+        from omniroute_delegation.exceptions import SchemaViolationError
+        from omniroute_delegation.semantic_parser import extract_json
+
         if isinstance(result, dict):
             structured = result.get("structuredContent")
             if isinstance(structured, dict) and structured:
