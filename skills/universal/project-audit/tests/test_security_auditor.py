@@ -138,7 +138,7 @@ class TestExecuteDelegation:
         assert receipt.exit_code == 1
         assert evidence is not None
         assert evidence.validity == EvidenceValidity.NOT_DETERMINABLE
-        assert evidence.raw_output == '{"findings": []}'
+        assert evidence.raw_output == '{"findings":[]}'
         assert evidence.raw_output_sha256
 
 
