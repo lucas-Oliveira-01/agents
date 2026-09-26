@@ -138,8 +138,6 @@ def _run_full_audit_unlocked(
                 previous_evidence,
             )
         )
-        prepared.plan._assert_mutable("bind incremental actions")
-        prepared.plan.previous_run_ref = previous_run_ref if hasattr(prepared.plan, "previous_run_ref") else None
 
     engineering = execute_engineering_pass(
         orchestrator,
