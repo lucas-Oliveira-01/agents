@@ -41,13 +41,19 @@ def _snapshot(base_snapshot, *, inputs=None, methodology=None):
     )
 
 
-def _base_with_dependencies(base_snapshot):
+def _base_with_dependencies(base_snapshot, auditor="fake-auditor"):
+    methodology = MethodologyState(
+        audit_contract_version=base_snapshot.methodology_state.audit_contract_version,
+        auditor_versions={auditor: "0.1.0"},
+        policy_version=base_snapshot.methodology_state.policy_version,
+    )
     return _snapshot(
         base_snapshot,
         inputs=[
             _input("src/auth.py", "a" * 64),
             _input("pyproject.toml", "b" * 64),
         ],
+        methodology=methodology,
     )
 
 
