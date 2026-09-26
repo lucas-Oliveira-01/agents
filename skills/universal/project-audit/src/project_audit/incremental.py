@@ -312,6 +312,60 @@ class IncrementalBinding:
     decision: IncrementalDecision
 
 
+@dataclass(frozen=True)
+class ReauditNecessity:
+    """Deterministic explanation of the existing incremental action matrix."""
+
+    decision: IncrementalDecision
+    reasons: Tuple[str, ...]
+    impacted_paths: Tuple[str, ...]
+    change_kinds: Tuple[str, ...]
+
+
+def assess_reaudit_necessity(
+    evidence: Evidence,
+    impact: ChangeImpact,
+    previous_snapshot: TargetSnapshot,
+    current_snapshot: TargetSnapshot,
+    auditor: str,
+) -> ReauditNecessity:
+    """Explain the existing incremental decision using Change Impact facts."""
+    match = impact.impact_for_evidence(evidence.source_refs, evidence.dependencies)
+    decision = decide_incremental_action(
+        evidence,
+        previous_snapshot,
+        current_snapshot,
+        auditor,
+        path_aliases=impact.rename_map,
+    )
+    reasons = []
+    kind_values = {kind.value for kind in match.change_kinds}
+    if impact.methodology_changed:
+        reasons.append("methodology_changed")
+    if match.source_paths:
+        if ChangeKind.RENAMED.value in kind_values and decision == IncrementalDecision.REUSE:
+            reasons.append("deterministic_rename_continuity")
+        else:
+            reasons.append("source_dependency_impacted")
+    if match.dependency_paths:
+        reasons.append("semantic_dependency_impacted")
+    if not reasons:
+        if evidence.validity == EvidenceValidity.STALE:
+            reasons.append("evidence_stale")
+        elif decision == IncrementalDecision.REUSE:
+            reasons.append("no_relevant_change")
+        elif decision == IncrementalDecision.REAUDIT:
+            reasons.append("insufficient_or_broken_dependency_context")
+        else:
+            reasons.append("assessment_requires_revalidation")
+    return ReauditNecessity(
+        decision=decision,
+        reasons=tuple(sorted(set(reasons))),
+        impacted_paths=tuple(sorted(set(match.source_paths + match.dependency_paths))),
+        change_kinds=tuple(kind.value for kind in match.change_kinds),
+    )
+
+
 def stable_work_item_key(work_item: AuditWorkItem) -> Tuple[str, str]:
     """Logical WorkItem identity independent of generated UUIDs."""
     return work_item.auditor, work_item.target_surface
