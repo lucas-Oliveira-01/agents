@@ -112,6 +112,10 @@ def execute_semantic_review(
             reason="SCHEMA_VIOLATION",
             receipt_ref=result.receipt.receipt_id,
         )
+        # Preserve rejected raw semantic transport as canonical Evidence before
+        # the WorkItem becomes terminal; the verifier must be able to reload it.
+        if result.evidence is not None:
+            orchestrator.commit_evidence(result.evidence, work_item)
         work_item.terminate(failure_state=WorkItemFailureState.SCHEMA_VIOLATION)
         orchestrator.commit_work_item(work_item)
         return result
@@ -122,6 +126,8 @@ def execute_semantic_review(
             reason="SCHEMA_VIOLATION",
             receipt_ref=result.receipt.receipt_id,
         )
+        if result.evidence is not None:
+            orchestrator.commit_evidence(result.evidence, work_item)
         work_item.terminate(failure_state=WorkItemFailureState.SCHEMA_VIOLATION)
         orchestrator.commit_work_item(work_item)
         return result
