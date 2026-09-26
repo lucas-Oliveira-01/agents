@@ -2,49 +2,79 @@
 
 ## 1. Scope
 
-This skill owns only the OmniRoute delegation boundary. External orchestration skills are outside this package's modification boundary.
+This skill owns the OmniRoute delegation boundary and the supervised L3W worker service. External orchestration skills remain outside the modification boundary.
 
-## 2. Architectural invariants
+## 2. L3W invariants
 
 The implementation MUST provide:
 
-- one security-enforcing `DelegationGateway`;
-- strict separation of transport, tool, leaf, and audit contracts;
-- typed execution states;
-- typed security and semantic exceptions;
-- tolerant semantic parsing with provenance;
-- preservation of valid partial evidence;
-- an explicit L3T interface and a reserved L3W interface.
+- one stateful `L3WDelegate` service;
+- one `WorkerManager` lifecycle authority;
+- one isolated `WorkspaceSandbox` per configured worker session;
+- an explicit `MemoryScope` selected by the L2;
+- a parent-death-aware watchdog;
+- strict timeout and cleanup semantics;
+- typed execution states and typed worker receipts.
 
-## 3. Trust boundary
+## 3. Worker lifecycle
 
-`MCPClient.call_tool` remains responsible for transport-level discovery and JSON Schema validation. The `DelegationGateway` is the only supported delegation facade and performs credential scanning before dispatch.
+```text
+START
+  ↓
+WORKSPACE_READY
+  ↓
+MEMORY_READY
+  ↓
+WATCHDOG_RUNNING
+  ↓
+HARNESS_RUNNING
+  ├── SUCCESS
+  ├── TIMED_OUT
+  ├── CANCELLED
+  └── FAILED
+  ↓
+FINALIZE
+  ↓
+CONSOLIDATE or CLEANUP
+```
 
-A future integration MUST NOT introduce a second direct delegation path.
+A worker session may execute multiple orders. Each order reuses the same workspace and memory scope, preserving state without requiring a permanently running process.
 
-## 4. Semantic result policy
+## 4. Process supervision
 
-Valid findings and coverage status are independent dimensions.
+The L2 creates only the watchdog process directly.
 
-Examples:
+On normal shutdown, the watchdog terminates the harness process group, waits for graceful exit, and escalates to SIGKILL after the grace period.
 
-- findings + no raw errors → `SUCCESS`;
-- findings + malformed entries → `PARTIAL_COVERAGE`;
-- no parseable result after recovery → `SCHEMA_VIOLATION` and `SemanticCoverageFailedError`.
+On orchestrator parent death, the watchdog receives `PR_SET_PDEATHSIG`.
 
-An empty findings list is never sufficient evidence of complete coverage.
+The sandboxed harness additionally uses `PR_SET_PDEATHSIG=SIGKILL` and bubblewrap `--die-with-parent` when strict sandboxing is enabled.
 
-## 5. L3T and L3W
+## 5. Sandbox policy
 
-L3T delegates are stateless and exchange payloads through the API.
+The default L3W policy is fail-closed.
 
-L3W delegates are stateful workers and must eventually receive an isolated workspace and explicit harness. The current refactor defines the interface only; it does not expand the worker runtime.
+If strict isolation is requested and the configured OS sandbox is unavailable, the worker MUST NOT execute.
 
-## 6. Maintenance boundaries
+A repository target is never used directly as the worker current directory.
 
-- `SKILL.md`: runtime behavior and routing.
-- `SPEC.md`: maintenance and architecture contract.
-- `SOURCES.md`: provenance and evidence.
-- `references/`: wire schemas and normative protocol material.
-- `tests/`: regression and contract evaluation.
+Git repositories use detached worktrees where possible so the worker receives a mutable tree without mutating the source working tree.
 
+## 6. Memory policy
+
+The L2 selects one of:
+
+- `GLOBAL`: reuse configured system memory;
+- `BUBBLE`: create an isolated memory identity per selected bubble.
+
+Multiple bubbles may coexist simultaneously.
+
+Orders can be appended to the bubble without changing the worker source code or global memory namespace.
+
+Bubble finalization can clean transient state or preserve a controlled handoff for later consolidation.
+
+## 7. Public service API
+
+The primary operations are `L3WDelegate.start()`, `issue_order()`, `add_order()`, `stop()`, and `execute()`.
+
+The legacy `local_worker_mcp` module is an adapter over this service and MUST NOT create raw subprocesses.
