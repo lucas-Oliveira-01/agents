@@ -47,11 +47,12 @@ def reconcile_finding_lifecycle(
     plan: AuditPlan,
     reviews: Iterable[SemanticReviewResult],
     verification_results: Iterable[VerificationResult],
+    preserved_finding_keys: Iterable[str] = (),
 ) -> Tuple[FindingRecord, ...]:
     """Persist lifecycle transitions and only infer FIXED from a complete/full run."""
     verification = {result.candidate_id: result for result in verification_results}
     now = datetime.now(timezone.utc)
-    seen = set()
+    seen = set(preserved_finding_keys)
     updated = []
 
     for review in reviews:
@@ -116,3 +117,67 @@ def reconcile_finding_lifecycle(
             updated.append(record)
 
     return tuple(updated)
+
+
+def preserve_reused_findings(
+    store: StateStore,
+    run: AuditRun,
+    previous_run_ref: str,
+    work_items: Iterable[object],
+    reused_evidence_by_work_item: dict[str, object],
+) -> Tuple[str, ...]:
+    """Carry forward non-fixed findings for surfaces whose Evidence was safely reused."""
+    reused_surfaces = {
+        (str(item.target_surface).split("/", 1)[0].upper(),
+         str(item.target_surface).split("/", 1)[1].upper())
+        for item in work_items
+        if str(getattr(item, "work_item_id", "")) in reused_evidence_by_work_item
+        and "/" in str(item.target_surface)
+    }
+    preserved = []
+    now = datetime.now(timezone.utc)
+
+    for key in store.list_finding_keys():
+        previous = store.load_finding_record(key)
+        if previous.run_ref != previous_run_ref:
+            continue
+        if previous.lifecycle == FindingLifecycle.FIXED:
+            continue
+        if (previous.fingerprint.domain.upper(), previous.fingerprint.control_surface.upper()) not in reused_surfaces:
+            continue
+
+        evidence = reused_evidence_by_work_item.get(
+            next(
+                (
+                    item.work_item_id
+                    for item in work_items
+                    if (
+                        str(item.target_surface).split("/", 1)[0].upper(),
+                        str(item.target_surface).split("/", 1)[1].upper(),
+                    ) == (
+                        previous.fingerprint.domain.upper(),
+                        previous.fingerprint.control_surface.upper(),
+                    )
+                    and item.work_item_id in reused_evidence_by_work_item
+                ),
+                "",
+            )
+        )
+        evidence_ref = getattr(evidence, "evidence_id", None)
+        record = FindingRecord(
+            finding_key=previous.finding_key,
+            fingerprint=previous.fingerprint,
+            status=previous.status,
+            lifecycle=FindingLifecycle.PERSISTING,
+            run_ref=run.run_id,
+            evidence_ref=evidence_ref,
+            first_seen=previous.first_seen,
+            last_seen=now,
+            previous_lifecycle=previous.lifecycle,
+            severity=previous.severity,
+            history=(previous.history + (FindingLifecycle.PERSISTING,))[-32:],
+        )
+        store.save_finding_record(record)
+        preserved.append(key)
+
+    return tuple(preserved)
