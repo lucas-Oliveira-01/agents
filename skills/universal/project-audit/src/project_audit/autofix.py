@@ -98,7 +98,7 @@ def logical_finding_key(
         "category": str(category).strip().upper(),
         "subcategory": str(subcategory or "").strip().upper(),
         "finding_type": str(finding_type).strip().upper(),
-        "location_file": str(location_file).strip().replace("\\", "/"),
+        "location_file": str(location_file).strip().replace("\\", "/").lstrip("./"),
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
