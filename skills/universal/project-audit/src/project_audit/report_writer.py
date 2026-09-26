@@ -367,7 +367,7 @@ def render_semantic_findings(
 
     lines = ["## SEMANTIC COVERAGE", ""]
     for review in review_list:
-        if review.status == "COMPLETED" and not review.raw_errors:
+        if review.status == "COMPLETED" and not review.raw_errors and not review.candidates:
             continue
         lines.extend([
             "### WorkItem {}".format(review.work_item_ref),
