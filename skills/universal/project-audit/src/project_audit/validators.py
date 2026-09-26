@@ -374,6 +374,23 @@ def validate_work_item_scope_membership(
     return _pass("WORK_ITEM_SCOPE_MEMBERSHIP_VALID", "WorkItems are contained by the resolved scope.")
 
 
+def validate_completed_work_item_has_evidence(
+    work_item: AuditWorkItem,
+    evidence_for_item: List[Evidence],
+) -> ValidationResult:
+    """A successful terminal WorkItem must leave at least one Evidence edge."""
+    if (
+        work_item.execution_state == ExecutionState.TERMINATED
+        and work_item.failure_state == WorkItemFailureState.NONE
+        and not evidence_for_item
+    ):
+        return _error(
+            "WORK_ITEM_COMPLETED_WITHOUT_EVIDENCE",
+            f"WorkItem {work_item.work_item_id} terminated successfully but has no Evidence.",
+        )
+    return _pass("WORK_ITEM_EVIDENCE_LINK_VALID", "WorkItem execution has the required Evidence link.")
+
+
 def validate_evidence_snapshot_consistency(
     evidence: Evidence,
     work_item: AuditWorkItem,
@@ -1092,6 +1109,9 @@ def validate_state_graph(
                 [plan.plan_id],
                 item_evidence,
             ).results
+        )
+        results.append(
+            validate_completed_work_item_has_evidence(work_item, item_evidence)
         )
     return ValidationReport(results)
 
