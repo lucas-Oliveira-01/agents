@@ -342,11 +342,13 @@ class Orchestrator:
         work_items: List[AuditWorkItem],
         current_fingerprint: str,
     ) -> None:
-        """Backward-compatible aggregate check without global invalidation."""
-        if not self.detect_snapshot_drift(run, current_fingerprint):
-            return
-        current = self.store.load_snapshot(current_fingerprint)
-        self.reconcile_snapshot_drift(run, plan, work_items, current)
+        """Compatibility hook that no longer performs global invalidation."""
+        if self.detect_snapshot_drift(run, current_fingerprint):
+            logger.warning(
+                "Aggregate snapshot drift observed for run %s; "
+                "node-level reconciliation requires a current TargetSnapshot.",
+                run.run_id,
+            )
 
     def check_target_unchanged(
         self,
