@@ -563,8 +563,6 @@ class Orchestrator:
             # ALL work items were blocked by policy — nothing executed
             run.execution_completeness = RunExecutionCompleteness.BLOCKED
             run.failure_state = RunFailureState.SAFETY_BLOCK
-        elif any_stale and not any_failed:
-            run.execution_completeness = RunExecutionCompleteness.PARTIAL
         elif (blocked or failed) and any_succeeded:
             # Mixed: some succeeded, some blocked/failed — PARTIAL
             run.execution_completeness = RunExecutionCompleteness.PARTIAL
