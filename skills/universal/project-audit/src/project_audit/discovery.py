@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
@@ -10,6 +11,11 @@ from typing import Optional, Tuple
 
 _SKIP_DIRS = {".git", ".audit", "node_modules", "__pycache__", ".pytest_cache"}
 _BINARY_PROBE = 8192
+
+
+class DiscoverySecurityError(RuntimeError):
+    """Raised when a target contains an unsafe filesystem entry."""
+
 
 @dataclass(frozen=True)
 class FileRecord:
@@ -78,12 +84,31 @@ def _sha256(path: Path) -> Optional[str]:
         return None
 
 
+def _validate_entry(path: Path) -> None:
+    """Reject filesystem entries that could escape or block discovery."""
+    try:
+        mode = path.lstat().st_mode
+    except OSError as exc:
+        raise DiscoverySecurityError(f"Unable to inspect target entry: {path}") from exc
+    if stat.S_ISLNK(mode):
+        raise DiscoverySecurityError(f"Symlink entries are not permitted during discovery: {path}")
+    if not stat.S_ISREG(mode):
+        raise DiscoverySecurityError(f"Special filesystem entries are not permitted during discovery: {path}")
+
+
 def _discover_files(root: Path) -> Tuple[FileRecord, ...]:
     records = []
     for current_root, dirs, filenames in os.walk(root, followlinks=False):
+        for dirname in list(dirs):
+            candidate = Path(current_root) / dirname
+            if candidate.is_symlink():
+                raise DiscoverySecurityError(
+                    f"Symlink directories are not permitted during discovery: {candidate}"
+                )
         dirs[:] = sorted(d for d in dirs if d not in _SKIP_DIRS)
         for filename in sorted(filenames):
             path = Path(current_root) / filename
+            _validate_entry(path)
             try:
                 size = path.stat().st_size
             except OSError:
