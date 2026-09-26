@@ -40,6 +40,7 @@ class L3WConfig(BaseModel):
     memory_write_paths: List[str] = Field(default_factory=list)
     strict_sandbox: bool = True
     use_bwrap: bool = True
+    sandbox_read_only_paths: List[str] = Field(default_factory=list)
     persist_workspace: bool = False
 
 
@@ -186,7 +187,6 @@ class L3WDelegate:
         config = L3WConfig(
             harness_executable=harness,
             workspace_dir=workspace_dir,
-            repository_root=workspace_dir,
             persist_workspace=True,
         )
         session = await self.start(config)
@@ -219,4 +219,5 @@ def _build_policy(config: L3WConfig, memory: MemoryScope) -> SandboxPolicy:
         require_os_sandbox=config.strict_sandbox,
         use_bwrap=config.use_bwrap,
         writable_paths=tuple(dict.fromkeys(writable)),
+        additional_read_only_paths=tuple(config.sandbox_read_only_paths),
     )
