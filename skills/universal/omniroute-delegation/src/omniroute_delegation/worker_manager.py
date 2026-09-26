@@ -36,6 +36,7 @@ class MemoryScopeConfig:
     root_dir: Optional[Path] = None
     cleanup: bool = True
     consolidate: bool = False
+    sandbox_mount: str = "/l3w-memory"
 
 
 @dataclass
@@ -64,10 +65,10 @@ class MemoryScope:
         env["AI_MEMORY_SCOPE"] = "bubble"
         env["AI_MEMORY_BUBBLE_ID"] = self.bubble_id
         env["AI_MEMORY_PROJECT"] = f"worker_bubble_{self.bubble_id}"
-        env["AI_MEMORY_ROOT"] = str(self.root_dir)
-        env["AI_MEMORY_ORDERS_FILE"] = str(self.orders_file)
+        env["AI_MEMORY_ROOT"] = self.config.sandbox_mount
+        env["AI_MEMORY_ORDERS_FILE"] = f"{self.config.sandbox_mount}/orders.jsonl"
         env["L3W_MEMORY_BUBBLE_ID"] = self.bubble_id
-        env["L3W_MEMORY_BUBBLE_ROOT"] = str(self.root_dir)
+        env["L3W_MEMORY_BUBBLE_ROOT"] = self.config.sandbox_mount
 
         metadata = {
             "bubble_id": self.bubble_id,
