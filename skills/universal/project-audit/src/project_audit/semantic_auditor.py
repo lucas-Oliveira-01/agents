@@ -5,11 +5,12 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 from .context_builder import ContextBundle
 from .delegation import DelegationStatus, WorkerPort
-from omniroute_delegation.contracts import AuditContract, ExecutionState as DelegationExecutionState
+if TYPE_CHECKING:
+    from omniroute_delegation.contracts import AuditContract
 
 from .models import AuditRun, AuditWorkItem, Evidence, EvidenceValidity, Provenance
 from .sensitivity import SensitivityAssessment, SensitivityState, aggregate_assessments, assess_text
@@ -250,6 +251,8 @@ class SemanticAuditor:
         *,
         declared_sensitivity: Optional[SensitivityState] = None,
     ) -> SemanticReviewResult:
+        from omniroute_delegation.contracts import ExecutionState as DelegationExecutionState
+
         actual_assessments = tuple(
             assess_text(item.content, item.path)
             for item in context.items
