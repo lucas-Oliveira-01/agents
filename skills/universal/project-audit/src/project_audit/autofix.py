@@ -401,6 +401,11 @@ def _run_immutable_fix_locked(
     except (OSError, json.JSONDecodeError) as exc:
         raise AutoFixError(f"Unable to read canonical execution state: {exc}") from exc
 
+    if execution_state.get("run_id") != source_run_id:
+        raise AutoFixError("Canonical execution state belongs to a different AuditRun.")
+    if execution_state.get("target_snapshot_ref") != source_run.target_snapshot_ref:
+        raise AutoFixError("Canonical execution state targets a different immutable snapshot.")
+
     candidates = extract_fix_candidates(
         execution_state,
         run_id=source_run_id,
@@ -488,6 +493,14 @@ def _run_immutable_fix_locked(
         )
         after_present = finding_present_in_report(post_report, key)
         snapshot_b = snapshot_b_pre_audit
+
+        post_run = reaudited.engineering.run
+        if post_run.execution_completeness.value != "COMPLETE":
+            raise AutoFixError("Post-fix re-audit did not reach COMPLETE execution state.")
+        if post_run.coverage_completeness.value != "FULL":
+            raise AutoFixError("Post-fix re-audit did not establish FULL coverage.")
+        if any(item.verdict.value != "VERIFIED" for item in reaudited.verification_results):
+            raise AutoFixError("Post-fix verifier did not establish VERIFIED state for all semantic candidates.")
 
         completed = complete_ledger(
             ledger,

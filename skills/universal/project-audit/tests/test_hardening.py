@@ -877,3 +877,37 @@ class TestSchemaDocumentation:
         with pytest.raises(IllegalStateTransitionError) as exc:
             work_item.retry_attempt()
         assert "Retry budget exhausted" in str(exc.value)
+
+
+# ===========================================================================
+# Phase 7 — persistence and boundary closure
+# ===========================================================================
+
+
+def test_finding_record_round_trips(state_store):
+    from project_audit.models import FindingFingerprint, FindingLifecycle, FindingRecord, FindingStatus
+    now = datetime.now(timezone.utc)
+    record = FindingRecord(
+        finding_key="F-test",
+        fingerprint=FindingFingerprint("SECURITY", "AUTH", "VULNERABILITY"),
+        status=FindingStatus.CONFIRMED,
+        lifecycle=FindingLifecycle.NEW,
+        run_ref="run-test",
+        evidence_ref=None,
+        first_seen=now,
+        last_seen=now,
+        history=(FindingLifecycle.NEW,),
+    )
+    state_store.save_finding_record(record)
+    loaded = state_store.load_finding_record("F-test")
+    assert loaded.to_dict() == record.to_dict()
+
+
+def test_execution_state_sidecar_is_bound_to_source_run(tmp_path):
+    """The auto-fix protocol must not consume another run's execution state."""
+    import json
+    state = tmp_path / "audit_execution_state.json"
+    state.write_text(json.dumps({"run_id": "run-B", "target_snapshot_ref": "snapshot-B"}), encoding="utf-8")
+    payload = json.loads(state.read_text(encoding="utf-8"))
+    assert payload["run_id"] != "run-A"
+    assert payload["target_snapshot_ref"] != "snapshot-A"

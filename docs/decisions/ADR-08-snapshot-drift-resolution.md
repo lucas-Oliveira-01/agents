@@ -1,17 +1,22 @@
 # ADR 08: Snapshot Drift Resolution Strategy
 
-## Context
-During the forensic review, it was identified that snapshot drift detection was partially implemented without a fully defined architectural contract. Specifically, the injection of a `current_snapshot_provider` lacked formal architectural authority. We must define when the drift is checked, who provides the snapshot, and how to handle it.
+## Status
+
+Accepted — Phase 7 canonicalizes global target drift and node dependency drift as distinct semantics.
 
 ## Decision
-We decide to **REMOVE** the `current_snapshot_provider` injection at the function level. Instead, the drift detection relies explicitly on comparing the `TargetSnapshot.snapshot_fingerprint` already persisted for the run against a point-in-time snapshot fingerprint obtained before/during critical execution boundaries.
 
-1. **Who produces the initial snapshot?** The `TargetSnapshot` is generated upfront during context building and its fingerprint is securely stored as part of the run.
-2. **When is the current state captured?** The Orchestrator checks for drift explicitly by comparing the `run.target_snapshot_ref` to the current state (provided by a system-level hashing/snapshot mechanism) during the pre-execution phase of a work item.
-3. **What happens on drift?** Execution is STOPPED immediately. The run is marked with `DRIFT_DETECTED`, preventing `COMPLETE` state and publication.
-4. **How does recovery work?** A run that suffered snapshot drift can be recovered, but it cannot be marked `COMPLETE` without a new snapshot.
-5. **How is Evidence affected?** Any `Evidence` collected after drift is detected is marked `SUSPECT`.
+The runtime uses two drift levels:
+
+1. **Global Target Drift**: the root target identity no longer matches the run's immutable `TargetSnapshot`. The run cannot complete or publish against that snapshot. Recovery requires a new snapshot.
+2. **Node Dependency Drift**: a subset of nodes referenced by an active WorkItem/Evidence changes during execution. Dependent evidence is marked `STALE`, the affected WorkItem terminates with `SNAPSHOT_DRIFT`, and independent WorkItems may continue.
+
+The current semantic pipeline uses node-level reconciliation. The older global-stop-only description is retired and must not be treated as an alternative implementation contract.
+
+## Evidence rules
+
+Evidence affected by node drift is never silently promoted back to `VALID`. It must be revalidated or regenerated under a stable snapshot before reuse.
 
 ## Consequences
-- **Positive:** Restores architectural integrity by removing unauthorized `current_snapshot_provider` residue. Clarifies the invalidation graph.
-- **Negative:** Checking for drift requires explicit mechanisms which might slightly increase execution time overhead.
+
+The architecture preserves unaffected work while maintaining a hard publication/completion boundary for global snapshot identity.

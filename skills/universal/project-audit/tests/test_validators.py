@@ -393,6 +393,29 @@ class TestSafetyAndEgress:
         assert r.is_error
         assert r.code == "EGRESS_SENSITIVE_DATA_DENIED"
 
+    def test_sensitive_external_egress_without_explicit_permission_is_blocked(self, audit_plan):
+        wi = make_work_item(
+            plan_id=audit_plan.plan_id,
+            egress_policy=EgressPolicy(
+                destination=EgressDestination.APPROVED_EXTERNAL,
+                allow_sensitive=False,
+            ),
+        )
+        result = validate_egress_policy(wi, data_is_sensitive=True)
+        assert result.is_error
+        assert result.code == "EGRESS_SENSITIVE_DATA_DENIED"
+
+    def test_unknown_sensitivity_is_blocked_without_sensitive_permission(self, audit_plan):
+        wi = make_work_item(
+            plan_id=audit_plan.plan_id,
+            egress_policy=EgressPolicy(
+                destination=EgressDestination.APPROVED_EXTERNAL,
+                allow_sensitive=False,
+            ),
+        )
+        result = validate_egress_policy(wi, data_is_sensitive=None)
+        assert result.is_error
+
     def test_egress_allowed_when_policy_permits(self, audit_plan):
         wi = make_work_item(
             plan_id=audit_plan.plan_id,
@@ -432,12 +455,12 @@ class TestSafetyAndEgress:
 
 
 class TestPublicationEligibility:
-    def _make_run(self, audit_plan, target_snapshot, completeness=RunExecutionCompleteness.COMPLETE):
+    def _make_run(self, audit_plan, target_snapshot, completeness=RunExecutionCompleteness.COMPLETE, work_item_ref=None):
         return AuditRun(
             run_id=str(uuid.uuid4()),
             target_snapshot_ref=target_snapshot.snapshot_fingerprint,
             plan_ref=audit_plan.plan_id,
-            work_item_refs=[],
+            work_item_refs=[work_item_ref] if work_item_ref else [],
             execution_completeness=completeness,
             coverage_completeness=RunCoverageCompleteness.FULL,
             failure_state=RunFailureState.NONE,
@@ -450,9 +473,36 @@ class TestPublicationEligibility:
         )
 
     def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot, work_item):
-        run = self._make_run(audit_plan, target_snapshot)
+        run = self._make_run(audit_plan, target_snapshot, work_item_ref=work_item.work_item_id)
         report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert not report.has_errors
+
+    def test_can_publish_rejects_work_item_subset(self, audit_plan, target_snapshot, work_item):
+        second = make_work_item(plan_id=audit_plan.plan_id)
+        audit_plan.work_items.extend([work_item, second])
+        run = AuditRun(
+            run_id=str(uuid.uuid4()),
+            target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+            plan_ref=audit_plan.plan_id,
+            work_item_refs=[work_item.work_item_id, second.work_item_id],
+            execution_completeness=RunExecutionCompleteness.COMPLETE,
+            coverage_completeness=RunCoverageCompleteness.FULL,
+            failure_state=RunFailureState.NONE,
+            artifact_refs=[
+                "docs/audit/00_inventory.md",
+                "docs/audit/01_coverage.md",
+                "docs/audit/02_analytical.md",
+                "docs/audit/03_audit_ledger.md",
+            ],
+        )
+        report = can_publish(
+            run,
+            [work_item],
+            [],
+            target_snapshot.snapshot_fingerprint,
+            audit_plan,
+        )
+        assert any(r.code == "RUN_WORK_ITEM_SET_MISMATCH" for r in report.errors())
 
     def test_complete_run_without_audit_artifacts_is_not_publishable(self, audit_plan, target_snapshot, work_item):
         run = AuditRun(
@@ -470,19 +520,19 @@ class TestPublicationEligibility:
         assert "PUBLISH_ARTIFACTS_MISSING" in error_codes
 
     def test_snapshot_drift_blocks_publication(self, audit_plan, target_snapshot, work_item):
-        run = self._make_run(audit_plan, target_snapshot)
+        run = self._make_run(audit_plan, target_snapshot, work_item_ref=work_item.work_item_id)
         report = can_publish(run, [work_item], [], "d" * 64, audit_plan)
         error_codes = [r.code for r in report.errors()]
         assert "SNAPSHOT_DRIFT_DETECTED" in error_codes
 
     def test_incomplete_execution_blocks_publication(self, audit_plan, target_snapshot, work_item):
-        run = self._make_run(audit_plan, target_snapshot, RunExecutionCompleteness.PARTIAL)
+        run = self._make_run(audit_plan, target_snapshot, RunExecutionCompleteness.PARTIAL, work_item_ref=work_item.work_item_id)
         report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         error_codes = [r.code for r in report.errors()]
         assert "PUBLISH_EXECUTION_INCOMPLETE" in error_codes
 
     def test_failed_work_items_block_publication(self, audit_plan, target_snapshot, work_item):
-        run = self._make_run(audit_plan, target_snapshot)
+        run = self._make_run(audit_plan, target_snapshot, work_item_ref=work_item.work_item_id)
         work_item.execution_state = ExecutionState.TERMINATED
         work_item.failure_state = WorkItemFailureState.INFRA_ERROR
         report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
@@ -490,7 +540,7 @@ class TestPublicationEligibility:
         assert "PUBLISH_HAS_FAILED_ITEMS" in error_codes
 
     def test_run_with_failure_state_blocks_publication(self, audit_plan, target_snapshot, work_item):
-        run = self._make_run(audit_plan, target_snapshot)
+        run = self._make_run(audit_plan, target_snapshot, work_item_ref=work_item.work_item_id)
         run.failure_state = RunFailureState.SNAPSHOT_DRIFT
         report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         error_codes = [r.code for r in report.errors()]

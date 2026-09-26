@@ -906,11 +906,7 @@ def validate_egress_policy(
     # UNKNOWN (None) is treated as True (fail closed)
     is_sensitive = data_is_sensitive if data_is_sensitive is not None else True
     
-    if (
-        policy.destination == EgressDestination.LOCAL_ONLY
-        and not policy.allow_sensitive
-        and is_sensitive
-    ):
+    if is_sensitive and not policy.allow_sensitive:
         return _error(
             "EGRESS_SENSITIVE_DATA_DENIED",
             f"WorkItem {work_item.work_item_id}: data_egress_policy denies external egress "
@@ -995,7 +991,18 @@ def can_publish(
         results.append(_error("PUBLISH_EMPTY_AUDIT", "Cannot publish an audit with no work items."))
         # Early return because other checks don't make sense on empty
         return ValidationReport(results)
-    
+
+    # Publication must be graph-closed: the caller cannot substitute a
+    # convenient subset of WorkItems for the immutable Run/Plan graph.
+    results.append(validate_run_work_item_references(run, plan, work_items))
+    if run.target_snapshot_ref != plan.target_snapshot_ref:
+        results.append(
+            _error(
+                "PUBLISH_PLAN_RUN_SNAPSHOT_MISMATCH",
+                f"Run {run.run_id} and Plan {plan.plan_id} target different snapshots.",
+            )
+        )
+
     if run.coverage_completeness == RunCoverageCompleteness.NONE:
         results.append(_error("PUBLISH_EMPTY_COVERAGE", "Cannot publish an audit with NONE coverage."))
 

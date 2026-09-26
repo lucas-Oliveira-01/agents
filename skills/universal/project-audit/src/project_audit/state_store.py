@@ -45,6 +45,10 @@ from .models import (
     EgressPolicy,
     Evidence,
     EvidenceValidity,
+    FindingFingerprint,
+    FindingLifecycle,
+    FindingRecord,
+    FindingStatus,
     ExecutionPolicy,
     ExecutionReceipt,
     ExecutionState,
@@ -266,6 +270,7 @@ class StateStore:
             "evidence": self.root / "evidence",
             "runs": self.root / "audit_runs",
             "receipts": self.root / "execution_receipts",
+            "findings": self.root / "findings",
         }
         for d in self._dirs.values():
             d.mkdir(parents=True, exist_ok=True)
@@ -379,6 +384,42 @@ class StateStore:
             attempts=attempts,
             artifact_refs=list(d.get("artifact_refs", [])),
         )
+
+    # ---- Finding lifecycle ----
+
+    def save_finding_record(self, record: FindingRecord) -> None:
+        path = self._dirs["findings"] / f"{record.finding_key}.json"
+        _atomic_write(path, record.to_dict())
+
+    def load_finding_record(self, finding_key: str) -> FindingRecord:
+        d = _read_json(self._dirs["findings"] / f"{finding_key}.json")
+        fp = d["fingerprint"]
+        return FindingRecord(
+            finding_key=d["finding_key"],
+            fingerprint=FindingFingerprint(
+                domain=fp["domain"],
+                control_surface=fp["control_surface"],
+                defect_type=fp["defect_type"],
+            ),
+            status=FindingStatus(d["status"]),
+            lifecycle=FindingLifecycle(d["lifecycle"]),
+            run_ref=d["run_ref"],
+            evidence_ref=d.get("evidence_ref"),
+            first_seen=_req_dt(d["first_seen"]),
+            last_seen=_req_dt(d["last_seen"]),
+            previous_lifecycle=(
+                FindingLifecycle(d["previous_lifecycle"])
+                if d.get("previous_lifecycle") else None
+            ),
+            severity=d.get("severity"),
+            history=tuple(FindingLifecycle(item) for item in d.get("history", [])),
+        )
+
+    def finding_exists(self, finding_key: str) -> bool:
+        return (self._dirs["findings"] / f"{finding_key}.json").exists()
+
+    def list_finding_keys(self) -> List[str]:
+        return [p.stem for p in self._dirs["findings"].glob("*.json")]
 
     # ---- Evidence ----
 
