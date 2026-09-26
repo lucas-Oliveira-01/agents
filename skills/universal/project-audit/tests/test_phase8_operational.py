@@ -12,7 +12,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Tuple
 from uuid import uuid4
 
 import pytest
@@ -44,7 +44,6 @@ from project_audit.models import (
 )
 from project_audit.planner import build_target_snapshot
 from project_audit.discovery import discover
-from project_audit.classifiers import classify_applicability, classify_files, classify_stack
 from project_audit.runtime import run_full_audit
 from project_audit.security_pass import DeterministicSecurityAuditor
 from project_audit.semantic_auditor import SemanticFindingCandidate, SemanticReviewResult
