@@ -1,18 +1,12 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from omniroute_delegation.contracts import AuditContract, DelegationTask, ExecutionState
-from omniroute_delegation.delegation_gateway import DelegationGateway
-from omniroute_delegation.exceptions import (
-    CredentialLeakPreventedError,
-    DelegationError,
-    SchemaViolationError,
-    SemanticCoverageFailedError,
-)
-from omniroute_delegation.mcp_client import MCPClient
-from omniroute_delegation.semantic_parser import SemanticRecoveryLoop, extract_json
+if TYPE_CHECKING:
+    from omniroute_delegation.contracts import AuditContract, DelegationTask
+    from omniroute_delegation.delegation_gateway import DelegationGateway
+    from omniroute_delegation.mcp_client import MCPClient
 
 from .delegation import DelegationBackend, DelegationRequest, DelegationResult, DelegationStatus
 
@@ -26,7 +20,7 @@ class OmniRouteDelegationBackend(DelegationBackend):
 
     def __init__(
         self,
-        gateway: DelegationGateway,
+        gateway: "DelegationGateway",
         *,
         provider_info: str = "omniroute/delegation-gateway",
     ) -> None:
@@ -34,6 +28,10 @@ class OmniRouteDelegationBackend(DelegationBackend):
         self.provider_info = provider_info
 
     def delegate(self, request: DelegationRequest) -> DelegationResult:
+        from omniroute_delegation.contracts import DelegationTask
+        from omniroute_delegation.exceptions import (CredentialLeakPreventedError, DelegationError, SchemaViolationError, SemanticCoverageFailedError)
+        from omniroute_delegation.semantic_parser import SemanticRecoveryLoop, extract_json
+
         task = DelegationTask.model_validate(self._build_task_payload(request))
 
         def invoke(attempt: int) -> Any:
@@ -127,7 +125,7 @@ class OmniRouteDelegationBackend(DelegationBackend):
         raise SchemaViolationError("OmniRoute returned no semantic payload.")
 
     @staticmethod
-    def _contract_to_payload(contract: AuditContract) -> Dict[str, Any]:
+    def _contract_to_payload(contract: "AuditContract") -> Dict[str, Any]:
         return {
             "findings": [
                 finding.model_dump(mode="json")
@@ -143,8 +141,11 @@ def create_local_omniroute_backend(
     *,
     mcp_url: Optional[str] = None,
     timeout: float = 30.0,
-) -> tuple[OmniRouteDelegationBackend, MCPClient]:
+) -> tuple[OmniRouteDelegationBackend, "MCPClient"]:
     """Construct the official DelegationGateway and its owned MCP transport."""
+    from omniroute_delegation.delegation_gateway import DelegationGateway
+    from omniroute_delegation.mcp_client import MCPClient
+
     client = MCPClient(mcp_url=mcp_url, timeout=timeout)
     gateway = DelegationGateway(client)
     return OmniRouteDelegationBackend(gateway), client
