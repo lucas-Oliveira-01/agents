@@ -22,6 +22,7 @@ from .security_runner import SecurityPassResult, execute_security_pass
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 from .verifier import VerificationResult, candidate_identity, consolidated_reviews, verify_semantic_reviews
 from .state_store import AuditWriterLock, StateStore
+from .finding_lifecycle import reconcile_finding_lifecycle
 
 
 @dataclass(frozen=True)
@@ -150,6 +151,14 @@ def _run_full_audit_unlocked(
         prepared.snapshot,
     )
     consolidated = consolidated_reviews(semantic_reviews, verification_results)
+    # Phase 7: persist lifecycle only from deterministic verifier results.
+    reconcile_finding_lifecycle(
+        orchestrator.store,
+        run,
+        prepared.plan,
+        consolidated,
+        verification_results,
+    )
     normalization = None
     # Render away from final paths. Drift during rendering cannot expose a report.
     with tempfile.TemporaryDirectory(prefix=".pending-", dir=vault) as temporary:
