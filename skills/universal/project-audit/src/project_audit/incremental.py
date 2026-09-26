@@ -24,11 +24,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Mapping, Optional, Tuple
+import uuid
 
 from .models import (
     AuditWorkItem,
     Evidence,
     EvidenceValidity,
+    Provenance,
     MethodologyState,
     TargetSnapshot,
     WorkItemAction,
@@ -292,3 +294,133 @@ def plan_incremental_actions(
             bind_decision_to_work_item(work_item, decision)
         decisions.append(decision)
     return tuple(decisions)
+
+
+
+@dataclass(frozen=True)
+class IncrementalBinding:
+    """Stable binding between a current WorkItem and prior logical evidence."""
+
+    current_work_item_ref: str
+    previous_work_item_ref: Optional[str]
+    evidence_ref: Optional[str]
+    decision: IncrementalDecision
+
+
+def stable_work_item_key(work_item: AuditWorkItem) -> Tuple[str, str]:
+    """Logical WorkItem identity independent of generated UUIDs."""
+    return work_item.auditor, work_item.target_surface
+
+
+def match_previous_evidence(
+    current_work_items: Iterable[AuditWorkItem],
+    previous_work_items: Iterable[AuditWorkItem],
+    previous_evidence: Mapping[str, Evidence],
+) -> Mapping[str, Evidence]:
+    """Match evidence to current WorkItems by stable logical identity.
+
+    Ambiguous prior matches are deliberately omitted so the caller fails safe
+    to REAUDIT instead of guessing which historical evidence belongs to a task.
+    """
+    previous_index: dict[Tuple[str, str], list[Tuple[str, Evidence]]] = {}
+    for previous in previous_work_items:
+        evidence = previous_evidence.get(previous.work_item_id)
+        if evidence is None:
+            continue
+        previous_index.setdefault(stable_work_item_key(previous), []).append(
+            (previous.work_item_id, evidence)
+        )
+
+    bound: dict[str, Evidence] = {}
+    for current in current_work_items:
+        matches = previous_index.get(stable_work_item_key(current), [])
+        if len(matches) == 1:
+            bound[current.work_item_id] = matches[0][1]
+    return bound
+
+
+def plan_incremental_actions_stable(
+    current_work_items: Iterable[AuditWorkItem],
+    previous_work_items: Iterable[AuditWorkItem],
+    previous_evidence: Mapping[str, Evidence],
+    previous_snapshot: TargetSnapshot,
+    current_snapshot: TargetSnapshot,
+) -> Tuple[IncrementalBinding, ...]:
+    """Apply the deterministic incremental matrix across regenerated WorkItems."""
+    current = tuple(current_work_items)
+    evidence_by_current = match_previous_evidence(
+        current, previous_work_items, previous_evidence
+    )
+    previous_by_current = {
+        current_item.work_item_id: previous
+        for current_item in current
+        for previous in previous_work_items
+        if stable_work_item_key(current_item) == stable_work_item_key(previous)
+    }
+
+    bindings = []
+    for item in current:
+        evidence = evidence_by_current.get(item.work_item_id)
+        previous = previous_by_current.get(item.work_item_id)
+        if evidence is None:
+            decision = IncrementalDecision.REAUDIT
+            item.action = WorkItemAction.REAUDIT
+            item.decision_basis = (
+                "incremental_decision=REAUDIT; reason=missing_or_ambiguous_prior_evidence"
+            )
+            bindings.append(
+                IncrementalBinding(
+                    item.work_item_id,
+                    previous.work_item_id if previous is not None else None,
+                    None,
+                    decision,
+                )
+            )
+            continue
+
+        decision = decide_incremental_action(
+            evidence,
+            previous_snapshot,
+            current_snapshot,
+            item.auditor,
+        )
+        bind_decision_to_work_item(item, decision)
+        bindings.append(
+            IncrementalBinding(
+                item.work_item_id,
+                previous.work_item_id if previous is not None else None,
+                evidence.evidence_id,
+                decision,
+            )
+        )
+    return tuple(bindings)
+
+
+def derive_reused_evidence(
+    prior: Evidence,
+    current_snapshot: TargetSnapshot,
+    current_work_item: AuditWorkItem,
+    *,
+    generated_at,
+    actor: str = "project-audit/incremental-reuse",
+) -> Evidence:
+    """Create a fresh immutable Evidence record for a safe REUSE decision."""
+    return Evidence(
+        evidence_id=str(uuid.uuid4()),
+        target_snapshot_ref=current_snapshot.snapshot_fingerprint,
+        work_item_ref=current_work_item.work_item_id,
+        source_refs=tuple(prior.source_refs),
+        dependencies=tuple(prior.dependencies),
+        validity=EvidenceValidity.VALID,
+        provenance=Provenance(
+            actor=actor,
+            generated_at=generated_at,
+            policy_version=current_snapshot.methodology_state.policy_version,
+        ),
+        fingerprint=prior.fingerprint,
+        provider=prior.provider,
+        model=prior.model,
+        raw_output=prior.raw_output,
+        raw_output_sha256=prior.raw_output_sha256,
+        derived_from_evidence_ref=prior.evidence_id,
+    )
