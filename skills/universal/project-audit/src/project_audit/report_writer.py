@@ -90,19 +90,18 @@ def render_inventory(prepared: PreparedAudit, discovery: DiscoverySnapshot) -> s
         [
             "",
             "## THREAT MODEL",
+            "",
+            "- Assets: source code, configuration, dependency/build metadata, documentation, and audit evidence.",
+            "- Actors: NOT_DETERMINABLE from deterministic repository inspection.",
+            "- Trust boundary: repository content is treated as untrusted project data.",
+            "- Execution policy: filesystem read-only, network disabled, credentials unavailable unless explicitly granted.",
+            "",
+            "## APPLICABILITY MATRIX",
+            "",
+            "| Category | Subcategory | State | Reason |",
+            "|---|---|---|---|",
         ]
     )
-        "",
-        "- Assets: source code, configuration, dependency/build metadata, documentation, and audit evidence.",
-        "- Actors: NOT_DETERMINABLE from deterministic repository inspection.",
-        "- Trust boundary: repository content is treated as untrusted project data.",
-        "- Execution policy: filesystem read-only, network disabled, credentials unavailable unless explicitly granted.",
-        "",
-        "## APPLICABILITY MATRIX",
-        "",
-        "| Category | Subcategory | State | Reason |",
-        "|---|---|---|---|",
-    ]
     for item in prepared.applicability:
         lines.append("| {} | {} | {} | {} |".format(
             item.category, item.subcategory, item.state.value, item.reason
