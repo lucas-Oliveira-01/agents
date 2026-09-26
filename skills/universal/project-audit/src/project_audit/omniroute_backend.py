@@ -157,7 +157,11 @@ class OmniRouteDelegationBackend(DelegationBackend):
                     if isinstance(item, dict) and item.get("type") == "text"
                 ).strip()
                 if raw_text:
-                    parsed = extract_json(raw_text)
+                    try:
+                        parsed = extract_json(raw_text)
+                    except SchemaViolationError as exc:
+                        setattr(exc, "raw_output", raw_text)
+                        raise
                     cleaned, provider, model = metadata_and_payload(parsed)
                     return SemanticPayload(
                         payload=cleaned,
@@ -167,7 +171,11 @@ class OmniRouteDelegationBackend(DelegationBackend):
                     )
 
         if isinstance(result, str):
-            parsed = extract_json(result)
+            try:
+                parsed = extract_json(result)
+            except SchemaViolationError as exc:
+                setattr(exc, "raw_output", result)
+                raise
             cleaned, provider, model = metadata_and_payload(parsed)
             return SemanticPayload(
                 payload=cleaned,
