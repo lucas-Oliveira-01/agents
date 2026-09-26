@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 import uuid
 
 from omniroute_delegation.contracts import AuditContract, ExecutionState
 from project_audit.classifiers import classify_applicability, classify_files, classify_stack
+from project_audit.context_builder import build_context
 from project_audit.delegation import (
     DelegationBackend,
     DelegationResult,
@@ -14,23 +16,22 @@ from project_audit.delegation import (
 from project_audit.discovery import discover
 from project_audit.models import (
     AuditRun,
-    AuditWorkItem,
     EgressDestination,
     EgressPolicy,
     Evidence,
     EvidenceValidity,
-    ExecutionState as WorkExecutionState,
+    Provenance,
     RunBudgetState,
     RunCoverageCompleteness,
     RunExecutionCompleteness,
     RunFailureState,
     RunPublicationState,
-    Provenance,
+    WorkItemFailureState,
 )
 from project_audit.orchestrator import Orchestrator
 from project_audit.planner import prepare_audit
-from project_audit.semantic_auditor import SemanticAuditor
 from project_audit.state_store import StateStore
+from project_audit.semantic_auditor import SemanticAuditor
 
 
 def _write(root: Path, relative: str, content: str) -> None:
@@ -61,7 +62,6 @@ class PartialCoverageBackend(DelegationBackend):
             raw_errors=[{"index": 1, "message": "Invalid finding shape"}],
             attempts=1,
         )
-        contract.findings = []
         return DelegationResult(
             request_id=request.request_id,
             status=DelegationStatus.SUCCESS,
@@ -107,9 +107,7 @@ def test_partial_coverage_preserves_findings_and_raw_errors(tmp_path: Path) -> N
     ).review(
         work_item,
         run,
-        __import__("project_audit.context_builder", fromlist=["build_context"]).build_context(
-            discovery, work_item.target_surface
-        ),
+        build_context(discovery, work_item.target_surface),
     )
 
     assert result.status == "PARTIAL_COVERAGE"
@@ -152,6 +150,7 @@ def test_snapshot_drift_invalidates_only_affected_work_item(tmp_path: Path) -> N
         publication_state=RunPublicationState.NOT_PUBLISHED,
     )
 
+    now = datetime.now(timezone.utc)
     first_evidence = Evidence(
         evidence_id=str(uuid.uuid4()),
         target_snapshot_ref=prepared.snapshot.snapshot_fingerprint,
@@ -159,7 +158,7 @@ def test_snapshot_drift_invalidates_only_affected_work_item(tmp_path: Path) -> N
         source_refs=("src/app.py",),
         dependencies=(),
         validity=EvidenceValidity.VALID,
-        provenance=Provenance(actor="test", generated_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc)),
+        provenance=Provenance(actor="test", generated_at=now),
         fingerprint="a" * 64,
     )
     second_evidence = Evidence(
@@ -169,16 +168,15 @@ def test_snapshot_drift_invalidates_only_affected_work_item(tmp_path: Path) -> N
         source_refs=("config.yaml",),
         dependencies=(),
         validity=EvidenceValidity.VALID,
-        provenance=Provenance(actor="test", generated_at=__import__("datetime").datetime.now(__import__("datetime").timezone.utc)),
+        provenance=Provenance(actor="test", generated_at=now),
         fingerprint="b" * 64,
     )
     orchestrator.commit_evidence(first_evidence, work_items[0])
     orchestrator.commit_evidence(second_evidence, work_items[1])
 
     (tmp_path / "src/app.py").write_text("print('after')\n", encoding="utf-8")
-    current = __import__("project_audit.planner", fromlist=["build_target_snapshot"]).build_target_snapshot(
-        discover(tmp_path)
-    )
+    from project_audit.planner import build_target_snapshot
+    current = build_target_snapshot(discover(tmp_path))
 
     changed = orchestrator.reconcile_snapshot_drift(
         run,
@@ -197,4 +195,5 @@ def test_snapshot_drift_invalidates_only_affected_work_item(tmp_path: Path) -> N
     valid_second = orchestrator.store.load_evidence(second_evidence.evidence_id)
     assert stale_first.validity == EvidenceValidity.STALE
     assert valid_second.validity == EvidenceValidity.VALID
-    assert work_items[0].failure_state == RunFailureState.SNAPSHOT_DRIFT or True
+    assert work_items[0].failure_state == WorkItemFailureState.SNAPSHOT_DRIFT
+    assert work_items[1].failure_state == WorkItemFailureState.NONE
