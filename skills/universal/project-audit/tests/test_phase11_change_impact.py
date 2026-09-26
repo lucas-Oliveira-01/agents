@@ -20,7 +20,7 @@ def snapshot_with_inputs(base_snapshot, inputs, *, policy=None):
     )
     methodology = MethodologyState(
         audit_contract_version=base_snapshot.methodology_state.audit_contract_version,
-        auditor_versions=dict(base_snapshot.methodology_state.auditor_versions),
+        auditor_versions={**dict(base_snapshot.methodology_state.auditor_versions), "fake-auditor": "0.1.0"},
         policy_version=policy or base_snapshot.methodology_state.policy_version,
     )
     return TargetSnapshot.create(base_snapshot.target_mode, project_state, methodology)
