@@ -63,3 +63,27 @@ class SemanticCoverageFailedError(DelegationError):
         super().__init__(
             f"Semantic coverage failed after recovery attempts; final state={state}."
         )
+
+
+class SandboxError(DelegationError):
+    """Workspace sandbox setup or policy failure."""
+
+
+class SandboxUnavailableError(SandboxError):
+    """A required OS-level sandbox is not available."""
+
+
+class WorkerManagerError(DelegationError):
+    """Base exception for worker lifecycle failures."""
+
+
+class WorkerTimeoutError(WorkerManagerError):
+    """A worker exceeded its configured timeout."""
+
+
+class WorkerStartupError(WorkerManagerError):
+    """A worker watchdog or harness failed to start."""
+
+
+class MemoryScopeError(DelegationError):
+    """Memory scope setup or finalization failure."""
