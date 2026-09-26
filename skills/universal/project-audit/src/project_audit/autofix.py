@@ -337,3 +337,151 @@ def complete_ledger(
             "reason": "Post-fix re-audit no longer emits the same logical finding identity.",
         }
     )
+
+
+def run_immutable_fix(
+    root: Path,
+    *,
+    state_dir: Path,
+    source_run_id: str,
+    candidate_id: str,
+    semantic_worker: Any,
+    semantic_egress_policy: Any,
+    normalize_command: str,
+) -> FixLedger:
+    """Execute exactly one verified P0/P1 fix transaction and re-audit it."""
+    from .runtime import run_full_audit
+    from .state_store import StateStore
+
+    store = StateStore(state_dir)
+    if not store.run_exists(source_run_id):
+        raise AutoFixError(f"Source audit run {source_run_id} does not exist.")
+
+    source_run = store.load_run(source_run_id)
+    source_snapshot = store.load_snapshot(source_run.target_snapshot_ref)
+    observed = current_snapshot(root)
+    validate_fix_preconditions(root, source_snapshot, observed)
+
+    state_path = root / ".audit" / "audit_execution_state.json"
+    if not state_path.is_file():
+        raise AutoFixError(
+            "Immutable auto-fix requires the source run execution state with verifier results."
+        )
+    try:
+        execution_state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise AutoFixError(f"Unable to read canonical execution state: {exc}") from exc
+
+    candidates = extract_fix_candidates(
+        execution_state,
+        run_id=source_run_id,
+        candidate_id=candidate_id,
+    )
+    if len(candidates) != 1:
+        raise AutoFixError(
+            f"Expected exactly one VERIFIED P0/P1 candidate {candidate_id}; found {len(candidates)}."
+        )
+    candidate = candidates[0]
+    ledger = begin_ledger(candidate, source_snapshot)
+    ledger_path = write_fix_ledger(root, ledger)
+
+    patch_sha256 = None
+    changed_files: Tuple[str, ...] = ()
+    worker_receipt = None
+    try:
+        import asyncio
+        from omniroute_delegation.local_worker_mcp import dispatch_opencode_worker
+
+        task = (
+            "Apply the smallest safe remediation for this already independently "
+            f"verified finding. Finding: {candidate.title}. "
+            f"Type: {candidate.finding_type}. "
+            f"Recommendation: {candidate.recommendation or 'Use the minimal evidence-grounded remediation.'} "
+            f"Target file: {candidate.location_file}. "
+            "Do not modify any other file. Do not change dependencies or configuration outside this file. "
+            "Do not weaken unrelated controls. Return a normal code patch."
+        )
+
+        async def dispatch():
+            raw = await dispatch_opencode_worker(
+                task=task,
+                target_file=candidate.location_file,
+                workspace_dir=str(root),
+                isolated_memory=True,
+            )
+            return json.loads(raw)
+
+        worker_receipt = asyncio.run(dispatch())
+        if worker_receipt.get("state") != "SUCCESS":
+            raise AutoFixError(
+                "L3W did not complete successfully: "
+                + str(worker_receipt.get("state") or "UNKNOWN")
+            )
+
+        patch = str(worker_receipt.get("diff") or "")
+        changed_files = validate_worker_patch(
+            patch,
+            expected_file=candidate.location_file,
+        )
+        patch_sha256 = apply_patch(root, patch)
+
+        # Snapshot B is captured after the patch and before the re-audit. The
+        # re-audit itself gets a dedicated state/output namespace so the source
+        # run's immutable artifacts are never overwritten.
+        snapshot_b_pre_audit = current_snapshot(root)
+        reaudit_root = root / ".audit" / "fixes" / ledger.fix_id / "reaudit"
+        reaudited = run_full_audit(
+            str(root),
+            state_dir=str(reaudit_root / "runs"),
+            output_dir=str(reaudit_root / "artifacts"),
+            target_mode=TargetMode.WORKTREE,
+            overwrite_artifacts=False,
+            normalize=True,
+            normalize_command=normalize_command,
+            semantic_worker=semantic_worker,
+            semantic_egress_policy=semantic_egress_policy,
+        )
+        normalized_path = reaudited.normalization.output_dir if reaudited.normalization else None
+        if normalized_path is None:
+            # The result object does not guarantee an output path, so resolve
+            # the dedicated output namespace deterministically.
+            normalized_file = reaudit_root / "artifacts" / "normalized" / "report_data.json"
+        else:
+            normalized_file = Path(normalized_path) / "report_data.json"
+        if not normalized_file.is_file():
+            raise AutoFixError("Post-fix normalization did not produce report_data.json.")
+        post_report = json.loads(normalized_file.read_text(encoding="utf-8"))
+        key = logical_finding_key(
+            category=candidate.category,
+            subcategory=candidate.subcategory,
+            finding_type=candidate.finding_type,
+            location_file=candidate.location_file,
+        )
+        after_present = finding_present_in_report(post_report, key)
+        snapshot_b = snapshot_b_pre_audit
+
+        completed = complete_ledger(
+            ledger,
+            snapshot_b=snapshot_b,
+            patch_sha256=patch_sha256 or "",
+            changed_files=changed_files,
+            after_present=after_present,
+            worker_receipt=worker_receipt,
+        )
+        write_fix_ledger(root, completed)
+        return completed
+    except Exception as exc:
+        failed = FixLedger(
+            **{
+                **ledger.__dict__,
+                "patch_sha256": patch_sha256,
+                "changed_files": changed_files,
+                "worker_receipt": worker_receipt,
+                "outcome": "FAILED",
+                "lifecycle": "PERSISTING",
+                "reason": str(exc),
+            }
+        )
+        write_fix_ledger(root, failed)
+        # A partially applied patch must never masquerade as FIXED.
+        raise
