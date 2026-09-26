@@ -10,7 +10,21 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Mapping, Optional, Tuple
 
-from .incremental import normalize_input_ref
+def normalize_input_ref(value: str) -> str:
+    text = str(value).strip().replace("\\\\", "/").lstrip("./")
+    if not text:
+        return ""
+    if ":" in text and not (len(text) >= 2 and text[1] == ":"):
+        head, suffix = text.rsplit(":", 1)
+        pieces = suffix.split("-", 1)
+        if suffix.isdigit() or (len(pieces) == 2 and all(part.isdigit() for part in pieces)):
+            text = head
+    if "#L" in text:
+        head, suffix = text.rsplit("#L", 1)
+        pieces = suffix.split("-", 1)
+        if suffix.isdigit() or (len(pieces) == 2 and all(part.isdigit() for part in pieces)):
+            text = head
+    return text
 
 
 class ChangeKind(str, Enum):
