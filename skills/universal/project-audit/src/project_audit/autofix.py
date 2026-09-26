@@ -356,9 +356,7 @@ def run_immutable_fix(
 ) -> FixLedger:
     """Execute exactly one verified P0/P1 fix transaction and re-audit it."""
     from .runtime import _run_full_audit_unlocked
-    from .state_store import AuditWriterLock, StateStore
-
-    store = StateStore(state_dir)
+    from .state_store import AuditWriterLock
     with AuditWriterLock(root / ".audit" / "audit-writer.lock"):
         return _run_immutable_fix_locked(
             root,
@@ -383,13 +381,8 @@ def _run_immutable_fix_locked(
     normalize_command: str,
     execution_state_path: Optional[Path] = None,
 ) -> FixLedger:
+    from .state_store import StateStore
     store = StateStore(state_dir)
-    writer_lock = AuditWriterLock(root / ".audit" / "audit-writer.lock")
-    writer_lock.acquire()
-    try:
-        _run_fix = True
-    finally:
-        pass
     if not store.run_exists(source_run_id):
         raise AutoFixError(f"Source audit run {source_run_id} does not exist.")
 
