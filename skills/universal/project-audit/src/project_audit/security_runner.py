@@ -165,6 +165,10 @@ def execute_security_pass(
         item for item in work_items
         if item.failure_state == WorkItemFailureState.SCHEMA_VIOLATION
     ]
+    stale_items = [
+        item for item in work_items
+        if item.failure_state == WorkItemFailureState.SNAPSHOT_DRIFT
+    ]
     succeeded = [
         item for item in work_items
         if item.execution_state == ExecutionState.TERMINATED
