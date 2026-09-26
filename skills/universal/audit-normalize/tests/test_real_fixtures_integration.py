@@ -37,7 +37,7 @@ def test_real_fixtures_field_level_extraction(audit_v1_path):
             base_dir=audit_v1_path,
         )
 
-        assert res["overall_status"] == "VALID"
+        assert res["schema_validity"] == "VALID"
         assert res["sources_processed"] == 4
         assert res["counts"]["findings"] == 4
         assert res["counts"]["controls"] == 4
@@ -204,7 +204,7 @@ def test_real_fixtures_field_level_extraction(audit_v1_path):
             schema_data = json.load(sf)
         validator = AuditDataValidator(schema_data)
         v_rep = validator.validate_all(data, base_dir=audit_v1_path)
-        assert v_rep["overall_status"] == "VALID"
+        assert v_rep["schema_validity"] == "VALID"
         assert v_rep["validations"]["schema_validation"]["status"] == "PASS"
         assert v_rep["validations"]["semantic_validation"]["status"] == "PASS"
         assert v_rep["validations"]["referential_validation"]["status"] == "PASS"

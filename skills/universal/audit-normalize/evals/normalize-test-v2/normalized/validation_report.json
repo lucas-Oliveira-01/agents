@@ -1,5 +1,8 @@
 {
-  "overall_status": "INVALID",
+  "schema_validity": "INVALID",
+  "execution_validity": "UNKNOWN",
+  "coverage_validity": "UNKNOWN",
+  "security_verdict": "INCOMPLETE",
   "validations": {
     "schema_validation": {
       "status": "FAIL",

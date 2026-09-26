@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Iterable
 
-from .contracts import AuditContract, ExecutionState, LeafFinding
+from .contracts import AuditContract, ExecutionState, LeafFinding, LeafContract
 from .exceptions import SchemaViolationError, SemanticCoverageFailedError
 
 _SEVERITY_ALIASES = {
@@ -13,13 +14,31 @@ _SEVERITY_ALIASES = {
     "HIGH": "P1",
     "MEDIUM": "P2",
     "LOW": "P3",
-    "INFO": "P4",
+    "INFO": "INFO",
     "P0": "P0",
     "P1": "P1",
     "P2": "P2",
     "P3": "P3",
-    "P4": "P4",
+    "P4": "INFO",
 }
+
+
+@dataclass(frozen=True)
+class SemanticPayload:
+    """Transport envelope preserving the exact model output and routing identity."""
+    payload: Any
+    raw_output: str
+    provider: Optional[str] = None
+    model: Optional[str] = None
+
+
+def _raw_output_for(payload: Any) -> str:
+    if isinstance(payload, str):
+        return payload
+    try:
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return repr(payload)
 
 
 def _extract_json_candidates(text: str) -> Iterable[str]:
@@ -74,7 +93,10 @@ def _candidate_from_item(item: Any) -> LeafFinding:
     if not isinstance(item, dict):
         raise SchemaViolationError("Finding candidate must be an object.")
 
-    required = ("title", "category", "description", "severity")
+    required = (
+        "title", "category", "type", "status",
+        "severity", "confidence", "evidence", "description",
+    )
     missing = [field for field in required if not isinstance(item.get(field), str)]
     if missing:
         raise SchemaViolationError(
@@ -136,26 +158,57 @@ class SemanticRecoveryLoop:
     def run(self) -> AuditContract:
         last_error: Optional[Exception] = None
         accumulated_errors: List[Dict[str, Any]] = []
+        last_raw_output: Optional[str] = None
+        last_provider: Optional[str] = None
+        last_model: Optional[str] = None
 
         for attempt in range(1, self._max_attempts + 1):
             try:
-                payload = self._delegate(attempt)
+                delegated = self._delegate(attempt)
+                if isinstance(delegated, SemanticPayload):
+                    payload = delegated.payload
+                    raw_output = delegated.raw_output
+                    provider = delegated.provider
+                    model = delegated.model
+                else:
+                    payload = delegated
+                    raw_output = _raw_output_for(delegated)
+                    provider = None
+                    model = None
+
+                last_raw_output = raw_output
+                last_provider = provider
+                last_model = model
                 findings, raw_errors = parse_leaf_output(payload)
                 accumulated_errors.extend(raw_errors)
+                leaf = LeafContract(
+                    findings=findings,
+                    raw_output=raw_output,
+                )
                 if raw_errors:
                     return AuditContract(
                         state=ExecutionState.PARTIAL_COVERAGE,
                         findings=findings,
                         raw_errors=accumulated_errors,
                         attempts=attempt,
+                        leaf=leaf,
+                        provider=provider,
+                        model=model,
+                        raw_output=raw_output,
                     )
                 return AuditContract(
                     state=ExecutionState.SUCCESS,
                     findings=findings,
                     attempts=attempt,
+                    leaf=leaf,
+                    provider=provider,
+                    model=model,
+                    raw_output=raw_output,
                 )
             except SchemaViolationError as exc:
                 last_error = exc
+                if 'payload' in locals():
+                    last_raw_output = _raw_output_for(payload)
                 accumulated_errors.append({
                     "attempt": attempt,
                     "error_type": type(exc).__name__,
@@ -167,5 +220,9 @@ class SemanticRecoveryLoop:
             findings=[],
             raw_errors=accumulated_errors,
             attempts=self._max_attempts,
+            leaf=LeafContract(findings=[], raw_output=last_raw_output),
+            provider=last_provider,
+            model=last_model,
+            raw_output=last_raw_output,
         )
         raise SemanticCoverageFailedError(result) from last_error

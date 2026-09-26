@@ -26,7 +26,7 @@ def test_run_full_audit_completes_two_pass_runtime_and_writes_artifacts(tmp_path
 
     assert result.security.run.execution_completeness.value == "COMPLETE"
     assert result.security.run.coverage_completeness.value == "FULL"
-    assert len(result.artifacts) == 4
+    assert len(result.artifacts) == 5
     assert all(Path(path).is_file() for path in result.artifacts)
     assert all(not item.path.startswith(".audit/") for item in result.prepared.snapshot.project_state.tracked_input_fingerprints)
 
@@ -80,6 +80,9 @@ def test_run_full_audit_can_explicitly_escalate_semantic_review(tmp_path: Path) 
                 error_message=None,
                 provider_info="fake-semantic/v1",
                 usage_tokens=10,
+                provider="fake-provider",
+                model="fake-model",
+                raw_output="{\"findings\":[{\"title\":\"Semantic review candidate\"}]}",
             )
 
     _write(tmp_path, "src/app.py", "print('ok')\n")
@@ -117,9 +120,11 @@ def test_run_full_audit_can_explicitly_escalate_semantic_review(tmp_path: Path) 
     assert backend.calls >= 1
     assert result.semantic_reviews
     assert any(review.candidates for review in result.semantic_reviews)
-    ledger = Path(result.artifacts[-1]).read_text(encoding="utf-8")
+    ledger = Path(tmp_path / ".audit" / "03_audit_ledger.md").read_text(encoding="utf-8")
     assert "SEM-001" in ledger
     assert "Semantic review candidate" in ledger
+    assert "Provider: fake-provider" in ledger
+    assert "Model: fake-model" in ledger
     import json
     normalized = tmp_path / ".audit" / "normalized"
     assert result.normalization.status == "COMPLETED", result.normalization.stdout
@@ -140,7 +145,7 @@ def test_real_normalizer_preserves_observations_without_inventing_findings(tmp_p
         "output_dir = sys.argv[sys.argv.index('-o') + 1]\n"
         "os.makedirs(output_dir, exist_ok=True)\n"
         "with open(os.path.join(output_dir, 'report_data.json'), 'w') as f: json.dump({'findings': [], 'inspections': []}, f)\n"
-        "with open(os.path.join(output_dir, 'validation_report.json'), 'w') as f: json.dump({'overall_status': 'VALID', 'validations': {}}, f)\n"
+        "with open(os.path.join(output_dir, 'validation_report.json'), 'w') as f: json.dump({'schema_validity': 'VALID', 'execution_validity': 'INCOMPLETE', 'coverage_validity': 'PARTIAL', 'security_verdict': 'INCOMPLETE', 'validations': {}, f)\n"
         "with open(os.path.join(output_dir, 'source_manifest.json'), 'w') as f: json.dump({}, f)\n"
         "with open(os.path.join(output_dir, 'report_data.schema.json'), 'w') as f: json.dump({}, f)\n"
     )
@@ -153,8 +158,8 @@ def test_real_normalizer_preserves_observations_without_inventing_findings(tmp_p
     assert result.normalization.status == "COMPLETED", result.normalization.stdout
     normalized = tmp_path / ".audit" / "normalized"
     validation = json.loads((normalized / "validation_report.json").read_text())
-    assert validation["overall_status"] == "VALID"
-    assert all(axis["status"] == "PASS" for axis in validation.get("validations", {}).values())
+    assert validation["security_verdict"] == "INCOMPLETE"
+    assert "overall_status" not in validation
     data = json.loads((normalized / "report_data.json").read_text())
     assert data["findings"] == []
     assert "inspections" in data

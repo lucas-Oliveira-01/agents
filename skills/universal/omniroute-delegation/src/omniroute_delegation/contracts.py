@@ -100,6 +100,13 @@ class AuditContract(BaseModel):
     workspace_dir: Optional[str] = None
     changed_files: List[str] = Field(default_factory=list)
 
+    # Transport provenance is retained even when semantic validation fails.
+    # "UNREPORTED" means the gateway did not provide an observed model identity;
+    # it is intentionally not presented as a guessed model.
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    raw_output: Optional[str] = None
+
 
 class L3TDelegate:
     """Stateless delegate interface: request in, semantic payload out."""

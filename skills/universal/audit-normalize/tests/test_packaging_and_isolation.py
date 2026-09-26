@@ -108,7 +108,7 @@ Description: State changing POST requests do not require Anti-CSRF token.
             text=True,
         )
         assert cli_run.returncode == 0, f"audit-normalize failed in isolation: {cli_run.stderr}"
-        assert "Status: VALID" in cli_run.stdout
+        assert "Schema validity: VALID" in cli_run.stdout
 
         # Verify all 4 required artifacts exist
         report_data_file = os.path.join(output_dir, "report_data.json")
@@ -123,7 +123,7 @@ Description: State changing POST requests do not require Anti-CSRF token.
 
         with open(val_report_file, "r") as f:
             val_data = json.load(f)
-        assert val_data["overall_status"] == "VALID"
+        assert val_data["schema_validity"] == "VALID"
 
         # 6. Execute audit-validate CLI on the generated artifact
         val_cli_run = subprocess.run(

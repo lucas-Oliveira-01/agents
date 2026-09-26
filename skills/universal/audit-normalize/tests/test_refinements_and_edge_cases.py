@@ -34,7 +34,7 @@ Description: JWT secret key is hardcoded in source repository.
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -84,7 +84,7 @@ Description: Token signature is not verified against public key.
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -144,7 +144,7 @@ Description: Policy does not mandate special characters.
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -202,7 +202,7 @@ Description: Intersects both range 10-30 and range 20-40.
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] in ("VALID", "VALID_WITH_WARNINGS")
+        assert result["schema_validity"] == "VALID"
         assert len(result["errors"]) == 0
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
@@ -262,7 +262,7 @@ Location: src/crypto/cipher.py:102
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -304,7 +304,7 @@ def test_target_project_precedence_resolution():
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -347,7 +347,7 @@ def test_target_project_precedence_tie():
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 
@@ -395,7 +395,7 @@ Location: src/view.py:20
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] in ("VALID", "VALID_WITH_WARNINGS")
+        assert result["schema_validity"] == "VALID"
         assert len(result["errors"]) == 0
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
@@ -467,7 +467,7 @@ Location: src/api/leak.py:15
             base_dir=tmp_dir,
         )
 
-        assert val_result["overall_status"] == "VALID"
+        assert val_result["schema_validity"] == "VALID"
         assert os.path.exists(os.path.join(out_dir, "report_data.json"))
         assert os.path.exists(os.path.join(out_dir, "validation_report.json"))
         assert os.path.exists(os.path.join(out_dir, "source_manifest.json"))
@@ -582,7 +582,7 @@ Description: User authentication utilizes Argon2id password hashing.
             base_dir=tmp_dir,
         )
 
-        assert result["overall_status"] == "VALID"
+        assert result["schema_validity"] == "VALID"
         with open(os.path.join(out_dir, "report_data.json")) as f:
             data = json.load(f)
 

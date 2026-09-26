@@ -86,7 +86,7 @@ flowchart TD
     - Em divergências de valores entre fontes: aplica a política de precedência por ranking de papéis.
     - Em empates de precedência: preserva o conflito não resolvido (`state: CONFLICT`, `value: null`, `conflict_id: CONFLICT-XXX`).
 11. **Derivação de Métricas**: Calcula contagens e distribuições de severidade exclusivamente a partir dos arrays normalizados.
-12. **Validação**: Executa o validador independente em todos os 4 eixos contratuais.
+12. **Validação**: Executa o validador independente nos quatro eixos de validação e deriva separadamente `schema_validity`, `execution_validity`, `coverage_validity` e `security_verdict`.
 13. **Emissão de Artefatos**: Grava os arquivos canônicos formatados deterministicamente.
 
 ---
@@ -148,6 +148,9 @@ audit-normalize -i relatorio1.md relatorio2.md -o output/
 # Modo estrito (falha se houver qualquer aviso/anomalia não bloqueante)
 audit-normalize -i docs/audit -o docs/audit/normalized --strict
 
+# Project Audit pode fornecer o estado de execução para impedir falso-limpo.
+audit-normalize -i docs/audit -o docs/audit/normalized --execution-state .audit/audit_execution_state.json
+
 # Execução alternativa como módulo Python
 python3 -m audit_normalize -i docs/audit -o docs/audit/normalized
 ```
@@ -192,17 +195,19 @@ results = validator.validate_all(data, base_dir=".")
 O processo de validação é desacoplado e cobre 4 dimensões obrigatórias:
 
 1. **JSON Schema**: Valida sintaxe e restrições estruturais contra `report_data.schema.json` utilizando o validador oficial Draft 2020-12.
-2. **Validação Semântica**:
+2. **Validade de Execução e Cobertura**: Quando disponível, consome o estado do `project-audit` e deriva independentemente `execution_validity` e `coverage_validity`.
+3. **Veredito de Segurança**: `security_verdict` só pode ser `COMPLETE_CLEAN` quando execução, cobertura e validações forem completas e válidas; falhas relevantes resultam em `INCOMPLETE`.
+4. **Validação Semântica**:
    - `metrics.findings_total == len(findings)`
    - Contagens de severidade (`P0`, `P1`, `P2`, `P3`, `INFO`) coincidem exatamente com a soma das severidades dos achados.
    - Estados de informação satisfazem seus contratos (`PRESENT` exige valor não nulo; `NOT_DETERMINABLE` exige `reason`; `CONFLICT` exige `conflict_id`).
    - `NOT_FOUND` é estritamente proibido como status de finding.
    - Em localizações com range, `line_end >= line_start`.
-3. **Validação Referencial**:
+5. **Validação Referencial**:
    - Todo `source_id` em proveniências e conflitos existe em `audit_snapshot.sources`.
    - Todo `conflict_id` referenciado em campos aponta para uma entrada existente em `conflicts[]`.
    - Conflitos com `finding_id` apontam para achados existentes.
-4. **Validação de Integridade**:
+6. **Validação de Integridade**:
    - Hashes SHA-256 batem com os bytes dos arquivos em disco.
    - O `snapshot_id` coincide com o hash do manifesto canônico.
 
@@ -215,5 +220,6 @@ O processo de validação é desacoplado e cobre 4 dimensões obrigatórias:
   - Não executa auditoria de código, não inspeciona o repositório e não gera findings sintéticos.
 - **Formato Inválido ou Corrompido**:
   - Registra anomalia formal do tipo `SOURCE_FORMAT_ANOMALY`.
-  - Se os dados mínimos necessários puderem ser extraídos com segurança, prossegue com estado `VALID_WITH_WARNINGS`.
-  - Se a falha violar regras estruturais obrigatórias do Schema, o dataset é classificado como `INVALID` e a execução é interrompida com código de erro.
+  - A validade estrutural é reportada em `schema_validity`.
+  - Falhas de execução, erros semânticos, erros de infraestrutura ou cobertura insuficiente não podem ser convertidos em `COMPLETE_CLEAN`.
+  - Um `validation_report.json` estruturalmente válido ainda pode ter `security_verdict: INCOMPLETE`.

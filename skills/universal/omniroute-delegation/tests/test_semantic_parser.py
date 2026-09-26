@@ -15,6 +15,8 @@ def finding(title="Finding", severity="HIGH"):
     return {
         "title": title,
         "category": "SECURITY",
+        "type": "VULNERABILITY",
+        "status": "PROBABLE",
         "description": "Observed security issue.",
         "severity": severity,
         "confidence": "HIGH",
@@ -46,7 +48,7 @@ def test_preserves_valid_findings_and_isolates_invalid_items():
     findings, errors = parse_leaf_output(
         [
             finding(title="Valid"),
-            {"title": "Invalid", "category": "SECURITY", "description": "bad", "severity": "VERY_BAD"},
+            {"title": "Invalid", "category": "SECURITY", "type": "VULNERABILITY", "status": "PROBABLE", "description": "bad", "severity": "VERY_BAD", "confidence": "LOW", "evidence": "bad"},
         ]
     )
     assert [item.title for item in findings] == ["Valid"]
@@ -68,6 +70,9 @@ def test_recovery_failure_never_becomes_zero_finding_success():
     assert exc.value.result.state == ExecutionState.SCHEMA_VIOLATION
     assert exc.value.result.attempts == 2
     assert exc.value.result.raw_errors
+    assert exc.value.result.raw_output == "not json"
+    assert exc.value.result.leaf is not None
+    assert exc.value.result.leaf.raw_output == "not json"
 
 
 def test_partial_result_is_explicit():
@@ -79,3 +84,5 @@ def test_partial_result_is_explicit():
     assert result.state == ExecutionState.PARTIAL_COVERAGE
     assert len(result.findings) == 1
     assert len(result.raw_errors) == 1
+    assert result.leaf is not None
+    assert result.leaf.raw_output

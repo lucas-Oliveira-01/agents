@@ -21,7 +21,14 @@
       "enum": ["VALID", "STALE", "INVALID", "NOT_DETERMINABLE"]
     },
     "provenance": { "$ref": "shared.schema.json#/$defs/provenance" },
-    "fingerprint": { "$ref": "shared.schema.json#/$defs/fingerprint" }
+    "fingerprint": { "$ref": "shared.schema.json#/$defs/fingerprint" },
+    "provider": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "raw_output": { "type": "string" },
+    "raw_output_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
   },
   "required": [
     "evidence_id", "target_snapshot_ref", "work_item_ref",

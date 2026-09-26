@@ -39,6 +39,9 @@ def test_backend_delegates_only_through_gateway():
     result = backend.delegate(_request())
 
     assert result.status == DelegationStatus.SUCCESS
+    assert result.provider == "omniroute"
+    assert result.model == "UNREPORTED"
+    assert result.raw_output == '{"findings": []}'
     assert gateway.calls
     task = gateway.calls[0]
     assert task.task_id == "test-req"
@@ -78,6 +81,9 @@ def test_backend_preserves_partial_audit_contract():
     assert result.audit_contract.state == ExecutionState.PARTIAL_COVERAGE
     assert len(result.audit_contract.findings) == 1
     assert result.audit_contract.raw_errors
+    assert result.raw_output == "not json"
+    assert result.raw_output is not None
+    assert result.audit_contract.raw_output == result.raw_output
     assert result.output_payload["findings"][0]["title"] == "Valid finding"
 
 

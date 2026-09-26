@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -21,17 +22,72 @@ OBSERVED_PROFILES = frozenset({"cheap", "fast", "coding", "coding:pro", "smart"}
 
 VALID_CACHE_MODES = frozenset({"native", "bypass", "deterministic"})
 
-# Patterns that suggest credentials in context
-_CREDENTIAL_PATTERNS = [
-    re.compile(r"(?:api[_-]?key|apikey)\s*[:=]\s*\S+", re.IGNORECASE),
-    re.compile(r"(?:password|passwd|pwd)\s*[:=]\s*\S+", re.IGNORECASE),
-    re.compile(r"(?:secret|token)\s*[:=]\s*\S+", re.IGNORECASE),
-    re.compile(r"(?:bearer|authorization)\s*[:=]\s*\S+", re.IGNORECASE),
-    re.compile(r"-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----", re.IGNORECASE),
-    re.compile(r"ghp_[A-Za-z0-9]{36,}", re.IGNORECASE),
-    re.compile(r"sk-[A-Za-z0-9]{20,}", re.IGNORECASE),
-    re.compile(r"AIza[A-Za-z0-9_-]{35}", re.IGNORECASE),
-]
+# Credential patterns are intentionally context-aware. A security gate must
+# protect real secret material without treating ordinary source-code identifiers
+# (for example, String token = request.getToken()) as credentials.
+#
+# Exact provider formats remain high-confidence matches. Generic secrets are
+# blocked only when a credential label is assigned a long/high-entropy literal.
+_CREDENTIAL_LITERAL_LABELS = (
+    "api[_-]?key",
+    "apikey",
+    "password",
+    "passwd",
+    "pwd",
+    "secret",
+    "token",
+    "access[_-]?token",
+    "refresh[_-]?token",
+)
+
+_LABELED_LITERAL_PATTERN = re.compile(
+    r"""\b(?:%s)\b\s*[:=]\s*(['"])(?P<value>[^'"]{12,})(?=\1)"""
+    % "|".join(_CREDENTIAL_LITERAL_LABELS),
+    re.IGNORECASE,
+)
+
+_BEARER_LITERAL_PATTERN = re.compile(
+    r"""\b(?:bearer|authorization)\b\s*[:=]\s*bearer\s+(?P<value>[A-Za-z0-9._~+/=-]{20,})\b""",
+    re.IGNORECASE,
+)
+
+_EXACT_CREDENTIAL_PATTERNS = (
+    ("private-key", re.compile(r"-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----", re.IGNORECASE)),
+    ("github-token", re.compile(r"gh[pousr]_[A-Za-z0-9_]{20,}", re.IGNORECASE)),
+    ("openai-token", re.compile(r"sk-[A-Za-z0-9]{20,}", re.IGNORECASE)),
+    ("gcp-api-key", re.compile(r"AIza[A-Za-z0-9_-]{35}", re.IGNORECASE)),
+    ("aws-access-key", re.compile(r"AKIA[0-9A-Z]{16}", re.IGNORECASE)),
+    ("gitlab-token", re.compile(r"glpat-[A-Za-z0-9_-]{20,}", re.IGNORECASE)),
+    ("slack-token", re.compile(r"xox[baprs]-[A-Za-z0-9-]{20,}", re.IGNORECASE)),
+    ("jwt", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}", re.IGNORECASE)),
+)
+
+_GENERIC_SECRET_MIN_LENGTH = 16
+_GENERIC_SECRET_MIN_ENTROPY = 3.0
+
+
+def _shannon_entropy(value: str) -> float:
+    """Return Shannon entropy (bits per character) for a secret candidate."""
+    if not value:
+        return 0.0
+    counts: Dict[str, int] = {}
+    for char in value:
+        counts[char] = counts.get(char, 0) + 1
+    length = len(value)
+    entropy = 0.0
+    for count in counts.values():
+        probability = count / length
+        entropy -= probability * math.log2(probability)
+    return entropy
+
+
+def _looks_like_high_entropy_secret(value: str) -> bool:
+    """Require both length and entropy before treating a generic literal as secret material."""
+    normalized = value.strip()
+    return (
+        len(normalized) >= _GENERIC_SECRET_MIN_LENGTH
+        and _shannon_entropy(normalized) >= _GENERIC_SECRET_MIN_ENTROPY
+    )
 
 # Task template
 _TASK_TEMPLATE = """Objective: {objective}
@@ -272,12 +328,31 @@ class TaskBuilder:
             return SecurityScanResult(is_clean=True)
 
         findings: List[str] = []
-        for pattern in _CREDENTIAL_PATTERNS:
-            matches = pattern.findall(text)
-            if matches:
-                # Don't include the actual credential in the finding
-                findings.append(f"Potential credential pattern detected: {pattern.pattern}")
 
+        # High-confidence provider formats and key material always block.
+        for name, pattern in _EXACT_CREDENTIAL_PATTERNS:
+            if pattern.search(text):
+                findings.append(f"Potential credential pattern detected: {name}")
+
+        # Generic assignments only block when the RHS is an actual quoted
+        # literal that is sufficiently long and information-dense. This avoids
+        # source-code false positives such as:
+        #   String token = request.getToken();
+        #   authorization = request.getHeader("Authorization");
+        for match in _LABELED_LITERAL_PATTERN.finditer(text):
+            value = match.group("value")
+            if _looks_like_high_entropy_secret(value):
+                findings.append("Potential credential pattern detected: high-entropy credential literal")
+
+        # Preserve compatibility with common Bearer material while avoiding
+        # identifier/method expressions.
+        for match in _BEARER_LITERAL_PATTERN.finditer(text):
+            value = match.group("value")
+            if _looks_like_high_entropy_secret(value) or len(value) >= 20:
+                findings.append("Potential credential pattern detected: bearer token")
+
+        # De-duplicate findings when the same literal matches multiple rules.
+        findings = list(dict.fromkeys(findings))
         return SecurityScanResult(
             is_clean=len(findings) == 0,
             findings=findings,
