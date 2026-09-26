@@ -14,7 +14,7 @@ import ctypes
 import json
 import os
 import signal
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 
 def _set_parent_death_signal(signum: int) -> None:
