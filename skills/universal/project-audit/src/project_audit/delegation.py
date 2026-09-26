@@ -167,11 +167,16 @@ class WorkerPort:
             raw = json.dumps(result.output_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
             fp = hashlib.sha256(raw).hexdigest()
 
+            source_refs = ()
+            target_ref = context_payload.get("target")
+            if isinstance(target_ref, str) and target_ref.strip():
+                source_refs = (target_ref,)
+
             evidence = Evidence(
                 evidence_id=str(uuid.uuid4()),
                 target_snapshot_ref=target_snapshot_ref,
                 work_item_ref=work_item.work_item_id,
-                source_refs=(),
+                source_refs=source_refs,
                 dependencies=(),
                 validity=EvidenceValidity.NOT_DETERMINABLE,
                 provenance=Provenance(
