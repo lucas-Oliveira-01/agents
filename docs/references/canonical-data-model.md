@@ -76,8 +76,12 @@ Answers: *"What objective fact was observed?"*
   - *Note: Evidence is an objective observation, not a technical conclusion.*
 - `FindingFingerprint`:
   - A stable identity descriptor (same logical problem across text refactors). Does not embed the full finding narrative.
+- `FindingStatus`:
+  - Epistemic state: `CANDIDATE`, `PROBABLE`, `CONFIRMED`, `REJECTED`, `NOT_DETERMINABLE`.
+  - Must remain independent from lifecycle.
 - `FindingLifecycle`:
-  - E.g., `NEW`, `PERSISTING`, `FIXED`.
+  - Historical state: `NEW`, `PERSISTING`, `MODIFIED`, `FIXED`, `REGRESSED`, `INVALIDATED`.
+  - `INVALIDATED` is not evidence that the finding is fixed; `REGRESSED` requires a prior `FIXED`.
 
 ---
 
