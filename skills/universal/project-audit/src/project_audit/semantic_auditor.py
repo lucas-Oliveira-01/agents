@@ -292,14 +292,17 @@ class SemanticAuditor:
         provider = (
             (delegated_result.provider if delegated_result is not None else None)
             or (audit_contract.provider if audit_contract is not None else None)
+            or (delegated_evidence.provider if delegated_evidence is not None else None)
         )
         model = (
             (delegated_result.model if delegated_result is not None else None)
             or (audit_contract.model if audit_contract is not None else None)
+            or (delegated_evidence.model if delegated_evidence is not None else None)
         )
         raw_output = (
             (delegated_result.raw_output if delegated_result is not None else None)
             or (audit_contract.raw_output if audit_contract is not None else None)
+            or (delegated_evidence.raw_output if delegated_evidence is not None else None)
         )
 
         if receipt.exit_code == 126:
