@@ -21,7 +21,7 @@ from .report_writer import write_audit_artifacts
 from .security_runner import SecurityPassResult, execute_security_pass
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 from .verifier import VerificationResult, candidate_identity, consolidated_reviews, verify_semantic_reviews
-from .state_store import StateStore
+from .state_store import AuditWriterLock, StateStore
 
 
 @dataclass(frozen=True)
@@ -72,7 +72,7 @@ def initialize_audit_repository(root: Path, vault: Path) -> None:
         raise ValueError(".audit must own its isolated Git repository")
 
 
-def run_full_audit(
+def _run_full_audit_unlocked(
     target: str,
     *,
     state_dir: Optional[str] = None,
@@ -283,3 +283,31 @@ def run_full_audit(
         semantic_reviews=semantic_reviews,
         verification_results=verification_results,
     )
+
+def run_full_audit(
+    target: str,
+    *,
+    state_dir: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    target_mode: TargetMode = TargetMode.WORKTREE,
+    overwrite_artifacts: bool = False,
+    normalize: bool = False,
+    normalize_command: str = "audit-normalize",
+    semantic_worker: Optional[SemanticAuditor] = None,
+    semantic_egress_policy: Optional[EgressPolicy] = None,
+) -> FullAuditResult:
+    """Execute one complete audit while holding the physical audit writer lock."""
+    root, vault, _, _ = audit_paths(target, state_dir, output_dir)
+    with AuditWriterLock(vault / "audit-writer.lock"):
+        return _run_full_audit_unlocked(
+            target,
+            state_dir=state_dir,
+            output_dir=output_dir,
+            target_mode=target_mode,
+            overwrite_artifacts=overwrite_artifacts,
+            normalize=normalize,
+            normalize_command=normalize_command,
+            semantic_worker=semantic_worker,
+            semantic_egress_policy=semantic_egress_policy,
+        )
+

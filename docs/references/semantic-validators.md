@@ -90,3 +90,17 @@ and a concrete location is grounded in Evidence.source_refs. The verifier never 
 produce REJECTED or NOT_DETERMINABLE. Unverified P0/P1 candidates are excluded from the consolidated semantic set while
 the verifier result remains auditable in the execution state and Ledger.
 
+## Phase 6 — Operational Concurrency and Recovery
+
+The writer boundary is now physical, not merely conventional:
+
+- AuditWriterLock serializes a complete audit execution within one .audit namespace.
+- Lock acquisition is non-blocking and fails closed when another writer is active.
+- The lock file is diagnostic only; recovery never infers staleness from its PID contents.
+- Canonical state writes fsync the temporary file before atomic replacement and fsync the parent directory when supported.
+- AuditRun=RUNNING is persisted before the first WorkItem executes.
+- Orchestrator.prepare_recovery() reconstructs a fresh Plan/WorkItem/Run graph with recovery_from_ref instead of mutating the interrupted run.
+- Completed WorkItems are preserved on replay; unresolved items return to PLANNED.
+- A completed WorkItem is not executed again during replay, preventing accidental duplicate execution.
+
+These rules are operational invariants in addition to the semantic validators in Sections 1–9.

@@ -61,4 +61,8 @@ __all__ = [
     "IndependentVerifier", "VerificationResult", "VerificationVerdict", "candidate_identity", "verify_semantic_reviews", "consolidated_reviews",
     "AutoFixError", "FixCandidate", "FixLedger", "logical_finding_key", "run_immutable_fix",
     "decide_incremental_action", "build_dependency_graph", "plan_incremental_actions",
+    "AuditWriterLock", "StateStoreBusyError", "RecoveryBundle",
 ]
+
+from .state_store import AuditWriterLock, StateStoreBusyError
+from .orchestrator import RecoveryBundle

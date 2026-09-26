@@ -355,9 +355,33 @@ def run_immutable_fix(
     execution_state_path: Optional[Path] = None,
 ) -> FixLedger:
     """Execute exactly one verified P0/P1 fix transaction and re-audit it."""
-    from .runtime import run_full_audit
-    from .state_store import StateStore
+    from .state_store import AuditWriterLock
+    with AuditWriterLock(root / ".audit" / "audit-writer.lock"):
+        return _run_immutable_fix_locked(
+            root,
+            state_dir=state_dir,
+            source_run_id=source_run_id,
+            candidate_id=candidate_id,
+            semantic_worker=semantic_worker,
+            semantic_egress_policy=semantic_egress_policy,
+            normalize_command=normalize_command,
+            execution_state_path=execution_state_path,
+        )
 
+
+def _run_immutable_fix_locked(
+    root: Path,
+    *,
+    state_dir: Path,
+    source_run_id: str,
+    candidate_id: str,
+    semantic_worker: Any,
+    semantic_egress_policy: Any,
+    normalize_command: str,
+    execution_state_path: Optional[Path] = None,
+) -> FixLedger:
+    from .runtime import _run_full_audit_unlocked
+    from .state_store import StateStore
     store = StateStore(state_dir)
     if not store.run_exists(source_run_id):
         raise AutoFixError(f"Source audit run {source_run_id} does not exist.")
@@ -435,7 +459,7 @@ def run_immutable_fix(
         # run's immutable artifacts are never overwritten.
         snapshot_b_pre_audit = current_snapshot(root, target_mode=TargetMode.WORKTREE)
         reaudit_root = root / ".audit" / "fixes" / ledger.fix_id / "reaudit"
-        reaudited = run_full_audit(
+        reaudited = _run_full_audit_unlocked(
             str(root),
             state_dir=str(reaudit_root / "runs"),
             output_dir=str(reaudit_root / "artifacts"),

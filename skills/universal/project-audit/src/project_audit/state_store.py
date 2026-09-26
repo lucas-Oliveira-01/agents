@@ -28,6 +28,9 @@ import json
 import os
 import tempfile
 from pathlib import Path
+from contextlib import AbstractContextManager
+import socket
+import time
 from typing import Dict, List, Optional
 
 from .models import (
@@ -71,6 +74,76 @@ class StateStoreError(RuntimeError):
     """Raised on state store I/O or corruption errors."""
 
 
+class StateStoreBusyError(StateStoreError):
+    """Raised when another orchestrator already owns the audit writer lock."""
+
+
+class AuditWriterLock(AbstractContextManager):
+    """Physical single-writer lock for one .audit state namespace.
+
+    POSIX flock is released by the kernel when the owning process exits, so a
+    crashed writer does not leave a logically stale lock requiring PID guessing.
+    """
+
+    def __init__(self, lock_path: Path) -> None:
+        self.path = Path(lock_path)
+        self._handle = None
+
+    def acquire(self) -> "AuditWriterLock":
+        if os.name != "posix":
+            raise RuntimeError("Physical audit writer locking requires POSIX flock.")
+        import fcntl
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        handle = self.path.open("a+", encoding="utf-8")
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            handle.close()
+            raise StateStoreBusyError(
+                f"Audit writer lock is already held: {self.path}"
+            ) from exc
+
+        handle.seek(0)
+        handle.truncate()
+        handle.write(
+            json.dumps(
+                {
+                    "pid": os.getpid(),
+                    "host": socket.gethostname(),
+                    "acquired_at": time.time(),
+                },
+                sort_keys=True,
+            )
+            + "\n"
+        )
+        handle.flush()
+        os.fsync(handle.fileno())
+        self._handle = handle
+        return self
+
+    def release(self) -> None:
+        if self._handle is None:
+            return
+        import fcntl
+
+        try:
+            self._handle.seek(0)
+            self._handle.truncate()
+            self._handle.flush()
+            os.fsync(self._handle.fileno())
+        finally:
+            fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+            self._handle.close()
+            self._handle = None
+
+    def __enter__(self) -> "AuditWriterLock":
+        return self.acquire()
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.release()
+
+
 def _atomic_write(path: Path, data: dict) -> None:
     """
     Atomic write via tempfile + rename.
@@ -85,7 +158,18 @@ def _atomic_write(path: Path, data: dict) -> None:
         with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
             f.write("\n")
-        os.rename(tmp_path, str(path))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, str(path))
+        try:
+            dir_fd = os.open(path.parent, os.O_DIRECTORY)
+        except (AttributeError, OSError):
+            dir_fd = None
+        if dir_fd is not None:
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
     except Exception:
         try:
             os.unlink(tmp_path)
