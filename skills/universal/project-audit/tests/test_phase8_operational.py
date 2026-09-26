@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, Tuple
 from uuid import uuid4
@@ -273,9 +274,11 @@ def _lifecycle_run(snapshot_ref: str, run_id: str) -> AuditRun:
 
 
 def test_finding_lifecycle_exercises_new_persisting_modified_fixed_regressed(tmp_path) -> None:
-    from tests.conftest import make_project_state, make_methodology_state
-
-    snapshot = build_target_snapshot(discover(str(tmp_path)))
+    target = tmp_path / "lifecycle"
+    target.mkdir()
+    (target / "src").mkdir()
+    (target / "src/auth.py").write_text("def authenticate(value):\\n    return value\\n", encoding="utf-8")
+    snapshot = build_target_snapshot(discover(str(target)))
     plan = AuditPlan(
         plan_id="plan",
         target_snapshot_ref=snapshot.snapshot_fingerprint,
@@ -323,8 +326,7 @@ def test_finding_lifecycle_exercises_new_persisting_modified_fixed_regressed(tmp
             validity=EvidenceValidity.VALID,
             provenance=Provenance(
                 actor="phase8-fixture",
-                generated_at=snapshot.project_state.tracked_input_fingerprints[0].fingerprint
-                and __import__("datetime").datetime(2026, 9, 26, tzinfo=__import__("datetime").timezone.utc),
+                generated_at=datetime(2026, 9, 26, tzinfo=timezone.utc),
             ),
             fingerprint=hashlib.sha256(b"fixture").hexdigest(),
         )
