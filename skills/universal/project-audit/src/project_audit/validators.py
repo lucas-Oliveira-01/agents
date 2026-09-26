@@ -1145,13 +1145,13 @@ def validate_run(
     """Run all semantic validators applicable to an AuditRun."""
     known_run_ids = known_run_ids or []
     interrupted_run_ids = interrupted_run_ids or []
+    # Run persistence can occur during intermediate execution states. The
+    # terminal, full graph invariants (scope derivation and coverage derivation)
+    # are enforced by validate_state_graph once all Evidence is available.
     results = [
         validate_run_not_complete_with_running_items(run, work_items),
         validate_run_work_item_references(run, plan, work_items),
-        validate_plan_scope_resolution(plan),
-        validate_work_item_scope_membership(plan, work_items),
         validate_coverage_not_full_with_blocked_items(run, work_items),
-        validate_coverage_completeness_derivable(run, plan, work_items),
         validate_run_recovery_ref(run, known_run_ids, interrupted_run_ids),
         validate_run_previous_ref_distinct_from_recovery(run),
     ]
