@@ -13,6 +13,9 @@ from typing import Any, Dict, List, Optional, Sequence
 import httpx
 import jsonschema
 
+from .exceptions import CredentialLeakPreventedError, SchemaViolationError
+from .task_builder import TaskBuilder
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -23,7 +26,7 @@ MCP_PROTOCOL_VERSION = "2024-11-05"
 
 CLIENT_INFO = {
     "name": "omniroute-delegation",
-    "version": "1.0.0",
+    "version": "1.1.0",
 }
 
 
@@ -476,9 +479,19 @@ class MCPClient:
         if tool_name not in self._session.tools:
             raise MCPProtocolError(f"Tool '{tool_name}' was not discovered.")
         if arguments is not None:
+            credential_findings = []
+            for field_name, value in arguments.items():
+                if isinstance(value, str):
+                    scan = TaskBuilder.scan_for_credentials(value)
+                    credential_findings.extend(
+                        field_name + ": " + finding for finding in scan.findings
+                    )
+            if credential_findings:
+                raise CredentialLeakPreventedError(credential_findings)
+
             errors = self.validate_tool_params(tool_name, arguments)
             if errors:
-                raise MCPProtocolError("Invalid tool parameters: " + "; ".join(errors))
+                raise SchemaViolationError("; ".join(errors))
 
         params: Dict[str, Any] = {"name": tool_name}
         if arguments:

@@ -5,3 +5,4 @@
 # Runtime dependencies:
 httpx>=0.24
 jsonschema>=4.18
+pydantic>=2.7
