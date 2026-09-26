@@ -80,6 +80,7 @@ class LeafContract(BaseModel):
 
     model_config = ConfigDict(extra="allow")
     findings: List[LeafFinding] = Field(default_factory=list)
+    raw_output: Optional[str] = None
 
 
 class AuditContract(BaseModel):
@@ -91,6 +92,10 @@ class AuditContract(BaseModel):
     raw_errors: List[Dict[str, Any]] = Field(default_factory=list)
     attempts: int = 0
     delegate_kind: DelegateKind = DelegateKind.L3T
+    leaf: Optional[LeafContract] = None
+    worker_id: Optional[str] = None
+    workspace_dir: Optional[str] = None
+    changed_files: List[str] = Field(default_factory=list)
 
 
 class L3TDelegate:
@@ -103,7 +108,7 @@ class L3TDelegate:
 
 
 class L3WDelegate:
-    """Future stateful worker interface with isolated workspace/harness."""
+    """Stateful worker interface with isolated workspace and harness."""
 
     kind = DelegateKind.L3W
 
@@ -112,5 +117,5 @@ class L3WDelegate:
         task: DelegationTask,
         workspace_dir: str,
         harness: Any,
-    ) -> Any:
+    ) -> AuditContract:
         raise NotImplementedError
