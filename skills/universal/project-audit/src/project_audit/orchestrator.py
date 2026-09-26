@@ -552,6 +552,9 @@ class Orchestrator:
         if any_semantic:
             run.execution_completeness = RunExecutionCompleteness.PARTIAL
             run.failure_state = RunFailureState.SEMANTIC_COVERAGE_FAILED
+        elif any_stale:
+            run.execution_completeness = RunExecutionCompleteness.PARTIAL
+            run.failure_state = RunFailureState.NONE
         elif any_failed and not any_succeeded:
             # All executed items failed (no partial success)
             run.execution_completeness = RunExecutionCompleteness.FAILED
