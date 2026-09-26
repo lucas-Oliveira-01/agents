@@ -30,10 +30,14 @@ def execute_semantic_review(
     work_items = work_items if work_items is not None else [work_item]
     orchestrator.check_target_unchanged(discovery.root, run, plan, work_items)
 
-    orchestrator.commit_work_item(work_item)
-    started = datetime.now(timezone.utc)
-    attempt = work_item.start_attempt(started_at=started)
-    orchestrator.commit_work_item(work_item)
+    if work_item.attempts and not work_item.attempts[-1].is_finished:
+        attempt = work_item.attempts[-1]
+        started = attempt.started_at
+    else:
+        orchestrator.commit_work_item(work_item)
+        started = datetime.now(timezone.utc)
+        attempt = work_item.start_attempt(started_at=started)
+        orchestrator.commit_work_item(work_item)
 
     context = build_context(discovery, work_item.target_surface)
     result = worker.review(work_item, run, context)
