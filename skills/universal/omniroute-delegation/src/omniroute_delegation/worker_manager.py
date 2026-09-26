@@ -133,6 +133,7 @@ class SandboxPolicy:
     )
     writable_paths: Sequence[str] = ()
     additional_read_only_paths: Sequence[str] = ()
+    writable_bindings: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -396,6 +397,10 @@ class WorkerManager:
         for path in policy.writable_paths:
             if os.path.exists(path):
                 wrapped.extend(["--bind", path, path])
+
+        for host_path, sandbox_path in policy.writable_bindings.items():
+            if os.path.exists(host_path):
+                wrapped.extend(["--bind", host_path, sandbox_path])
 
         wrapped.extend(
             [
