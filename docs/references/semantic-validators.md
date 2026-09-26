@@ -79,3 +79,14 @@ Finding lifecycle is independent from finding epistemic status. The lifecycle mo
 
 Evidence persistence also enforces exact WorkItem and TargetSnapshot references, and the
 optional raw model-output hash is verified deterministically.
+## Phase 4 — Independent Verification Gate
+
+Before publication/consolidation, semantic candidates pass through a verifier that is independent of the auditor's narrative.
+The verifier consumes the canonical Evidence associated with the WorkItem and exact TargetSnapshot. It does not use raw
+LLM output, provider/model metadata, description, impact, or recommendation as proof.
+
+P0/P1 candidates cross the consolidation gate only when their existing epistemic state is CONFIRMED, confidence is HIGH,
+and a concrete location is grounded in Evidence.source_refs. The verifier never promotes a candidate; unsuccessful checks
+produce REJECTED or NOT_DETERMINABLE. Unverified P0/P1 candidates are excluded from the consolidated semantic set while
+the verifier result remains auditable in the execution state and Ledger.
+
