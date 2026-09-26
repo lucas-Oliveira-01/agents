@@ -140,12 +140,13 @@ def test_breaking_contract_change_requires_reaudit(target_snapshot, work_item):
 
 
 def test_auditor_version_change_requires_revalidate(target_snapshot, work_item):
+    previous = _base_with_dependencies(target_snapshot, auditor=work_item.auditor)
     previous_method = MethodologyState(
-        audit_contract_version=target_snapshot.methodology_state.audit_contract_version,
+        audit_contract_version=previous.methodology_state.audit_contract_version,
         auditor_versions={work_item.auditor: "0.1.0"},
-        policy_version=target_snapshot.methodology_state.policy_version,
+        policy_version=previous.methodology_state.policy_version,
     )
-    previous = _snapshot(target_snapshot, methodology=previous_method)
+    previous = _snapshot(previous, methodology=previous_method)
     evidence = _evidence_for(previous, work_item)
     current_method = MethodologyState(
         audit_contract_version=previous_method.audit_contract_version,
@@ -178,7 +179,11 @@ def test_invalid_evidence_has_highest_precedence(target_snapshot, work_item):
 
 
 def test_missing_dependency_context_fails_safe_to_reaudit(target_snapshot, work_item):
-    empty = _evidence_for(target_snapshot, work_item)
+    empty = dataclasses.replace(
+        _evidence_for(target_snapshot, work_item),
+        source_refs=(),
+        dependencies=(),
+    )
     assert not empty.source_refs and not empty.dependencies
     assert decide_incremental_action(
         empty, target_snapshot, target_snapshot, work_item.auditor
