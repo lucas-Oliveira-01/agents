@@ -158,3 +158,85 @@ def test_full_audit_can_reuse_safe_evidence_from_previous_run(tmp_path):
         if evidence.derived_from_evidence_ref
     ]
     assert reused
+
+
+
+def test_reused_finding_is_preserved_in_current_run(state_store, audit_plan, work_item, target_snapshot):
+    from datetime import datetime, timezone
+    from project_audit.finding_lifecycle import preserve_reused_findings
+    from project_audit.models import (
+        AuditRun,
+        FindingFingerprint,
+        FindingLifecycle,
+        FindingRecord,
+        FindingStatus,
+        RunBudgetState,
+        RunCoverageCompleteness,
+        RunExecutionCompleteness,
+        RunFailureState,
+        RunPublicationState,
+    )
+
+    previous_run_ref = "00000000-0000-0000-0000-000000000099"
+    current_run = AuditRun(
+        run_id="00000000-0000-0000-0000-000000000100",
+        target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+        plan_ref=audit_plan.plan_id,
+        work_item_refs=[work_item.work_item_id],
+        execution_completeness=RunExecutionCompleteness.COMPLETE,
+        coverage_completeness=RunCoverageCompleteness.FULL,
+        failure_state=RunFailureState.NONE,
+        budget_state=RunBudgetState.HEALTHY,
+        publication_state=RunPublicationState.NOT_PUBLISHED,
+    )
+    fingerprint = FindingFingerprint(
+        domain="SECURITY",
+        control_surface="AUTHENTICATION",
+        defect_type="VULNERABILITY",
+    )
+    from project_audit.finding_lifecycle import finding_key
+    key = finding_key(fingerprint)
+    now = datetime(2026, 9, 26, tzinfo=timezone.utc)
+    record = FindingRecord(
+        finding_key=key,
+        fingerprint=fingerprint,
+        status=FindingStatus.CONFIRMED,
+        lifecycle=FindingLifecycle.PERSISTING,
+        run_ref=previous_run_ref,
+        evidence_ref=None,
+        first_seen=now,
+        last_seen=now,
+        previous_lifecycle=FindingLifecycle.NEW,
+        severity="P1",
+        history=(FindingLifecycle.NEW, FindingLifecycle.PERSISTING),
+    )
+    state_store.save_finding_record(record)
+
+    security_item = dataclasses.replace(
+        work_item,
+        target_surface="SECURITY/AUTHENTICATION",
+        work_item_id="00000000-0000-0000-0000-000000000101",
+    )
+    prior_evidence = make_evidence(
+        target_snapshot_ref=target_snapshot.snapshot_fingerprint,
+        work_item_ref="00000000-0000-0000-0000-000000000099",
+    )
+    current_evidence = derive_reused_evidence(
+        prior_evidence,
+        target_snapshot,
+        security_item,
+        generated_at=now,
+    )
+
+    preserved = preserve_reused_findings(
+        state_store,
+        current_run,
+        previous_run_ref,
+        [security_item],
+        {security_item.work_item_id: current_evidence},
+    )
+    assert key in preserved
+    current = state_store.load_finding_record(key)
+    assert current.lifecycle == FindingLifecycle.PERSISTING
+    assert current.run_ref == current_run.run_id
+    assert current.evidence_ref == current_evidence.evidence_id
