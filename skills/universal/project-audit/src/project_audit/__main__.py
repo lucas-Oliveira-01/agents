@@ -14,6 +14,7 @@ from .state_store import StateStore
 from .omniroute_backend import create_local_omniroute_backend
 from .semantic_auditor import SemanticAuditor
 from .models import EgressPolicy, EgressDestination
+from .autofix import AutoFixError, run_immutable_fix
 from .delegation import WorkerPort
 import sys
 
@@ -32,7 +33,8 @@ def main() -> int:
         default="prepare",
         help="Prepare the plan, execute Engineering PASS 1, execute full audit, or fix findings",
     )
-    parser.add_argument("--run-id", default=None, help="Run ID to use for 'fix' phase")
+    parser.add_argument("--run-id", default=None, help="Source run ID to use for 'fix' phase")
+    parser.add_argument("--finding-id", default=None, help="Verified P0/P1 candidate ID to fix in the immutable fix transaction")
     parser.add_argument("--no-persist", action="store_true", help="Do not persist state during prepare phase")
     parser.add_argument("--output-dir", default=None, help="Audit Markdown output directory (default: <target>/.audit)")
     parser.add_argument("--overwrite-audit", action="store_true", help="Explicitly allow replacing existing audit artifacts")
@@ -111,57 +113,48 @@ def main() -> int:
             if not args.run_id:
                 print("Error: --run-id is required for the 'fix' phase", file=sys.stderr)
                 return 1
-
-            findings_path = Path(args.output_dir or (discovery.root / ".audit")) / "report_data.json"
-            if not findings_path.exists():
-                print(f"Error: {findings_path} not found. Please run full audit with --normalize first to produce JSON findings.", file=sys.stderr)
+            if not args.finding_id:
+                print("Error: --finding-id is required; Phase 5 fixes exactly one verified P0/P1 per transaction.", file=sys.stderr)
+                return 1
+            if semantic_worker is None:
+                print("Error: semantic worker is required for post-fix re-audit.", file=sys.stderr)
                 return 1
 
-            import json
+            state_path = Path(args.state_dir) if args.state_dir else discovery.root / ".audit" / "runs"
+            egress_policy = EgressPolicy(
+                destination=EgressDestination.APPROVED_EXTERNAL
+                if getattr(args, "allow_external", False)
+                else EgressDestination.LOCAL_ONLY,
+                allow_sensitive=True,
+            )
             try:
-                data = json.loads(findings_path.read_text(encoding="utf-8"))
-            except Exception as e:
-                print(f"Error reading JSON findings: {e}", file=sys.stderr)
-                return 1
+                ledger = run_immutable_fix(
+                    discovery.root,
+                    state_dir=state_path,
+                    source_run_id=args.run_id,
+                    candidate_id=args.finding_id,
+                    semantic_worker=semantic_worker,
+                    semantic_egress_policy=egress_policy,
+                    normalize_command=args.normalize_command,
+                )
+            except AutoFixError as exc:
+                print(f"Auto-fix refused: {exc}", file=sys.stderr)
+                return 4
+            except Exception as exc:
+                print(f"Auto-fix transaction failed: {exc}", file=sys.stderr)
+                return 5
 
-            print("Scanning for P0/P1 findings to auto-fix...")
-            import asyncio
-            try:
-                from omniroute_delegation.local_worker_mcp import dispatch_opencode_worker
-            except ImportError:
-                print("Auto-fix unavailable. Install omniroute-delegation locally.", file=sys.stderr)
-                return 1
-
-            p1_count = 0
-            for cand in data.get("findings", []):
-                if cand.get("severity") in ["P0", "P1"] and cand.get("status", "CONFIRMED") == "CONFIRMED":
-                    p1_count += 1
-                    title = cand.get("title", "")
-                    print(f"Auto-fixing {cand.get('severity')}: {title}")
-                    loc_dict = cand.get("location", {}) or {}
-                    loc = loc_dict.get("file", "") if isinstance(loc_dict, dict) else ""
-                    task = (
-                        f"Fix the confirmed finding: {title}. "
-                        f"Description: {cand.get('description', '')}. "
-                        f"Recommendation: {cand.get('recommendation', '')}"
-                    )
-
-                    async def run_dispatch():
-                        res = await dispatch_opencode_worker(
-                            task=task,
-                            target_file=loc,
-                            workspace_dir=str(discovery.root),
-                            isolated_memory=True
-                        )
-                        print(f"L3W worker dispatched for {title}")
-                    asyncio.run(run_dispatch())
-
-            if p1_count > 0:
-                print(f"Dispatched {p1_count} L3W workers for confirmed P0/P1 auto-fixes.")
-            else:
-                print("No P0/P1 confirmed findings required auto-fix.")
-            return 0
-
+            print("phase=fix")
+            print(f"fix_id={ledger.fix_id}")
+            print(f"candidate={ledger.candidate_id}")
+            print(f"snapshot_a={ledger.target_snapshot_a}")
+            print(f"snapshot_b={ledger.target_snapshot_b or 'NOT_AVAILABLE'}")
+            print(f"patch_sha256={ledger.patch_sha256 or 'NOT_AVAILABLE'}")
+            print(f"changed_files={','.join(ledger.changed_files) or 'NONE'}")
+            print(f"lifecycle={ledger.lifecycle}")
+            print(f"outcome={ledger.outcome}")
+            print(f"ledger={discovery.root / '.audit' / 'fixes' / (ledger.fix_id + '.json')}")
+            return 0 if ledger.outcome == "FIXED" else 6
         # -- Full Audit Execution --
         result = run_full_audit(
             args.target,
