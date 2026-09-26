@@ -282,7 +282,7 @@ class SemanticAuditor:
         delegated_evidence = execution.evidence
         delegated_result = execution.result
 
-        audit_contract = delegated_result.audit_contract
+        audit_contract = delegated_result.audit_contract if delegated_result is not None else None
 
         if receipt.exit_code == 126:
             return SemanticReviewResult(
