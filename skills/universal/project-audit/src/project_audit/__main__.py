@@ -7,7 +7,7 @@ from .classifiers import classify_applicability, classify_files, classify_stack
 from .discovery import discover
 from .models import TargetMode
 from .normalization_runner import run_audit_normalize
-from .orchestrator import Orchestrator, SnapshotDriftError
+from .orchestrator import Orchestrator
 from .planner import prepare_audit
 from .runtime import run_full_audit, audit_paths, initialize_audit_repository
 from .state_store import StateStore
@@ -124,7 +124,7 @@ def main() -> int:
                 print(f"Error reading JSON findings: {e}", file=sys.stderr)
                 return 1
 
-            print("Scanning for P1/P0 findings to auto-fix...")
+            print("Scanning for P0/P1 findings to auto-fix...")
             import asyncio
             try:
                 from omniroute_delegation.local_worker_mcp import dispatch_opencode_worker
@@ -140,7 +140,11 @@ def main() -> int:
                     print(f"Auto-fixing {cand.get('severity')}: {title}")
                     loc_dict = cand.get("location", {}) or {}
                     loc = loc_dict.get("file", "") if isinstance(loc_dict, dict) else ""
-                    task = f"Corrija o problema: {title}. Descrição: {cand.get('description', '')}. Recomendação: {cand.get('recommendation', '')}"
+                    task = (
+                        f"Fix the confirmed finding: {title}. "
+                        f"Description: {cand.get('description', '')}. "
+                        f"Recommendation: {cand.get('recommendation', '')}"
+                    )
 
                     async def run_dispatch():
                         res = await dispatch_opencode_worker(
@@ -149,11 +153,11 @@ def main() -> int:
                             workspace_dir=str(discovery.root),
                             isolated_memory=True
                         )
-                        print(f"Worker process dispatched for {title}")
+                        print(f"L3W worker dispatched for {title}")
                     asyncio.run(run_dispatch())
 
             if p1_count > 0:
-                print(f"Dispatched {p1_count} workers for P0/P1 auto-fixing in background!")
+                print(f"Dispatched {p1_count} L3W workers for confirmed P0/P1 auto-fixes.")
             else:
                 print("No P0/P1 confirmed findings required auto-fix.")
             return 0
@@ -179,7 +183,7 @@ def main() -> int:
         print(f"coverage={final_run.coverage_completeness.value}")
         print(f"run={final_run.run_id}")
         print(f"snapshot={final_run.target_snapshot_ref}")
-        print(f"artifacts={len(result.artifacts)}"); print(f"DEBUG_ARTIFACTS: {result.artifacts}")
+        print(f"artifacts={len(result.artifacts)}")
         print(f"output_dir={args.output_dir or str(result.discovery.root / '.audit')}")
         
         if final_run.failure_state.value == "SEMANTIC_COVERAGE_FAILED":
@@ -200,7 +204,7 @@ def main() -> int:
 
 
     finally:
-        # R-09 Fix: Close MCP client
+        # Release the MCP transport owned by the Gateway-backed backend.
         if mcp_client is not None:
             import asyncio
             try:
