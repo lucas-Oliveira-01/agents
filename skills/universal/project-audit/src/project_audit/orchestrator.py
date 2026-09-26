@@ -435,7 +435,14 @@ class Orchestrator:
             raise OrchestratorError(
                 f"Recovery failed: run {interrupted_run_id} not found in store."
             )
-        return self.store.load_run(interrupted_run_id)
+        run = self.store.load_run(interrupted_run_id)
+        from project_audit.models import IllegalStateTransitionError
+        if run.execution_completeness == RunExecutionCompleteness.COMPLETE:
+            raise IllegalStateTransitionError(
+                f"Cannot recover run {interrupted_run_id} because it is already COMPLETE. "
+                "Recovery is only for interrupted runs."
+            )
+        return run
 
     def prepare_recovery(self, interrupted_run_id: str) -> RecoveryBundle:
         """
