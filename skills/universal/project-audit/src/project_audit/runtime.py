@@ -19,6 +19,7 @@ from .planner import PreparedAudit, prepare_audit
 from .report_writer import write_audit_artifacts
 from .security_runner import SecurityPassResult, execute_security_pass
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
+from .verifier import VerificationResult, consolidated_reviews, verify_semantic_reviews
 from .state_store import StateStore
 
 
@@ -31,6 +32,7 @@ class FullAuditResult:
     artifacts: Tuple[str, ...]
     normalization: Optional[NormalizationResult]
     semantic_reviews: Tuple[SemanticReviewResult, ...] = ()
+    verification_results: Tuple[VerificationResult, ...] = ()
 
 
 def audit_paths(
@@ -126,6 +128,16 @@ def run_full_audit(
     semantic_reviews = tuple(engineering.semantic_reviews) + tuple(security.semantic_reviews)
     run = engineering.run
     work_items = list(prepared.work_items)
+
+    # Phase 4: independent verification happens after semantic review and before
+    # any report/normalizer consolidation. The verifier receives only persisted
+    # Evidence context and the immutable TargetSnapshot, not the model narrative.
+    verification_results = verify_semantic_reviews(
+        semantic_reviews,
+        {item.work_item_id: item for item in work_items},
+        prepared.snapshot,
+    )
+    consolidated = consolidated_reviews(semantic_reviews, verification_results)
     normalization = None
     # Render away from final paths. Drift during rendering cannot expose a report.
     with tempfile.TemporaryDirectory(prefix=".pending-", dir=vault) as temporary:
@@ -133,7 +145,8 @@ def run_full_audit(
         orchestrator.check_target_unchanged(root, run, prepared.plan, work_items)
         staged = write_audit_artifacts(
             str(staging), prepared, discovery, engineering, security,
-            semantic_reviews=semantic_reviews,
+            semantic_reviews=consolidated,
+            verification_results=verification_results,
         )
         execution_state_path = staging / "audit_execution_state.json"
         execution_state_path.write_text(
@@ -153,6 +166,17 @@ def run_full_audit(
                             "provider": review.provider,
                             "model": review.model,
                             "raw_output_sha256": review.raw_output_fingerprint,
+                            "verification": [
+                                {
+                                    "candidate_id": result.candidate_id,
+                                    "severity": result.severity,
+                                    "verdict": result.verdict.value,
+                                    "evidence_ref": result.evidence_ref,
+                                    "reasons": list(result.reasons),
+                                }
+                                for result in verification_results
+                                if result.work_item_ref == review.work_item_ref
+                            ],
                         }
                         for review in semantic_reviews
                     ],
@@ -223,4 +247,5 @@ def run_full_audit(
         artifacts=tuple(list(artifact_map.values()) + [str(state_destination)]),
         normalization=normalization,
         semantic_reviews=semantic_reviews,
+        verification_results=verification_results,
     )
