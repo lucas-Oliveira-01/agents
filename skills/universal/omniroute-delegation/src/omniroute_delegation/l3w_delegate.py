@@ -72,7 +72,7 @@ class L3WSession:
         command.extend(["--task", task])
 
         if target_file:
-            target = self.workspace.assert_inside(target_file)
+            target = self.workspace.map_source_path(target_file)
             relative = target.relative_to(self.workspace.root).as_posix()
             command.extend(["--target", f"/workspace/{relative}"])
 
@@ -189,7 +189,7 @@ class L3WDelegate:
     ) -> AuditContract:
         config = L3WConfig(
             harness_executable=harness,
-            workspace_dir=workspace_dir,
+            repository_root=workspace_dir,
             persist_workspace=True,
         )
         session = await self.start(config)
