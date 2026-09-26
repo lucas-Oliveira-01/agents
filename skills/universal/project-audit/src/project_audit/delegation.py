@@ -20,7 +20,8 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from .models import AuditWorkItem, Evidence, ExecutionReceipt, ExecutionPolicy, Provenance, EvidenceValidity
-from omniroute_delegation.contracts import AuditContract
+if TYPE_CHECKING:
+    from omniroute_delegation.contracts import AuditContract
 from .validators import validate_egress_policy
 
 
@@ -62,7 +63,7 @@ class DelegationResult:
     error_message: Optional[str]
     provider_info: Optional[str]
     usage_tokens: Optional[int]
-    audit_contract: Optional[AuditContract] = None
+    audit_contract: Optional["AuditContract"] = None
 
 
 @dataclasses.dataclass(frozen=True)
