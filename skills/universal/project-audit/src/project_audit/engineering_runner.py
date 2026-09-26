@@ -186,11 +186,15 @@ def execute_engineering_pass(
     blocked = [item for item in executed_items if item.failure_state == WorkItemFailureState.SAFETY_BLOCK]
     failed = [
         item for item in executed_items
-        if item.failure_state not in {WorkItemFailureState.NONE, WorkItemFailureState.SAFETY_BLOCK, WorkItemFailureState.SCHEMA_VIOLATION}
+        if item.failure_state not in {WorkItemFailureState.NONE, WorkItemFailureState.SAFETY_BLOCK, WorkItemFailureState.SCHEMA_VIOLATION, WorkItemFailureState.SNAPSHOT_DRIFT}
     ]
     semantic_failed = [
         item for item in executed_items
         if item.failure_state == WorkItemFailureState.SCHEMA_VIOLATION
+    ]
+    stale_items = [
+        item for item in executed_items
+        if item.failure_state == WorkItemFailureState.SNAPSHOT_DRIFT
     ]
     succeeded = [
         item for item in executed_items
@@ -207,7 +211,7 @@ def execute_engineering_pass(
         run.execution_completeness = RunExecutionCompleteness.PARTIAL
         run.coverage_completeness = RunCoverageCompleteness.PARTIAL
         run.failure_state = RunFailureState.SEMANTIC_COVERAGE_FAILED
-    elif semantic_partial:
+    elif (semantic_partial or stale_items) and not failed and not blocked:
         run.execution_completeness = RunExecutionCompleteness.PARTIAL
         run.coverage_completeness = RunCoverageCompleteness.PARTIAL
         run.failure_state = RunFailureState.NONE
