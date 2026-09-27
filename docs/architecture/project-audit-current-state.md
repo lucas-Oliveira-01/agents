@@ -101,3 +101,14 @@ No canonical JSON schema, entity, WorkItem action, routing responsibility, or pu
 A fresh post-Phase-17 audit found a remaining execution-history boundary. Retry now validates temporal preconditions before mutating WorkItem state, so rejected retries are state-preserving. When an Attempt carries a receipt_ref, the Orchestrator now requires the referenced ExecutionReceipt to exist and point back to the same WorkItem before persistence.
 
 No canonical JSON schema, entity, WorkItem action, routing responsibility, or publication mode was added.
+
+## Phase 19 — Recovery Execution Lineage Integrity
+
+A boundary audit after Phase 18 found that the fresh recovery graph could copy historical
+Attempt/receipt references into new WorkItem identities. Recovery now keeps historical
+Attempts and Receipts on the interrupted graph and carries completed work into the new
+graph only through fresh REUSE Evidence derived from valid historical Evidence.
+
+When historical Evidence is unavailable, the recovered WorkItem is reconstructed as
+PLANNED rather than being marked complete without a proof-bearing current WorkItem edge.
+No canonical JSON schema, entity, routing responsibility, or publication mode changes.
