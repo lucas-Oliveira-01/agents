@@ -92,6 +92,8 @@ def execute_semantic_review(
             reason="SAFETY_BLOCK",
             receipt_ref=result.receipt.receipt_id,
         )
+        if result.evidence is not None:
+            orchestrator.commit_evidence(result.evidence, work_item)
         work_item.terminate(failure_state=WorkItemFailureState.SAFETY_BLOCK)
         orchestrator.commit_work_item(work_item)
         return result
@@ -102,6 +104,8 @@ def execute_semantic_review(
             reason="INFRA_ERROR",
             receipt_ref=result.receipt.receipt_id,
         )
+        if result.evidence is not None:
+            orchestrator.commit_evidence(result.evidence, work_item)
         work_item.terminate(failure_state=WorkItemFailureState.INFRA_ERROR)
         orchestrator.commit_work_item(work_item)
         return result
