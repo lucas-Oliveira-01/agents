@@ -110,3 +110,8 @@ These rules are operational invariants in addition to the semantic validators in
 Recovery WorkItems with successful terminal state must own current-scope Evidence. Historical
 Attempts and ExecutionReceipt references are not copied into fresh recovery WorkItems;
 completed recovery state is represented through fresh derived Evidence.
+
+## Phase 20 — Immutable Evidence Drift Lineage
+
+Evidence immutability is enforced at the persistence boundary. Snapshot drift creates fresh STALE
+Evidence linked through `derived_from_evidence_ref`; historical VALID Evidence is not rewritten.

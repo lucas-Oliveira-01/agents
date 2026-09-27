@@ -168,3 +168,9 @@ when valid historical Evidence can be derived into fresh Evidence bound to the n
 otherwise the recovered item returns to PLANNED for normal execution.
 
 Historical WorkItem, Attempt, Receipt, and Evidence records remain unchanged.
+
+## Phase 20 — Durable Immutable Persistence
+
+TargetSnapshot, frozen AuditPlan, Evidence, and ExecutionReceipt persistence is write-once:
+equivalent rewrites are idempotent and conflicting rewrites are rejected. Snapshot-drift STALE status
+is represented by a fresh derived Evidence record instead of mutating the historical record.

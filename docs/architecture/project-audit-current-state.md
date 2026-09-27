@@ -112,3 +112,14 @@ graph only through fresh REUSE Evidence derived from valid historical Evidence.
 When historical Evidence is unavailable, the recovered WorkItem is reconstructed as
 PLANNED rather than being marked complete without a proof-bearing current WorkItem edge.
 No canonical JSON schema, entity, routing responsibility, or publication mode changes.
+
+## Phase 20 — Durable Evidence Immutability and Snapshot-Drift Lineage
+
+A boundary audit after Phase 19 found a contradiction between immutable Evidence and the
+node-level snapshot-drift implementation: the latter rewrote VALID Evidence to STALE under the
+same identity, and StateStore allowed conflicting rewrites for immutable identities.
+
+StateStore is now write-once for TargetSnapshot, frozen AuditPlan, Evidence, and ExecutionReceipt;
+identical writes are idempotent and conflicts fail closed. Snapshot drift creates fresh STALE Evidence
+with `derived_from_evidence_ref`, preserving the original immutable observation.
+No canonical schema, entity, routing responsibility, or publication mode changes.

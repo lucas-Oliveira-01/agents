@@ -25,7 +25,7 @@ from .models import (
 )
 from .orchestrator import Orchestrator
 from .planner import build_target_snapshot
-from .incremental import derive_reused_evidence
+from .incremental import derive_reused_evidence, derive_stale_evidence
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 from .semantic_runner import execute_semantic_review
 
@@ -183,7 +183,7 @@ def execute_engineering_pass(
             work_item_ref=item.work_item_id,
             source_refs=result.source_refs,
             dependencies=(),
-            validity=EvidenceValidity.STALE if current_item_drifted else EvidenceValidity.VALID,
+            validity=EvidenceValidity.VALID,
             provenance=Provenance(
                 actor=auditor.ACTOR,
                 generated_at=finished,
@@ -192,6 +192,13 @@ def execute_engineering_pass(
         )
 
         orchestrator.commit_evidence(evidence, item)
+        if current_item_drifted:
+            stale = derive_stale_evidence(
+                evidence,
+                build_target_snapshot(discovery),
+                generated_at=evidence.provenance.generated_at,
+            )
+            orchestrator.commit_evidence(stale, item)
 
         needs_semantic = any(
             getattr(observation, "state", None) == "NOT_DETERMINABLE"

@@ -191,9 +191,15 @@ def test_snapshot_drift_invalidates_only_affected_work_item(tmp_path: Path) -> N
     assert run.audit_status == RunExecutionCompleteness.PARTIAL.value
     assert run.coverage_completeness == RunCoverageCompleteness.PARTIAL
 
-    stale_first = orchestrator.store.load_evidence(first_evidence.evidence_id)
+    original_first = orchestrator.store.load_evidence(first_evidence.evidence_id)
     valid_second = orchestrator.store.load_evidence(second_evidence.evidence_id)
-    assert stale_first.validity == EvidenceValidity.STALE
+    assert original_first.validity == EvidenceValidity.VALID
+    assert any(
+        evidence.validity == EvidenceValidity.STALE
+        and evidence.derived_from_evidence_ref == first_evidence.evidence_id
+        for evidence_id in orchestrator.store.list_evidence_ids()
+        for evidence in [orchestrator.store.load_evidence(evidence_id)]
+    )
     assert valid_second.validity == EvidenceValidity.VALID
     assert work_items[0].failure_state == WorkItemFailureState.SNAPSHOT_DRIFT
     assert work_items[1].failure_state == WorkItemFailureState.NONE

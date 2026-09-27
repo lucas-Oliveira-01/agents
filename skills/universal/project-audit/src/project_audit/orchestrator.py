@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 from .fake_auditor import FakeAuditor, FakeAuditorResult, FakeAuditorWithSnapshot
-from .incremental import derive_reused_evidence
+from .incremental import derive_reused_evidence, derive_stale_evidence
 from .models import (
     ApplicabilityDecision,
     Attempt,
@@ -547,13 +547,28 @@ class Orchestrator:
                 for evidence_id in self.store.list_evidence_ids()
                 if self.store.load_evidence(evidence_id).work_item_ref == work_item.work_item_id
             ]
+            existing_stale_sources = {
+                evidence.derived_from_evidence_ref
+                for evidence in evidence_for_item
+                if evidence.validity == EvidenceValidity.STALE
+                and evidence.derived_from_evidence_ref is not None
+            }
             source_refs: List[str] = []
             for evidence in evidence_for_item:
                 source_refs.extend(evidence.source_refs)
-                if self._paths_overlap(changed_paths, list(evidence.source_refs)):
-                    self.store.save_evidence(
-                        replace(evidence, validity=EvidenceValidity.STALE)
+                if (
+                    evidence.validity == EvidenceValidity.VALID
+                    and self._paths_overlap(changed_paths, list(evidence.source_refs))
+                    and evidence.evidence_id not in existing_stale_sources
+                ):
+                    stale = derive_stale_evidence(
+                        evidence,
+                        current_snapshot,
+                        generated_at=evidence.provenance.generated_at,
                     )
+                    self.commit_evidence(stale, work_item)
+                    work_item.artifact_refs.append(f"evidence/{stale.evidence_id}.json")
+                    existing_stale_sources.add(evidence.evidence_id)
 
             if self._paths_overlap(changed_paths, source_refs):
                 work_item.failure_state = WorkItemFailureState.SNAPSHOT_DRIFT
@@ -890,9 +905,9 @@ class Orchestrator:
                     list(evidence.source_refs),
                 )
             )
-            if current_item_drifted:
-                evidence = replace(evidence, validity=EvidenceValidity.STALE)
-
+            # Evidence describes the observation at the run's immutable snapshot.
+            # Persist that historical observation unchanged; drift is represented by
+            # a fresh derived STALE Evidence record below.
             # Commit receipt (evidence of execution)
             self.commit_receipt(receipt)
 
@@ -913,6 +928,13 @@ class Orchestrator:
                     )
                     self.commit_evidence(evidence, work_item)
                     work_item.artifact_refs.append(f"evidence/{evidence.evidence_id}.json")
+                    stale = derive_stale_evidence(
+                        evidence,
+                        snapshot,
+                        generated_at=evidence.provenance.generated_at,
+                    )
+                    self.commit_evidence(stale, work_item)
+                    work_item.artifact_refs.append(f"evidence/{stale.evidence_id}.json")
                     work_item.terminate(failure_state=WorkItemFailureState.SNAPSHOT_DRIFT)
                 else:
                     attempt.finish(
