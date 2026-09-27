@@ -905,9 +905,9 @@ class Orchestrator:
                     list(evidence.source_refs),
                 )
             )
-            if current_item_drifted:
-                evidence = replace(evidence, validity=EvidenceValidity.STALE)
-
+            # Evidence describes the observation at the run's immutable snapshot.
+            # Persist that historical observation unchanged; drift is represented by
+            # a fresh derived STALE Evidence record below.
             # Commit receipt (evidence of execution)
             self.commit_receipt(receipt)
 
@@ -928,6 +928,13 @@ class Orchestrator:
                     )
                     self.commit_evidence(evidence, work_item)
                     work_item.artifact_refs.append(f"evidence/{evidence.evidence_id}.json")
+                    stale = derive_stale_evidence(
+                        evidence,
+                        snapshot,
+                        generated_at=evidence.provenance.generated_at,
+                    )
+                    self.commit_evidence(stale, work_item)
+                    work_item.artifact_refs.append(f"evidence/{stale.evidence_id}.json")
                     work_item.terminate(failure_state=WorkItemFailureState.SNAPSHOT_DRIFT)
                 else:
                     attempt.finish(
