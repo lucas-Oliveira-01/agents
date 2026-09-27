@@ -80,7 +80,10 @@ def _relationship_terms(content: str) -> Tuple[str, ...]:
         r"\b(?:from|import)\s+([A-Za-z_][A-Za-z0-9_.]*)",
         r"\bnew\s+([A-Za-z_][A-Za-z0-9_]*)",
     ):
-        terms.update(match.lower() for match in re.findall(pattern, content))
+        for match in re.findall(pattern, content):
+            normalized = match.lower()
+            terms.add(normalized)
+            terms.add(normalized.rsplit(".", 1)[-1])
     return tuple(sorted(terms))
 
 def build_context(
