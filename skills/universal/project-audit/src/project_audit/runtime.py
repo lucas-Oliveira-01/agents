@@ -376,6 +376,19 @@ def _run_full_audit_unlocked(
                 run, prepared.plan, work_items, known_run_ids=orchestrator.store.list_run_ids(),
             )
             orchestrator.check_target_unchanged(root, run, prepared.plan, work_items)
+            orchestrator.publish_run(
+                run,
+                prepared.plan,
+                work_items,
+                [
+                    orchestrator.store.load_evidence(evidence_id)
+                    for evidence_id in orchestrator.store.list_evidence_ids()
+                    if orchestrator.store.load_evidence(evidence_id).work_item_ref in {
+                        item.work_item_id for item in work_items
+                    }
+                ],
+                prepared.snapshot.snapshot_fingerprint,
+            )
         except Exception:
             # Wipe only this attempt's outputs. Earlier successful runs remain intact.
             for path in final_paths:
