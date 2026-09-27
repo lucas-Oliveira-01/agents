@@ -22,6 +22,7 @@ from project_audit.models import (
     RunExecutionCompleteness,
     RunFailureState,
     RunPublicationState,
+    WorkItemFailureState,
 )
 from project_audit.planner import prepare_audit
 from project_audit.semantic_auditor import SemanticAuditor
@@ -224,7 +225,7 @@ def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path
         exit_code=0,
         receipt_ref=str(uuid.uuid4()),
     )
-    work_item.terminate(failure_state=__import__("project_audit.models", fromlist=["WorkItemFailureState"]).WorkItemFailureState.NONE)
+    work_item.terminate(failure_state=WorkItemFailureState.NONE)
     orchestrator.commit_work_item(work_item)
     work_item.retry_attempt(started_at=datetime.now(timezone.utc))
     orchestrator.commit_work_item(work_item)
