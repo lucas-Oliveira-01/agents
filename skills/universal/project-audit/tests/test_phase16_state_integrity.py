@@ -102,28 +102,28 @@ def test_reloaded_frozen_plan_preserves_immutable_collections(
         loaded.requested_scope = ("hacked",)
 
 
-def test_run_plan_work_item_graph_cannot_use_a_subset(
+def test_run_plan_work_item_graph_rejects_undeclared_refs(
     audit_plan, target_snapshot, execution_policy, egress_policy
 ):
-    first = make_work_item(
+    declared = make_work_item(
         plan_id=audit_plan.plan_id,
         target_surface="security/authentication",
         execution_policy=execution_policy,
         egress_policy=egress_policy,
     )
-    second = make_work_item(
+    undeclared = make_work_item(
         plan_id=audit_plan.plan_id,
         target_surface="security/authorization",
         execution_policy=execution_policy,
         egress_policy=egress_policy,
     )
-    audit_plan.work_items = [first, second]
+    audit_plan.work_items = [declared]
 
     run = AuditRun(
         run_id=str(uuid.uuid4()),
         target_snapshot_ref=target_snapshot.snapshot_fingerprint,
         plan_ref=audit_plan.plan_id,
-        work_item_refs=[first.work_item_id],
+        work_item_refs=[undeclared.work_item_id],
         execution_completeness=RunExecutionCompleteness.COMPLETE,
         coverage_completeness=RunCoverageCompleteness.FULL,
         failure_state=RunFailureState.NONE,
@@ -131,7 +131,7 @@ def test_run_plan_work_item_graph_cannot_use_a_subset(
         publication_state=RunPublicationState.NOT_PUBLISHED,
     )
 
-    result = validate_run_work_item_references(run, audit_plan, [first])
+    result = validate_run_work_item_references(run, audit_plan, [undeclared])
 
     assert result.is_error
     assert result.code == "RUN_PLAN_WORK_ITEM_SET_MISMATCH"
