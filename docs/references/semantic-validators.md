@@ -104,3 +104,9 @@ The writer boundary is now physical, not merely conventional:
 - A completed WorkItem is not executed again during replay, preventing accidental duplicate execution.
 
 These rules are operational invariants in addition to the semantic validators in Sections 1–9.
+
+## Phase 19 — Recovery Lineage
+
+Recovery WorkItems with successful terminal state must own current-scope Evidence. Historical
+Attempts and ExecutionReceipt references are not copied into fresh recovery WorkItems;
+completed recovery state is represented through fresh derived Evidence.
