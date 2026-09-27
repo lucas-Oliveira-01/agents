@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -181,7 +183,7 @@ def _http_client_runtime(path: str, content: str) -> str:
     parts = {part for part in Path(lower_path).parts}
 
     browser_path = suffix in {".js", ".jsx", ".ts", ".tsx"} and bool(
-        parts.intersection({"frontend", "public", "static", "web"})
+        parts.intersection({"frontend", "public", "static"})
     )
     browser_signal = any(
         token in lower
@@ -211,30 +213,53 @@ def _http_client_runtime(path: str, content: str) -> str:
         return "SERVER_HTTP_CLIENT"
     if any(token in lower for token in ("axios", "fetch(", "urllib", "requests", "httpx")):
         return "UNKNOWN_HTTP_CLIENT"
-    if any(token in lower for token in ("axios", "fetch(", "urllib", "requests", "httpx", "httpclient", "resttemplate", "webclient")):
+    if any(token in lower for token in ("axios", "fetch(", "urllib", "requests", "httpx")):
         return "UNKNOWN_HTTP_CLIENT"
     return "NO_HTTP_CLIENT"
 
 
-def _authentication_evidence(snapshot: DiscoverySnapshot, classifications: Tuple[FileClassification, ...], stack: set[str]) -> Tuple[str, ...]:
-    signals = (
+def _authentication_evidence(
+    snapshot: DiscoverySnapshot,
+    classifications: Tuple[FileClassification, ...],
+    stack: set[str],
+) -> Tuple[str, ...]:
+    """Prefer structural authentication symbols over arbitrary substring hits."""
+    path_signals = (
         "jwt", "authmiddleware", "authorizationmiddleware", "authcontext",
         "jwtvalidator", "jwtissuer", "loginservice", "logincontroller",
-        "authentication", "authorization", "oauth", "bcrypt", "passwordhasher",
+        "authentication", "authorization", "oauth", "passwordhasher",
     )
     refs = []
     for item in classifications:
-        if item.kind not in {FileKind.SOURCE, FileKind.TEST}:
+        if item.kind != FileKind.SOURCE:
             continue
         path_lower = item.path.lower()
-        content = _read_text(snapshot, item.path, 48_000).lower()
-        if any(token in path_lower or token in content for token in signals):
+        content = _read_text(snapshot, item.path, 48_000)
+        structural = "\n".join(
+            line
+            for line in content.splitlines()
+            if not line.lstrip().startswith(("//", "#", "/*", "*", '"""', "'''"))
+        ).lower()
+        declaration_hits = re.findall(
+            r"\b(?:class|interface|function|def)\s+([a-z0-9_]*(?:auth|authentication|authorization|jwt|login|oauth|session|owner)[a-z0-9_]*)\b",
+            structural,
+        )
+        import_hits = any(
+            token in line
+            for line in structural.splitlines()
+            if line.strip().startswith(("import ", "from ", "using ", "require("))
+            for token in ("jwt", "oauth", "spring-security", "auth", "bcrypt")
+        )
+        path_hit = any(token in path_lower for token in path_signals)
+        if path_hit or declaration_hits or import_hits:
             refs.append(item.path)
-    if refs:
-        return tuple(sorted(set(refs)))
-    if any(token in " ".join(stack).lower() for token in ("jwt", "oauth", "spring-security")):
+    if not refs and any(
+        token in " ".join(stack).lower()
+        for token in ("jwt", "oauth", "spring-security")
+    ):
         return tuple()
-    return tuple()
+    return tuple(sorted(set(refs)))
+
 
 def classify_applicability(snapshot: DiscoverySnapshot, stack: Iterable[str]) -> Tuple[ApplicabilityDecision, ...]:
     stack_set = set(stack)
