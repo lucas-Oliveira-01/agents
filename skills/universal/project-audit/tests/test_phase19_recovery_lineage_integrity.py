@@ -3,8 +3,6 @@ from __future__ import annotations
 from datetime import timedelta
 from uuid import uuid4
 
-import pytest
-
 from project_audit.models import (
     AuditRun,
     ExecutionReceipt,
