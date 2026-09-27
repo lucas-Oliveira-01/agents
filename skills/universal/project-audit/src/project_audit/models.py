@@ -236,12 +236,14 @@ class FindingFingerprint:
     domain: str
     control_surface: str
     defect_type: str
+    identity_scope: str = ""
 
     def to_dict(self) -> dict:
         return {
             "domain": self.domain,
             "control_surface": self.control_surface,
             "defect_type": self.defect_type,
+            "identity_scope": self.identity_scope,
         }
 
 
