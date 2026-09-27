@@ -431,6 +431,21 @@ def validate_run_work_item_references(
     """Run refs, plan refs and supplied WorkItems must form one closed set."""
     actual_ids = [wi.work_item_id for wi in work_items]
     refs = list(run.work_item_refs)
+    declared_plan_ids = [wi.work_item_id for wi in plan.work_items]
+    if len(declared_plan_ids) != len(set(declared_plan_ids)):
+        return _error(
+            "PLAN_DUPLICATE_WORK_ITEM_REF",
+            f"AuditPlan {plan.plan_id} contains duplicate WorkItem references.",
+        )
+    if set(refs) != set(declared_plan_ids):
+        return _error(
+            "RUN_PLAN_WORK_ITEM_SET_MISMATCH",
+            f"AuditRun {run.run_id} refs do not match the immutable AuditPlan WorkItem set.",
+            {
+                "run_refs": sorted(refs),
+                "plan_refs": sorted(declared_plan_ids),
+            },
+        )
     if len(refs) != len(set(refs)):
         return _error(
             "RUN_DUPLICATE_WORK_ITEM_REF",
