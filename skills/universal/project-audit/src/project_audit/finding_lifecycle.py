@@ -24,11 +24,43 @@ def canonical_finding_fingerprint(
     candidate: SemanticFindingCandidate,
     target_surface: str,
 ) -> FindingFingerprint:
-    """Build identity from stable semantics, not generated narrative or a file path."""
+    """Build identity from stable semantic anchors and source scope.
+
+    The canonical descriptor remains domain/control/type, while identity_scope
+    separates distinct logical defects that share those broad categories.
+    """
+    locations = candidate.locations or ((candidate.location,) if candidate.location else ())
+    source_files = sorted(
+        {
+            str(location.get("file", "")).strip().replace("\\", "/").lstrip("./")
+            for location in locations
+            if isinstance(location, dict) and location.get("file")
+        }
+    )
+    evidence_anchor = " ".join(
+        str(candidate.evidence or "").split()
+    ).lower()
+    identity_payload = {
+        "target_surface": str(target_surface).strip().upper(),
+        "domain": candidate.category,
+        "control_surface": candidate.subcategory or str(target_surface).split("/", 1)[0].upper(),
+        "defect_type": candidate.finding_type,
+        "source_files": source_files,
+        "evidence_anchor": evidence_anchor,
+    }
+    identity_scope = hashlib.sha256(
+        json.dumps(
+            identity_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
     return FindingFingerprint(
         domain=candidate.category,
         control_surface=candidate.subcategory or str(target_surface).split("/", 1)[0].upper(),
         defect_type=candidate.finding_type,
+        identity_scope=identity_scope,
     )
 
 
