@@ -460,8 +460,13 @@ def render_semantic_findings(
             "Severity: {}".format(candidate.severity),
             "Confidence: {}".format(candidate.confidence),
         ])
-        if candidate.location:
-            lines.append("Location: {}".format(_format_location(candidate.location)))
+        candidate_locations = candidate.locations or ((candidate.location,) if candidate.location else ())
+        if candidate_locations:
+            lines.append(
+                "Locations: {}".format(
+                    " | ".join(_format_location(location) for location in candidate_locations)
+                )
+            )
         lines.extend([
             "Evidence:",
             candidate.evidence,
