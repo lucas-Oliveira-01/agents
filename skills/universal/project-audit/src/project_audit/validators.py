@@ -554,7 +554,7 @@ def validate_work_item_state_machine(work_item: AuditWorkItem) -> ValidationResu
     """
     Validates that execution_state is consistent with attempt history.
     RUNNING requires at least one unfinished attempt.
-    TERMINATED requires at least one attempt.
+    TERMINATED requires at least one attempt for executed WorkItems; REUSE may terminate without an Attempt.
     (semantic-validators.md §3)
     """
     state = work_item.execution_state
