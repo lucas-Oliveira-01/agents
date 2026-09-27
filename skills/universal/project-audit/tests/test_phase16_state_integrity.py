@@ -22,6 +22,11 @@ from project_audit.validators import validate_run_work_item_references
 from tests.conftest import make_work_item
 
 
+@pytest.fixture
+def orchestrator(state_store):
+    return Orchestrator(state_store)
+
+
 def test_commit_work_item_requires_existing_plan(
     orchestrator, execution_policy, egress_policy
 ):
