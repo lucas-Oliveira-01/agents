@@ -437,13 +437,14 @@ def validate_run_work_item_references(
             "PLAN_DUPLICATE_WORK_ITEM_REF",
             f"AuditPlan {plan.plan_id} contains duplicate WorkItem references.",
         )
-    if set(refs) != set(declared_plan_ids):
+    if not set(refs).issubset(set(declared_plan_ids)):
         return _error(
             "RUN_PLAN_WORK_ITEM_SET_MISMATCH",
-            f"AuditRun {run.run_id} refs do not match the immutable AuditPlan WorkItem set.",
+            f"AuditRun {run.run_id} contains WorkItem refs not declared by the immutable AuditPlan.",
             {
                 "run_refs": sorted(refs),
                 "plan_refs": sorted(declared_plan_ids),
+                "undeclared_refs": sorted(set(refs) - set(declared_plan_ids)),
             },
         )
     if len(refs) != len(set(refs)):
