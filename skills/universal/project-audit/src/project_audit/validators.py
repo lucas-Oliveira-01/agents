@@ -336,6 +336,18 @@ def validate_plan_work_item_references(
     return _pass("PLAN_WORK_ITEM_REFERENCES_VALID", "Plan and WorkItem references are consistent.")
 
 
+def validate_attempt_timestamps(work_item: AuditWorkItem) -> ValidationResult:
+    """Each finished Attempt must finish/fail at or after its own start time."""
+    for attempt in work_item.attempts:
+        if attempt.finished_at is not None and attempt.finished_at < attempt.started_at:
+            return _error(
+                "ATTEMPT_FINISH_BEFORE_START",
+                f"WorkItem {work_item.work_item_id}: Attempt {attempt.attempt_id} "
+                "finished before it started.",
+            )
+    return _pass("ATTEMPT_TIMESTAMPS_VALID", "Attempt-local timestamps are coherent.")
+
+
 def validate_work_item_scope_membership(
     plan: AuditPlan,
     work_items: List[AuditWorkItem],
@@ -1215,6 +1227,7 @@ def validate_work_item(
     results = [
         validate_work_item_plan_ref(work_item, known_plan_ids),
         validate_work_item_state_machine(work_item),
+        validate_attempt_timestamps(work_item),
         validate_attempt_ordering(work_item),
         validate_execution_gate(work_item),
     ]
