@@ -1,6 +1,6 @@
 # Project Audit — Current State
 
-**Status em 2026-09-26: Swarm Architecture (L2/L3) estável; integrado na `main`.**
+**Status em 2026-09-27: Swarm Architecture (L2/L3) estável; integrado na `main`.**
 
 ## Baseline e Arquitetura Swarm
 
@@ -80,3 +80,10 @@ This closes the remaining known planning-coverage gap between an existing securi
 ## Phase 15 — Publication Lifecycle Closure
 
 The canonical publication lifecycle is now closed. After artifact generation and the final snapshot check, an eligible run crosses the Orchestrator publication barrier and is persisted as PUBLISHED_COMPLETE. Publication is idempotent, requires the existing can_publish() invariants plus physical required artifacts, and does not introduce a new WorkItem action, canonical entity, schema field, or OmniRoute responsibility. PUBLISHED_PARTIAL remains reserved pending an explicit authorization contract.
+
+
+## Phase 16 — State Integrity Closure
+
+A boundary audit after Phase 15 identified residual Layer 2 persistence gaps. Phase 16 closes them without schema expansion: WorkItem commits now require a persisted Plan and semantic validation; Run WorkItem references must match the frozen Plan WorkItem set; and AuditPlan becomes immutable after freeze, including immutable applicability/budget value objects and reloaded frozen collections.
+
+The vertical-slice API now materializes separately supplied WorkItems into the Plan before freezing it, preserving the canonical Plan → Run graph closure.
