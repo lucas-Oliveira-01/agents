@@ -139,8 +139,9 @@ def test_recovery_replays_completed_item_when_evidence_is_unavailable(
         completed=False,
     )
 
-    original_item.execution_state = ExecutionState.TERMINATED
-    original_item.failure_state = WorkItemFailureState.NONE
+    attempt = original_item.start_attempt(started_at=FIXED_TS)
+    attempt.finish(finished_at=FIXED_TS + timedelta(seconds=1), exit_code=0)
+    original_item.terminate(WorkItemFailureState.NONE)
     orchestrator.commit_work_item(original_item)
 
     bundle = orchestrator.prepare_recovery(run.run_id)
