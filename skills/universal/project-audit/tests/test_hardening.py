@@ -292,6 +292,58 @@ class TestBlockedFailedPartialDistinction:
         assert run.coverage_completeness == RunCoverageCompleteness.FULL
 
 
+
+def test_finding_identity_scope_separates_distinct_same_type_findings():
+    from project_audit.finding_lifecycle import canonical_finding_fingerprint, finding_key
+    from project_audit.semantic_auditor import SemanticFindingCandidate
+
+    common = dict(
+        category="SECURITY",
+        subcategory="AUTHORIZATION",
+        finding_type="VULNERABILITY",
+        status="PROBABLE",
+        severity="P2",
+        confidence="MEDIUM",
+        cause=None,
+        impact=None,
+        exploitability=None,
+        recommendation=None,
+    )
+    first = SemanticFindingCandidate(
+        title="IDOR A",
+        location={"file": "src/orders/OrderController.java", "line": 10},
+        locations=({"file": "src/orders/OrderController.java", "line": 10},),
+        evidence="resource id from request is used without ownership check",
+        description="candidate A",
+        raw_severity="P2",
+        normalization_rule=None,
+        raw_type="VULNERABILITY",
+        type_normalization_rule=None,
+        raw_status="PROBABLE",
+        status_normalization_rule=None,
+        **common,
+    )
+    second = SemanticFindingCandidate(
+        title="IDOR B",
+        location={"file": "src/employees/EmployeeController.java", "line": 10},
+        locations=({"file": "src/employees/EmployeeController.java", "line": 10},),
+        evidence="employee id from request is used without ownership check",
+        description="candidate B",
+        raw_severity="P2",
+        normalization_rule=None,
+        raw_type="VULNERABILITY",
+        type_normalization_rule=None,
+        raw_status="PROBABLE",
+        status_normalization_rule=None,
+        **common,
+    )
+
+    first_key = finding_key(canonical_finding_fingerprint(first, "SECURITY/AUTHORIZATION"))
+    second_key = finding_key(canonical_finding_fingerprint(second, "SECURITY/AUTHORIZATION"))
+
+    assert first_key != second_key
+
+
 # ===========================================================================
 # §2 — can_publish() for each critical state
 # ===========================================================================
