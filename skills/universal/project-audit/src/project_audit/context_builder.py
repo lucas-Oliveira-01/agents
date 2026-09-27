@@ -318,6 +318,6 @@ def build_context(
     return ContextBundle(
         task="Audit " + target_surface,
         target_surface=target_surface,
-        items=tuple(items),
+        items=tuple(selected),
         fingerprint=fingerprint,
     )
