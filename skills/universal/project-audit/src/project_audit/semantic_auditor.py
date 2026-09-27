@@ -163,7 +163,7 @@ def _normalize_locations(value: Any) -> Tuple[Dict[str, Any], ...]:
 
     normalized = []
     for item in values:
-        location = _normalize_location(item)
+        location = _validate_location(item)
         if location is not None:
             normalized.append(location)
     return tuple(normalized)
