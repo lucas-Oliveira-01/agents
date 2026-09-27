@@ -25,8 +25,8 @@ from project_audit.models import (
     RunExecutionCompleteness,
     RunFailureState,
     RunPublicationState,
-    WorkingTreeState,
-    TargetMode,
+    WorkItemAction,
+    WorkItemFailureState,
 )
 from project_audit.orchestrator import Orchestrator, OrchestratorError, PublicationError
 from project_audit.planner import build_target_snapshot
@@ -75,7 +75,7 @@ def _complete_graph(tmp_path: Path):
         plan_ref=plan_id,
         auditor="phase15-fixture",
         target_surface="CODE_QUALITY/STATIC_REVIEW",
-        action=__import__("project_audit.models", fromlist=["WorkItemAction"]).WorkItemAction.REAUDIT,
+        action=WorkItemAction.REAUDIT,
         decision_basis="Phase 15 fixture",
         effective_execution_policy=execution_policy,
         data_egress_policy=egress_policy,
@@ -88,7 +88,7 @@ def _complete_graph(tmp_path: Path):
 
     work_item.start_attempt()
     work_item.attempts[-1].finish(work_item.attempts[-1].started_at, exit_code=0)
-    work_item.terminate(failure_state=__import__("project_audit.models", fromlist=["WorkItemFailureState"]).WorkItemFailureState.NONE)
+    work_item.terminate(failure_state=WorkItemFailureState.NONE)
     orchestrator.commit_work_item(work_item)
 
     evidence = Evidence(
