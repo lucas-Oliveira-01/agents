@@ -874,7 +874,7 @@ class Orchestrator:
             else:
                 if current_item_drifted:
                     attempt.fail(
-                        finished_at=now,
+                        finished_at=attempt_finished_at,
                         reason="SNAPSHOT_DRIFT",
                         receipt_ref=receipt.receipt_id,
                     )
@@ -883,7 +883,7 @@ class Orchestrator:
                     work_item.terminate(failure_state=WorkItemFailureState.SNAPSHOT_DRIFT)
                 else:
                     attempt.finish(
-                        finished_at=now,
+                        finished_at=attempt_finished_at,
                         exit_code=0,
                         receipt_ref=receipt.receipt_id,
                     )
