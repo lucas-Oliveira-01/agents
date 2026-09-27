@@ -36,6 +36,15 @@ from .delegation import WorkerExecution
 from .autofix import AutoFixError, FixCandidate, FixLedger, logical_finding_key, run_immutable_fix
 from .verifier import IndependentVerifier, VerificationResult, VerificationVerdict, candidate_identity, consolidated_reviews, verify_semantic_reviews
 from .change_impact import ChangeImpact, ChangeEvent, ChangeKind, EvidenceImpact, build_change_impact
+from .classification_lineage import (
+    ClassificationChange,
+    ClassificationLineage,
+    ReclassificationImpact,
+    build_classification_lineage,
+    build_reclassification_impact,
+    compare_classification_lineage,
+    missing_reclassification_impact,
+)
 from .incremental import (
     IncrementalDecision,
     DependencyKind,
@@ -82,6 +91,9 @@ __all__ = [
     "IncrementalDecision", "DependencyKind", "DependencyNode", "EvidenceDependencyGraph",
     "IncrementalBinding", "ReauditNecessity", "assess_reaudit_necessity",
     "ChangeImpact", "ChangeEvent", "ChangeKind", "EvidenceImpact", "build_change_impact",
+    "ClassificationChange", "ClassificationLineage", "ReclassificationImpact",
+    "build_classification_lineage", "build_reclassification_impact",
+    "compare_classification_lineage", "missing_reclassification_impact",
     "IndependentVerifier", "VerificationResult", "VerificationVerdict", "candidate_identity", "verify_semantic_reviews", "consolidated_reviews",
     "AutoFixError", "FixCandidate", "FixLedger", "logical_finding_key", "run_immutable_fix",
     "decide_incremental_action", "build_dependency_graph", "plan_incremental_actions",
