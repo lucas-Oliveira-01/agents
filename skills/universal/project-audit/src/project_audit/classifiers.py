@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -172,6 +174,93 @@ def classify_stack(snapshot: DiscoverySnapshot) -> Tuple[str, ...]:
     return tuple(sorted(technologies))
 
 
+
+def _http_client_runtime(path: str, content: str) -> str:
+    """Classify outbound HTTP usage without equating browser fetch with SSRF."""
+    lower_path = path.lower()
+    lower = content.lower()
+    suffix = Path(path).suffix.lower()
+    parts = {part for part in Path(lower_path).parts}
+
+    browser_path = suffix in {".js", ".jsx", ".ts", ".tsx"} and bool(
+        parts.intersection({"frontend", "public", "static"})
+    )
+    browser_signal = any(
+        token in lower
+        for token in ("document.", "window.", "addeventlistener", "queryselector", "innerhtml", "textcontent")
+    )
+    if browser_path or (suffix in {".js", ".jsx", ".ts", ".tsx"} and browser_signal):
+        return "BROWSER_HTTP_CLIENT"
+
+    server_language = suffix in {
+        ".java", ".kt", ".py", ".go", ".rs", ".rb", ".php", ".cs"
+    }
+    server_path = bool(parts.intersection({"backend", "server", "api"}))
+    if any(token in lower for token in (
+        "resttemplate", "webclient", "httpclient", "requests.get(",
+        "requests.post(", "urllib.request", "httpx.", "java.net.http",
+    )):
+        return "SERVER_HTTP_CLIENT"
+    if server_path and any(token in lower for token in ("axios", "fetch(", "undici", "got(")):
+        return "SERVER_HTTP_CLIENT"
+    if server_language and any(
+        token in lower
+        for token in (
+            "axios", "fetch(", "http://", "https://", "httpx",
+            "requests", "urllib",
+        )
+    ):
+        return "SERVER_HTTP_CLIENT"
+    if any(token in lower for token in ("axios", "fetch(", "urllib", "requests", "httpx")):
+        return "UNKNOWN_HTTP_CLIENT"
+    if any(token in lower for token in ("axios", "fetch(", "urllib", "requests", "httpx")):
+        return "UNKNOWN_HTTP_CLIENT"
+    return "NO_HTTP_CLIENT"
+
+
+def _authentication_evidence(
+    snapshot: DiscoverySnapshot,
+    classifications: Tuple[FileClassification, ...],
+    stack: set[str],
+) -> Tuple[str, ...]:
+    """Prefer structural authentication symbols over arbitrary substring hits."""
+    path_signals = (
+        "jwt", "authmiddleware", "authorizationmiddleware", "authcontext",
+        "jwtvalidator", "jwtissuer", "loginservice", "logincontroller",
+        "authentication", "authorization", "oauth", "passwordhasher",
+    )
+    refs = []
+    for item in classifications:
+        if item.kind != FileKind.SOURCE:
+            continue
+        path_lower = item.path.lower()
+        content = _read_text(snapshot, item.path, 48_000)
+        structural = "\n".join(
+            line
+            for line in content.splitlines()
+            if not line.lstrip().startswith(("//", "#", "/*", "*", '"""', "'''"))
+        ).lower()
+        declaration_hits = re.findall(
+            r"\b(?:class|interface|function|def)\s+([a-z0-9_]*(?:auth|authentication|authorization|jwt|login|oauth|session|owner)[a-z0-9_]*)\b",
+            structural,
+        )
+        import_hits = any(
+            token in line
+            for line in structural.splitlines()
+            if line.strip().startswith(("import ", "from ", "using ", "require("))
+            for token in ("jwt", "oauth", "spring-security", "auth", "bcrypt")
+        )
+        path_hit = any(token in path_lower for token in path_signals)
+        if path_hit or declaration_hits or import_hits:
+            refs.append(item.path)
+    if not refs and any(
+        token in " ".join(stack).lower()
+        for token in ("jwt", "oauth", "spring-security")
+    ):
+        return tuple()
+    return tuple(sorted(set(refs)))
+
+
 def classify_applicability(snapshot: DiscoverySnapshot, stack: Iterable[str]) -> Tuple[ApplicabilityDecision, ...]:
     stack_set = set(stack)
     classifications = classify_files(snapshot)
@@ -219,14 +308,44 @@ def classify_applicability(snapshot: DiscoverySnapshot, stack: Iterable[str]) ->
         "Documentation artifacts were discovered" if documentation_evidence else "No documentation artifact was discovered; absence is not proof of undocumented operation",
         documentation_evidence[:8],
     )
-    http_evidence = tuple(
-        item.path for item in snapshot.files
-        if not item.binary and any(
-            token in _read_text(snapshot, item.path, 32_000).lower()
-            for token in ("httpclient", "resttemplate", "webclient", "requests.get", "axios", "fetch(", "urllib", "httpx")
-        )
+    runtime_by_path = {}
+    for item in snapshot.files:
+        if item.binary:
+            continue
+        content = _read_text(snapshot, item.path, 32_000)
+        runtime_by_path[item.path] = _http_client_runtime(item.path, content)
+
+    server_http = tuple(
+        path for path, runtime in runtime_by_path.items()
+        if runtime == "SERVER_HTTP_CLIENT"
     )
-    add("SECURITY", "SSRF", ApplicabilityState.APPLICABLE if http_evidence else ApplicabilityState.NOT_DETERMINABLE, "Server-side HTTP client indicators found" if http_evidence else "No decisive outbound HTTP evidence", http_evidence[:8])
+    unknown_http = tuple(
+        path for path, runtime in runtime_by_path.items()
+        if runtime == "UNKNOWN_HTTP_CLIENT"
+    )
+    browser_http = tuple(
+        path for path, runtime in runtime_by_path.items()
+        if runtime == "BROWSER_HTTP_CLIENT"
+    )
+
+    if server_http:
+        ssrf_state = ApplicabilityState.APPLICABLE
+        ssrf_reason = "Server-side HTTP client evidence identified"
+        ssrf_evidence = server_http[:8]
+    elif unknown_http:
+        ssrf_state = ApplicabilityState.NOT_DETERMINABLE
+        ssrf_reason = "Outbound HTTP exists but runtime context is not provably server-side"
+        ssrf_evidence = unknown_http[:8]
+    elif browser_http:
+        ssrf_state = ApplicabilityState.NOT_APPLICABLE
+        ssrf_reason = "Only browser/client-side HTTP usage was identified; no server-side SSRF surface"
+        ssrf_evidence = browser_http[:8]
+    else:
+        ssrf_state = ApplicabilityState.NOT_DETERMINABLE
+        ssrf_reason = "No decisive outbound HTTP evidence"
+        ssrf_evidence = ()
+
+    add("SECURITY", "SSRF", ssrf_state, ssrf_reason, ssrf_evidence)
 
     frontend_evidence = tuple(item.path for item in snapshot.files if Path(item.path).suffix.lower() in {".html", ".jsx", ".tsx", ".vue", ".svelte"} or item.path.lower().endswith("package.json"))
     add("SECURITY", "XSS", ApplicabilityState.APPLICABLE if frontend_evidence else ApplicabilityState.NOT_DETERMINABLE, "Frontend/template surface identified" if frontend_evidence else "No decisive frontend/template evidence", frontend_evidence[:8])
@@ -234,8 +353,18 @@ def classify_applicability(snapshot: DiscoverySnapshot, stack: Iterable[str]) ->
     secret_surface = tuple(item.path for item in snapshot.files if Path(item.path).name.lower() in {".env", ".env.local", ".env.production", "credentials.json", "secrets.yaml"})
     add("SECURITY", "SECRET_EXPOSURE", ApplicabilityState.APPLICABLE if secret_surface or snapshot.git.is_repository else ApplicabilityState.NOT_DETERMINABLE, "Configuration/history can expose secrets" if secret_surface or snapshot.git.is_repository else "Insufficient project metadata", secret_surface[:8])
 
-    auth_signal = any(token in " ".join(stack_set).lower() for token in ("spring", "jwt", "oauth"))
-    add("SECURITY", "AUTHENTICATION", ApplicabilityState.APPLICABLE if auth_signal else ApplicabilityState.NOT_DETERMINABLE, "Authentication-related stack signal found" if auth_signal else "No deterministic authentication mechanism identified")
+    auth_evidence = _authentication_evidence(snapshot, classifications, stack_set)
+    auth_signal = bool(auth_evidence) or any(
+        token in " ".join(stack_set).lower()
+        for token in ("spring", "jwt", "oauth", "spring-security")
+    )
+    add(
+        "SECURITY",
+        "AUTHENTICATION",
+        ApplicabilityState.APPLICABLE if auth_signal else ApplicabilityState.NOT_DETERMINABLE,
+        "Authentication-related source or stack signals found" if auth_signal else "No deterministic authentication mechanism identified",
+        auth_evidence[:8],
+    )
     add("SECURITY", "AUTHORIZATION", ApplicabilityState.APPLICABLE if source_paths else ApplicabilityState.NOT_DETERMINABLE, "Authorization semantics require source inspection" if source_paths else "No source evidence")
     sql_present = "JDBC" in stack_set or "JPA_HIBERNATE" in stack_set or bool(db_evidence)
     add("SECURITY", "SQL_INJECTION", ApplicabilityState.APPLICABLE if sql_present else ApplicabilityState.NOT_DETERMINABLE, "SQL/persistence surface identified" if sql_present else "No decisive SQL surface evidence")

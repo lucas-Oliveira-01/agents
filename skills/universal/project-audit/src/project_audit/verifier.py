@@ -57,6 +57,7 @@ def candidate_identity(candidate: SemanticFindingCandidate) -> str:
         "severity": candidate.severity,
         "confidence": candidate.confidence,
         "location": candidate.location,
+        "locations": candidate.locations,
         "evidence": candidate.evidence,
     }
     digest = hashlib.sha256(
@@ -86,15 +87,16 @@ def _normalize_ref(value: str) -> str:
     return text
 
 
-def _location_ref(candidate: SemanticFindingCandidate) -> Optional[str]:
-    location = candidate.location
-    if not isinstance(location, dict):
-        return None
-    value = location.get("file")
-    if isinstance(value, str) and value.strip():
-        return _normalize_ref(value)
-    return None
-
+def _location_refs(candidate: SemanticFindingCandidate) -> Tuple[str, ...]:
+    locations = candidate.locations or ((candidate.location,) if candidate.location else ())
+    refs = []
+    for location in locations:
+        if not isinstance(location, dict):
+            continue
+        value = location.get("file")
+        if isinstance(value, str) and value.strip():
+            refs.append(_normalize_ref(value))
+    return tuple(ref for ref in refs if ref)
 
 class IndependentVerifier:
     """Independent deterministic verification policy for semantic candidates."""
@@ -160,8 +162,8 @@ class IndependentVerifier:
                 evidence.evidence_id,
             )
 
-        location_ref = _location_ref(candidate)
-        if location_ref is None:
+        location_refs = _location_refs(candidate)
+        if not location_refs:
             if candidate.severity in {"P0", "P1"}:
                 return VerificationResult(
                     candidate_id,
@@ -177,16 +179,20 @@ class IndependentVerifier:
                 for ref in evidence.source_refs
                 if _normalize_ref(ref)
             }
-            if location_ref not in source_refs:
+            missing = sorted(set(location_refs) - source_refs)
+            if missing:
                 return VerificationResult(
                     candidate_id,
                     work_item.work_item_id,
                     candidate.severity,
                     VerificationVerdict.REJECTED,
-                    ("candidate location is not represented by persisted Evidence.source_refs",),
+                    (
+                        "candidate locations are not fully represented by persisted Evidence.source_refs: "
+                        + ", ".join(missing),
+                    ),
                     evidence.evidence_id,
                 )
-            reasons.append("candidate location is grounded in persisted source evidence")
+            reasons.append("all candidate locations are grounded in persisted source evidence")
 
         # Critical findings may only cross the verifier gate when the auditor
         # has already supplied the strongest epistemic state. The verifier does

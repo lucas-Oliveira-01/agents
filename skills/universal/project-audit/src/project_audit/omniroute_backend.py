@@ -124,67 +124,107 @@ class OmniRouteDelegationBackend(DelegationBackend):
         from omniroute_delegation.exceptions import SchemaViolationError
         from omniroute_delegation.semantic_parser import SemanticPayload, extract_json
 
-        def metadata_and_payload(value: Any) -> tuple[Any, Optional[str], Optional[str]]:
+        def metadata(value: Any) -> tuple[Optional[str], Optional[str]]:
             if not isinstance(value, dict):
-                return value, None, None
-            metadata = value.get("_omniroute_meta")
-            if not isinstance(metadata, dict):
-                return value, None, None
-            cleaned = dict(value)
-            cleaned.pop("_omniroute_meta", None)
-            provider = metadata.get("provider") if isinstance(metadata.get("provider"), str) else None
-            model = metadata.get("model") if isinstance(metadata.get("model"), str) else None
-            if model is None and isinstance(metadata.get("route"), str):
-                model = metadata["route"]
-            return cleaned, provider, model
+                return None, None
+            item = value.get("_omniroute_meta")
+            if not isinstance(item, dict):
+                return None, None
+            provider = item.get("provider") if isinstance(item.get("provider"), str) else None
+            model = item.get("model") if isinstance(item.get("model"), str) else None
+            if model is None and isinstance(item.get("route"), str):
+                model = item["route"]
+            return provider, model
 
-        if isinstance(result, dict):
-            structured = result.get("structuredContent")
-            if isinstance(structured, dict) and structured:
-                cleaned, provider, model = metadata_and_payload(structured)
+        def cleaned(value: Any) -> Any:
+            if isinstance(value, dict) and isinstance(value.get("_omniroute_meta"), dict):
+                value = dict(value)
+                value.pop("_omniroute_meta", None)
+            return value
+
+        def parse_text(raw_text: str) -> Any:
+            try:
+                return extract_json(raw_text)
+            except SchemaViolationError as exc:
+                setattr(exc, "raw_output", raw_text)
+                raise
+
+        def decode(value: Any, depth: int = 0) -> SemanticPayload:
+            if depth > 3:
+                raise SchemaViolationError("OmniRoute semantic envelope nesting is too deep.")
+
+            outer_provider, outer_model = metadata(value)
+
+            if isinstance(value, str):
+                parsed = parse_text(value)
+                parsed = cleaned(parsed)
+                provider, model = metadata(parsed)
                 return SemanticPayload(
-                    payload=cleaned,
-                    raw_output=json.dumps(structured, ensure_ascii=False, sort_keys=True),
-                    provider=provider or self.provider,
-                    model=model or self.model,
+                    payload=parsed,
+                    raw_output=value,
+                    provider=provider or outer_provider or self.provider,
+                    model=model or outer_model or self.model,
                 )
 
-            content = result.get("content", [])
-            if isinstance(content, list):
-                raw_text = "".join(
-                    item.get("text", "")
-                    for item in content
-                    if isinstance(item, dict) and item.get("type") == "text"
-                ).strip()
-                if raw_text:
-                    try:
-                        parsed = extract_json(raw_text)
-                    except SchemaViolationError as exc:
-                        setattr(exc, "raw_output", raw_text)
-                        raise
-                    cleaned, provider, model = metadata_and_payload(parsed)
+            if isinstance(value, dict):
+                structured = value.get("structuredContent")
+                if isinstance(structured, (dict, list)) and structured:
+                    parsed = cleaned(structured)
+                    provider, model = metadata(parsed)
                     return SemanticPayload(
-                        payload=cleaned,
-                        raw_output=raw_text,
-                        provider=provider or self.provider,
-                        model=model or self.model,
+                        payload=parsed,
+                        raw_output=json.dumps(structured, ensure_ascii=False, sort_keys=True),
+                        provider=provider or outer_provider or self.provider,
+                        model=model or outer_model or self.model,
                     )
 
-        if isinstance(result, str):
-            try:
-                parsed = extract_json(result)
-            except SchemaViolationError as exc:
-                setattr(exc, "raw_output", result)
-                raise
-            cleaned, provider, model = metadata_and_payload(parsed)
-            return SemanticPayload(
-                payload=cleaned,
-                raw_output=result,
-                provider=provider or self.provider,
-                model=model or self.model,
-            )
+                for key in ("result", "output"):
+                    nested = value.get(key)
+                    if isinstance(nested, (str, dict, list)):
+                        nested_result = decode(nested, depth + 1)
+                        return SemanticPayload(
+                            payload=nested_result.payload,
+                            raw_output=nested_result.raw_output,
+                            provider=nested_result.provider or outer_provider or self.provider,
+                            model=nested_result.model or outer_model or self.model,
+                        )
 
-        raise SchemaViolationError("OmniRoute returned no semantic payload.")
+                content = value.get("content")
+                if isinstance(content, list):
+                    raw_text = "".join(
+                        item.get("text", "")
+                        for item in content
+                        if isinstance(item, dict) and item.get("type") == "text"
+                    ).strip()
+                    if raw_text:
+                        parsed = cleaned(parse_text(raw_text))
+                        provider, model = metadata(parsed)
+                        return SemanticPayload(
+                            payload=parsed,
+                            raw_output=raw_text,
+                            provider=provider or outer_provider or self.provider,
+                            model=model or outer_model or self.model,
+                        )
+
+                parsed = cleaned(value)
+                return SemanticPayload(
+                    payload=parsed,
+                    raw_output=json.dumps(value, ensure_ascii=False, sort_keys=True),
+                    provider=outer_provider or self.provider,
+                    model=outer_model or self.model,
+                )
+
+            if isinstance(value, list):
+                return SemanticPayload(
+                    payload=value,
+                    raw_output=json.dumps(value, ensure_ascii=False, sort_keys=True),
+                    provider=self.provider,
+                    model=self.model,
+                )
+
+            raise SchemaViolationError("OmniRoute returned no semantic payload.")
+
+        return decode(result)
 
     @staticmethod
     def _contract_to_payload(contract: "AuditContract") -> Dict[str, Any]:

@@ -66,6 +66,21 @@ def _run_for(prepared, work_item):
     )
 
 
+
+def test_context_builder_expands_one_hop_cross_file_relationships(tmp_path: Path) -> None:
+    _write(tmp_path, "auth/OrderController.java", "import service.OrderService; import dao.OrderRepository; class OrderController {}\n")
+    _write(tmp_path, "service/OrderService.java", "class OrderService {}\n")
+    _write(tmp_path, "dao/OrderRepository.java", "class OrderRepository {}\n")
+    for idx in range(8):
+        _write(tmp_path, f"misc/Unrelated{idx}.java", f"class Unrelated{idx} {{}}\n")
+
+    discovery = discover(tmp_path)
+    context = build_context(discovery, "SECURITY/AUTHORIZATION", max_files=3)
+    paths = {item.path for item in context.items}
+
+    assert "auth/OrderController.java" in paths
+    assert {"service/OrderService.java", "dao/OrderRepository.java"} <= paths
+
 def test_context_builder_is_bounded_and_deterministic(tmp_path: Path) -> None:
     for idx in range(20):
         _write(tmp_path, "src/module{}/service.py".format(idx), "print('x')\n")
@@ -161,6 +176,101 @@ def test_semantic_auditor_accepts_structured_output_when_policy_explicitly_allow
     assert len(result.candidates) == 1
     assert result.evidence is not None
 
+
+
+def test_semantic_auditor_salvages_valid_findings_from_mixed_output(tmp_path: Path) -> None:
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    discovery = discover(tmp_path)
+    prepared = prepare_audit(
+        discovery,
+        classify_files(discovery),
+        classify_applicability(discovery, classify_stack(discovery)),
+    )
+    work_item = next(item for item in prepared.work_items if not item.target_surface.startswith("SECURITY/"))
+    work_item.data_egress_policy = EgressPolicy(
+        destination=EgressDestination.APPROVED_EXTERNAL,
+        allow_sensitive=True,
+    )
+    payload = {
+        "findings": [
+            {
+                "title": "Valid finding",
+                "category": "CODE_QUALITY",
+                "subcategory": "STATIC_REVIEW",
+                "type": "BUG",
+                "status": "PROBABLE",
+                "severity": "P2",
+                "confidence": "MEDIUM",
+                "location": {"file": "src/app.py", "line": 1},
+                "evidence": "Observed",
+                "description": "Valid candidate",
+            },
+            {
+                "title": "Invalid finding",
+                "category": "CODE_QUALITY",
+                "severity": "P2",
+            },
+        ]
+    }
+    auditor = SemanticAuditor(WorkerPort(FakeBackend(payload), "test-semantic"))
+    result = auditor.review(
+        work_item, _run_for(prepared, work_item), build_context(discovery, work_item.target_surface)
+    )
+
+    assert result.status == "PARTIAL_COVERAGE"
+    assert len(result.candidates) == 1
+    assert result.candidates[0].title == "Valid finding"
+    assert result.raw_errors
+    assert result.evidence is not None
+
+
+def test_semantic_auditor_preserves_schema_violation_as_semantic_failure(tmp_path: Path) -> None:
+    _write(tmp_path, "src/app.py", "print('ok')\n")
+    discovery = discover(tmp_path)
+    prepared = prepare_audit(
+        discovery,
+        classify_files(discovery),
+        classify_applicability(discovery, classify_stack(discovery)),
+    )
+    work_item = next(item for item in prepared.work_items if not item.target_surface.startswith("SECURITY/"))
+    work_item.data_egress_policy = EgressPolicy(
+        destination=EgressDestination.APPROVED_EXTERNAL,
+        allow_sensitive=True,
+    )
+
+    from omniroute_delegation.contracts import AuditContract, ExecutionState
+
+    class SchemaFailureBackend(DelegationBackend):
+        def delegate(self, request):
+            contract = AuditContract(
+                state=ExecutionState.SCHEMA_VIOLATION,
+                findings=[],
+                raw_errors=[{"message": "invalid semantic output"}],
+                attempts=2,
+                raw_output="not-json",
+            )
+            return DelegationResult(
+                request_id=request.request_id,
+                status=DelegationStatus.FAILED,
+                output_payload=None,
+                error_message="semantic coverage failed",
+                provider_info="dummy",
+                usage_tokens=0,
+                audit_contract=contract,
+                provider="dummy",
+                model="dummy-model",
+                raw_output="not-json",
+            )
+
+    auditor = SemanticAuditor(WorkerPort(SchemaFailureBackend(), "test-semantic"))
+    result = auditor.review(
+        work_item, _run_for(prepared, work_item), build_context(discovery, work_item.target_surface)
+    )
+
+    assert result.status == "SCHEMA_VIOLATION"
+    assert result.audit_contract is not None
+    assert result.audit_contract.state == ExecutionState.SCHEMA_VIOLATION
+    assert result.raw_errors
 
 def test_semantic_auditor_rejects_invalid_worker_output(tmp_path: Path) -> None:
     _write(tmp_path, "src/app.py", "print('ok')\n")

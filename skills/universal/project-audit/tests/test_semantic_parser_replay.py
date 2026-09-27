@@ -84,6 +84,70 @@ def test_semantic_parser_normalizes_severity():
     assert candidates[1].normalization_rule == "HIGH->P1"
 
 
+def test_semantic_parser_normalizes_documented_type_status_evidence_and_location_aliases():
+    payload = {
+        "findings": [
+            {
+                "title": "Alias finding",
+                "category": "SECURITY",
+                "type": "CSRF",
+                "status": "POSSIBLE",
+                "severity": "HIGH",
+                "confidence": "MEDIUM",
+                "location": {"files": ["src/app.py"], "lines": [23, 25]},
+                "evidence": ["First observation", "Second observation"],
+                "description": "Candidate emitted using documented alternate forms.",
+            }
+        ]
+    }
+
+    from project_audit.semantic_auditor import _parse_output
+    candidates = _parse_output(payload)
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.finding_type == "VULNERABILITY"
+    assert candidate.raw_type == "CSRF"
+    assert candidate.type_normalization_rule == "CSRF->VULNERABILITY"
+    assert candidate.status == "NOT_DETERMINABLE"
+    assert candidate.raw_status == "POSSIBLE"
+    assert candidate.status_normalization_rule == "POSSIBLE->NOT_DETERMINABLE"
+    assert candidate.severity == "P1"
+    assert candidate.location == {"file": "src/app.py", "line_start": 23, "line_end": 25}
+    assert candidate.evidence == "First observation\nSecond observation"
+
+
+def test_semantic_parser_preserves_multi_file_locations():
+    payload = {
+        "findings": [{
+            "title": "Cross-file authorization candidate",
+            "category": "SECURITY",
+            "subcategory": "AUTHORIZATION",
+            "type": "IDOR",
+            "status": "PROBABLE",
+            "severity": "HIGH",
+            "confidence": "MEDIUM",
+            "location": {
+                "locations": [
+                    {"file": "src/controller/Orders.java", "line": 10},
+                    {"file": "src/service/OrderService.java", "line_start": 42, "line_end": 48}
+                ]
+            },
+            "evidence": "The resource identifier is propagated without ownership validation.",
+            "description": "Cross-file candidate requiring confirmation.",
+        }]
+    }
+
+    from project_audit.semantic_auditor import _parse_output
+    candidates = _parse_output(payload)
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert len(candidate.locations) == 2
+    assert candidate.location == candidate.locations[0]
+    assert candidate.locations[1]["file"] == "src/service/OrderService.java"
+
+
 def test_semantic_parser_rejects_unknown_severity():
     payload = {
         "findings": [
