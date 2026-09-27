@@ -258,6 +258,21 @@ jobs:
 
       - name: Run Phase 18 execution history acceptance
         run: python -m pytest -q skills/universal/project-audit/tests/test_phase18_execution_history_integrity.py
+  phase19-recovery-lineage-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install project-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e skills/universal/project-audit
+      - name: Run Phase 19 recovery lineage acceptance
+        run: python -m pytest -q skills/universal/project-audit/tests/test_phase19_recovery_lineage_integrity.py
   normalize-integration:
     runs-on: ubuntu-latest
     steps:
