@@ -66,6 +66,21 @@ def _run_for(prepared, work_item):
     )
 
 
+
+def test_context_builder_expands_one_hop_cross_file_relationships(tmp_path: Path) -> None:
+    _write(tmp_path, "auth/OrderController.java", "import service.OrderService; import dao.OrderRepository; class OrderController {}\n")
+    _write(tmp_path, "service/OrderService.java", "class OrderService {}\n")
+    _write(tmp_path, "dao/OrderRepository.java", "class OrderRepository {}\n")
+    for idx in range(8):
+        _write(tmp_path, f"misc/Unrelated{idx}.java", f"class Unrelated{idx} {{}}\n")
+
+    discovery = discover(tmp_path)
+    context = build_context(discovery, "SECURITY/AUTHORIZATION", max_files=3)
+    paths = {item.path for item in context.items}
+
+    assert "auth/OrderController.java" in paths
+    assert {"service/OrderService.java", "dao/OrderRepository.java"} <= paths
+
 def test_context_builder_is_bounded_and_deterministic(tmp_path: Path) -> None:
     for idx in range(20):
         _write(tmp_path, "src/module{}/service.py".format(idx), "print('x')\n")
