@@ -302,6 +302,16 @@ class ProjectState:
     submodules_state: tuple  # tuple[SubmoduleState, ...]
     tracked_input_fingerprints: tuple  # tuple[TrackedInputFingerprint, ...]
 
+    def __post_init__(self) -> None:
+        # Frozen dataclasses only prevent field reassignment. Normalize nested
+        # collections so TargetSnapshot immutability is effective at runtime.
+        object.__setattr__(self, "submodules_state", tuple(self.submodules_state))
+        object.__setattr__(
+            self,
+            "tracked_input_fingerprints",
+            tuple(self.tracked_input_fingerprints),
+        )
+
 
 @dataclass(frozen=True)
 class MethodologyState:
@@ -424,6 +434,12 @@ class ExecutionReceipt:
     artifact_refs: List[str]
     environment_summary: Optional[str] = None  # non-sensitive summary only
 
+    def __post_init__(self) -> None:
+        # Prevent mutable list aliases from bypassing the immutable receipt
+        # contract after construction or StateStore reload.
+        object.__setattr__(self, "arguments", tuple(self.arguments))
+        object.__setattr__(self, "artifact_refs", tuple(self.artifact_refs))
+
     def to_dict(self) -> dict:
         return {
             "receipt_id": self.receipt_id,
@@ -531,6 +547,11 @@ class Evidence:
     # New immutable Evidence derived from a prior Evidence during incremental
     # REUSE. The historical source Evidence remains untouched.
     derived_from_evidence_ref: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        # Keep Evidence immutable even when callers provide mutable lists.
+        object.__setattr__(self, "source_refs", tuple(self.source_refs))
+        object.__setattr__(self, "dependencies", tuple(self.dependencies))
 
     def to_dict(self) -> dict:
         d = {
