@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 from .fake_auditor import FakeAuditor, FakeAuditorResult, FakeAuditorWithSnapshot
+from .incremental import derive_reused_evidence
 from .models import (
     ApplicabilityDecision,
     Attempt,
