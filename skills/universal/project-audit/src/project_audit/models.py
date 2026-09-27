@@ -631,6 +631,16 @@ class AuditWorkItem:
     def transition(self, new_state: ExecutionState) -> None:
         """Apply a validated state transition."""
         allowed = self._VALID_TRANSITIONS.get(self.execution_state, set())
+        # REUSE represents materialization from already-valid historical Evidence,
+        # not a new execution. It may therefore close directly from PLANNED after
+        # fresh Evidence has been committed by the Orchestrator.
+        if (
+            self.execution_state == ExecutionState.PLANNED
+            and new_state == ExecutionState.TERMINATED
+            and self.action == WorkItemAction.REUSE
+        ):
+            self.execution_state = new_state
+            return
         if new_state not in allowed:
             raise IllegalStateTransitionError(
                 f"WorkItem {self.work_item_id}: cannot transition "

@@ -554,11 +554,24 @@ def validate_work_item_state_machine(work_item: AuditWorkItem) -> ValidationResu
     """
     Validates that execution_state is consistent with attempt history.
     RUNNING requires at least one unfinished attempt.
-    TERMINATED requires at least one attempt.
+    TERMINATED requires at least one attempt for executed WorkItems; REUSE may terminate without an Attempt.
     (semantic-validators.md §3)
     """
     state = work_item.execution_state
     attempts = work_item.attempts
+
+    # A REUSE WorkItem can close without an execution Attempt because the
+    # completion proof is the fresh current-snapshot Evidence edge.
+    if (
+        state == ExecutionState.TERMINATED
+        and not attempts
+        and work_item.action == WorkItemAction.REUSE
+        and work_item.failure_state == WorkItemFailureState.NONE
+    ):
+        return _pass(
+            "WORK_ITEM_REUSE_STATE_VALID",
+            f"WorkItem {work_item.work_item_id} is a non-executing REUSE completion.",
+        )
 
     if state == ExecutionState.RUNNING:
         if not attempts:

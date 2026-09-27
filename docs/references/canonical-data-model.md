@@ -159,3 +159,12 @@ No new canonical entity or schema field is introduced.
 The mutable execution trail is now closed at the retry and persistence boundaries. A rejected retry cannot partially transition a WorkItem. Non-null Attempt.receipt_ref values must resolve to durable ExecutionReceipt records belonging to the same WorkItem before that WorkItem is persisted.
 
 No new canonical entity or schema field is introduced.
+
+## Phase 19 — Recovery Execution Lineage Integrity
+
+Recovery creates fresh WorkItem identities and therefore cannot copy historical Attempt or
+ExecutionReceipt references into those identities. Completed WorkItems are preserved only
+when valid historical Evidence can be derived into fresh Evidence bound to the new WorkItem;
+otherwise the recovered item returns to PLANNED for normal execution.
+
+Historical WorkItem, Attempt, Receipt, and Evidence records remain unchanged.
