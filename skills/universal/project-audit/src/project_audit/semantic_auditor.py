@@ -32,6 +32,80 @@ _ALLOWED_CONFIDENCES = {"HIGH", "MEDIUM", "LOW"}
 
 
 @dataclass(frozen=True)
+_TYPE_ALIASES = {
+    "VULNERABILITY": "VULNERABILITY",
+    "WEAKNESS": "VULNERABILITY",
+    "SECURITY_VULNERABILITY": "VULNERABILITY",
+    "BRUTE_FORCE": "VULNERABILITY",
+    "CSRF": "VULNERABILITY",
+    "XSS": "VULNERABILITY",
+    "SSRF": "VULNERABILITY",
+    "SQL_INJECTION": "VULNERABILITY",
+    "IDOR": "VULNERABILITY",
+    "SECRET_MANAGEMENT": "RISK",
+    "STORAGE": "RISK",
+    "CRYPTOGRAPHY": "RISK",
+    "SECURITY_MISCONFIGURATION": "VULNERABILITY",
+    "AUTHENTICATION": "VULNERABILITY",
+    "AUTHORIZATION": "VULNERABILITY",
+}
+
+_STATUS_ALIASES = {
+    "CONFIRMED": "CONFIRMED",
+    "PROBABLE": "PROBABLE",
+    "POSSIBLE": "NOT_DETERMINABLE",
+    "NOT_DETERMINABLE": "NOT_DETERMINABLE",
+}
+
+
+def _normalize_evidence(value: Any) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, list) and value:
+        parts = [item.strip() for item in value if isinstance(item, str) and item.strip()]
+        if parts:
+            return "\n".join(parts)
+    raise SemanticOutputError("evidence must be a non-empty string or list of strings")
+
+
+def _normalize_location(value: Any) -> Optional[Dict[str, Any]]:
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip():
+        return {"file": value.strip()}
+    if not isinstance(value, dict):
+        raise SemanticOutputError("location must be an object, file string, or null")
+
+    normalized = dict(value)
+    files = normalized.get("files")
+    if "file" not in normalized and isinstance(files, list):
+        string_files = [item.strip() for item in files if isinstance(item, str) and item.strip()]
+        if len(string_files) == 1:
+            normalized["file"] = string_files[0]
+        elif len(string_files) > 1:
+            raise SemanticOutputError("location.files contains multiple files and cannot map to a single canonical location")
+
+    line_value = normalized.get("line")
+    if isinstance(line_value, str):
+        text = line_value.strip()
+        pieces = text.split("-", 1)
+        if text.isdigit():
+            normalized["line"] = int(text)
+        elif len(pieces) == 2 and all(piece.strip().isdigit() for piece in pieces):
+            normalized["line_start"] = int(pieces[0].strip())
+            normalized["line_end"] = int(pieces[1].strip())
+            normalized.pop("line", None)
+
+    lines = normalized.get("lines")
+    if isinstance(lines, list) and len(lines) == 2 and all(isinstance(item, int) for item in lines):
+        normalized["line_start"] = lines[0]
+        normalized["line_end"] = lines[1]
+        normalized.pop("lines", None)
+
+    normalized.pop("files", None)
+    return normalized
+
+
 class SemanticFindingCandidate:
     title: str
     category: str
@@ -49,6 +123,10 @@ class SemanticFindingCandidate:
     recommendation: Optional[str]
     raw_severity: Optional[str] = None
     normalization_rule: Optional[str] = None
+    raw_type: Optional[str] = None
+    type_normalization_rule: Optional[str] = None
+    raw_status: Optional[str] = None
+    status_normalization_rule: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -73,40 +151,55 @@ class SemanticOutputError(ValueError):
 
 
 def _validate_location(value: Any) -> Optional[Dict[str, Any]]:
-    if value is None:
+    normalized = _normalize_location(value)
+    if normalized is None:
         return None
-    if not isinstance(value, dict):
-        raise SemanticOutputError("location must be an object or null")
-    file_path = value.get("file")
+    file_path = normalized.get("file")
     if file_path is not None and not isinstance(file_path, str):
         raise SemanticOutputError("location.file must be a string")
     for key in ("line", "line_start", "line_end"):
-        if key in value and value[key] is not None and (
-            not isinstance(value[key], int) or value[key] < 1
+        if key in normalized and normalized[key] is not None and (
+            not isinstance(normalized[key], int) or normalized[key] < 1
         ):
             raise SemanticOutputError("location line fields must be positive integers")
-    if "line_start" in value and "line_end" in value and value["line_end"] < value["line_start"]:
+    if "line_start" in normalized and "line_end" in normalized and normalized["line_end"] < normalized["line_start"]:
         raise SemanticOutputError("location.line_end cannot precede line_start")
-    return value
-
+    return normalized
 
 def _parse_candidate(item: Any) -> SemanticFindingCandidate:
     if not isinstance(item, dict):
         raise SemanticOutputError("finding entry must be an object")
 
-    required = ("title", "category", "type", "status", "severity", "confidence", "evidence", "description")
+    required = ("title", "category", "type", "status", "severity", "confidence", "description")
     missing = [key for key in required if not isinstance(item.get(key), str) or not item.get(key).strip()]
     if missing:
         raise SemanticOutputError("finding missing required fields: " + ", ".join(missing))
 
     category = item["category"].strip().upper()
-    finding_type = item["type"].strip().upper()
-    status = item["status"].strip().upper()
+    raw_type = item["type"].strip().upper()
+    raw_status = item["status"].strip().upper()
     raw_severity = item["severity"].strip().upper()
     confidence = item["confidence"].strip().upper()
 
+    finding_type = _TYPE_ALIASES.get(raw_type)
+    status = _STATUS_ALIASES.get(raw_status)
     severity = raw_severity
     normalization_rule = None
+    type_normalization_rule = None
+    status_normalization_rule = None
+
+    if finding_type is None:
+        if raw_type in _ALLOWED_TYPES:
+            finding_type = raw_type
+        else:
+            raise SemanticOutputError("unsupported finding type: " + raw_type)
+    if finding_type != raw_type:
+        type_normalization_rule = raw_type + "->" + finding_type
+
+    if status is None:
+        raise SemanticOutputError("unsupported status: " + raw_status)
+    if status != raw_status:
+        status_normalization_rule = raw_status + "->" + status
 
     if severity == "CRITICAL":
         severity = "P0"
@@ -123,8 +216,6 @@ def _parse_candidate(item: Any) -> SemanticFindingCandidate:
 
     if category not in _ALLOWED_CATEGORIES:
         raise SemanticOutputError("unsupported category: " + category)
-    if finding_type not in _ALLOWED_TYPES:
-        raise SemanticOutputError("unsupported finding type: " + finding_type)
     if status not in _ALLOWED_STATUS:
         raise SemanticOutputError("unsupported status: " + status)
     if severity not in _ALLOWED_SEVERITIES:
@@ -149,7 +240,7 @@ def _parse_candidate(item: Any) -> SemanticFindingCandidate:
         severity=severity,
         confidence=confidence,
         location=_validate_location(item.get("location")),
-        evidence=item["evidence"].strip(),
+        evidence=_normalize_evidence(item.get("evidence")),
         description=item["description"].strip(),
         cause=item.get("cause"),
         impact=item.get("impact"),
@@ -157,8 +248,11 @@ def _parse_candidate(item: Any) -> SemanticFindingCandidate:
         recommendation=item.get("recommendation"),
         raw_severity=raw_severity,
         normalization_rule=normalization_rule,
+        raw_type=raw_type,
+        type_normalization_rule=type_normalization_rule,
+        raw_status=raw_status,
+        status_normalization_rule=status_normalization_rule,
     )
-
 
 def _parse_output(
     payload: Any,
