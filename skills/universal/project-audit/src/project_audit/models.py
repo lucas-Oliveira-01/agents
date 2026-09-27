@@ -684,10 +684,21 @@ class AuditWorkItem:
                 f"Retry budget exhausted: maximum {max_retries} retries allowed."
             )
 
-        # Transition back to RUNNING for retry
+        # Validate the candidate attempt before changing any state. A rejected
+        # retry must leave the terminated WorkItem exactly as it was.
+        now = started_at or datetime.now(timezone.utc)
+        if self.attempts:
+            last = self.attempts[-1]
+            if last.finished_at and now < last.finished_at:
+                raise IllegalAttemptOrderError(
+                    f"Attempt #{len(self.attempts) + 1} start ({now.isoformat()}) "
+                    f"is before Attempt #{len(self.attempts)} finish ({last.finished_at.isoformat()})."
+                )
+
+        # Transition back to RUNNING for retry only after all preconditions pass.
         self.execution_state = ExecutionState.RUNNING
         self.failure_state = WorkItemFailureState.NONE
-        return self.start_attempt(started_at=started_at)
+        return self.start_attempt(started_at=now)
 
     def terminate(
         self,
