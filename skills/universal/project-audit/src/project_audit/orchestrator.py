@@ -229,6 +229,11 @@ class Orchestrator:
             work_item,
             [work_item.plan_ref],
             evidence_for_item,
+            defer_reuse_validation=(
+                work_item.action == WorkItemAction.REUSE
+                and work_item.execution_state != ExecutionState.TERMINATED
+                and not evidence_for_item
+            ),
         )
         if semantic.has_errors:
             raise OrchestratorError(
