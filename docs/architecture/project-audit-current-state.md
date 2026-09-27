@@ -94,3 +94,10 @@ The vertical-slice API now materializes separately supplied WorkItems into the P
 A fresh post-Phase-16 boundary audit closed the remaining shallow-immutability and referential persistence gaps. ProjectState, Evidence, and ExecutionReceipt now normalize nested collections to immutable tuples at construction. The Orchestrator requires durable WorkItem references before committing ExecutionReceipt or Evidence, and Evidence validation uses the persisted WorkItem and its Plan/Snapshot context.
 
 No canonical JSON schema, entity, WorkItem action, routing responsibility, or publication mode was added.
+
+
+## Phase 18 — Execution History Integrity Closure
+
+A fresh post-Phase-17 audit found a remaining execution-history boundary. Retry now validates temporal preconditions before mutating WorkItem state, so rejected retries are state-preserving. When an Attempt carries a receipt_ref, the Orchestrator now requires the referenced ExecutionReceipt to exist and point back to the same WorkItem before persistence.
+
+No canonical JSON schema, entity, WorkItem action, routing responsibility, or publication mode was added.
