@@ -560,6 +560,18 @@ def validate_work_item_state_machine(work_item: AuditWorkItem) -> ValidationResu
     state = work_item.execution_state
     attempts = work_item.attempts
 
+    # A REUSE WorkItem can close without an execution Attempt because the
+    # completion proof is the fresh current-snapshot Evidence edge.
+    if (
+        state == ExecutionState.TERMINATED
+        and not attempts
+        and work_item.action == WorkItemAction.REUSE
+    ):
+        return _pass(
+            "WORK_ITEM_REUSE_STATE_VALID",
+            f"WorkItem {work_item.work_item_id} is a non-executing REUSE completion.",
+        )
+
     if state == ExecutionState.RUNNING:
         if not attempts:
             return _error(
