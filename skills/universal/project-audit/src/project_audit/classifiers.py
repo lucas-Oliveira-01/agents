@@ -201,7 +201,13 @@ def _http_client_runtime(path: str, content: str) -> str:
         return "SERVER_HTTP_CLIENT"
     if server_path and any(token in lower for token in ("axios", "fetch(", "undici", "got(")):
         return "SERVER_HTTP_CLIENT"
-    if server_language and any(token in lower for token in ("axios", "fetch(", "http://", "https://")):
+    if server_language and any(
+        token in lower
+        for token in (
+            "axios", "fetch(", "http://", "https://", "httpx",
+            "requests", "urllib",
+        )
+    ):
         return "SERVER_HTTP_CLIENT"
     if any(token in lower for token in ("axios", "fetch(", "urllib", "requests", "httpx")):
         return "UNKNOWN_HTTP_CLIENT"
