@@ -87,3 +87,10 @@ The canonical publication lifecycle is now closed. After artifact generation and
 A boundary audit after Phase 15 identified residual Layer 2 persistence gaps. Phase 16 closes them without schema expansion: WorkItem commits now require a persisted Plan and semantic validation; Run WorkItem references must match the frozen Plan WorkItem set; and AuditPlan becomes immutable after freeze, including immutable applicability/budget value objects and reloaded frozen collections.
 
 The vertical-slice API now materializes separately supplied WorkItems into the Plan before freezing it, preserving the canonical Plan → Run graph closure.
+
+
+## Phase 17 — Immutable Evidence & Execution Trail Closure
+
+A fresh post-Phase-16 boundary audit closed the remaining shallow-immutability and referential persistence gaps. ProjectState, Evidence, and ExecutionReceipt now normalize nested collections to immutable tuples at construction. The Orchestrator requires durable WorkItem references before committing ExecutionReceipt or Evidence, and Evidence validation uses the persisted WorkItem and its Plan/Snapshot context.
+
+No canonical JSON schema, entity, WorkItem action, routing responsibility, or publication mode was added.
