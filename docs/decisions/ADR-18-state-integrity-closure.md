@@ -32,10 +32,10 @@ Orchestrator.commit_work_item() now:
 validate_run_work_item_references() now verifies that:
 
 - Run references are unique;
-- the Run WorkItem set equals the immutable Plan WorkItem set;
+- every Run WorkItem ref belongs to the immutable Plan WorkItem set;
 - the supplied WorkItem objects remain consistent with the Run references.
 
-A vertical-slice call that receives WorkItems separately materializes those references into the Plan before the Plan is frozen. A non-empty pre-existing Plan whose WorkItem set differs from the supplied slice is rejected.
+A vertical-slice call that receives WorkItems separately materializes those references into the Plan before the Plan is frozen. A non-empty pre-existing Plan whose WorkItem set is missing supplied items is rejected; pass-level Runs may legitimately reference a subset of the Plan.
 
 ### Frozen Plan immutability
 
@@ -43,7 +43,7 @@ AuditPlan now rejects field reassignment after freeze(). Frozen instances normal
 
 ## Consequences
 
-The persistence boundary now rejects malformed WorkItem state, dangling Plan references, and Run/Plan WorkItem-set divergence deterministically.
+The persistence boundary now rejects malformed WorkItem state, dangling Plan references, and Run refs outside the frozen Plan WorkItem set deterministically.
 
 No new canonical entity, schema field, WorkItem action, routing responsibility, LLM/SLM decision, or publication mode is introduced.
 
