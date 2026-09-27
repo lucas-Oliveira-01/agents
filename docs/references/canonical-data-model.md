@@ -145,3 +145,10 @@ The frozen-at-start contract is now enforced at the object and persistence bound
 The Orchestrator WorkItem commit gate requires a durable plan reference and passes the WorkItem through the composite semantic validators before StateStore persistence. AuditRun WorkItem references must exactly match the immutable WorkItem set declared by its Plan.
 
 No new canonical entity or JSON schema field is introduced.
+
+
+## Phase 17 — Immutable Evidence & Execution Trail Closure
+
+The immutable Layer 2 contract is now enforced at construction, reload, and persistence boundaries. ProjectState nested collections, Evidence source/dependency references, and ExecutionReceipt argument/artifact references are normalized to tuples. The Orchestrator rejects Receipt or Evidence persistence when their WorkItem references do not resolve to durable state; Evidence is checked against the persisted WorkItem and its canonical Plan/Snapshot.
+
+No new canonical entity or schema field is introduced.
