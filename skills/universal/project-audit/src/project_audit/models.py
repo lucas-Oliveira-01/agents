@@ -792,16 +792,15 @@ class AuditPlan:
             raise ImmutablePlanError(
                 f"AuditPlan {self.plan_id} is already frozen at {self.frozen_at.isoformat()}."
             )
-        self.frozen_at = at or datetime.now(timezone.utc)
-        # Deep immutability: convert mutable collections to tuples
-        if hasattr(self, "requested_scope"):
-            self.requested_scope = tuple(self.requested_scope)  # type: ignore
-        if hasattr(self, "applicability_decisions"):
-            self.applicability_decisions = tuple(self.applicability_decisions)  # type: ignore
-        if hasattr(self, "resolved_scope"):
-            self.resolved_scope = tuple(self.resolved_scope)  # type: ignore
-        if hasattr(self, "work_items"):
-            self.work_items = tuple(self.work_items)  # type: ignore
+        # Convert collections before setting frozen_at so the custom
+        # __setattr__ guard does not block the one-time transition.
+        object.__setattr__(self, "requested_scope", tuple(self.requested_scope))
+        object.__setattr__(
+            self, "applicability_decisions", tuple(self.applicability_decisions)
+        )
+        object.__setattr__(self, "resolved_scope", tuple(self.resolved_scope))
+        object.__setattr__(self, "work_items", tuple(self.work_items))
+        object.__setattr__(self, "frozen_at", at or datetime.now(timezone.utc))
 
     def _assert_mutable(self, operation: str) -> None:
         if self.is_frozen:
