@@ -205,7 +205,9 @@ def _http_client_runtime(path: str, content: str) -> str:
         return "SERVER_HTTP_CLIENT"
     if any(token in lower for token in ("axios", "fetch(", "urllib", "requests", "httpx")):
         return "UNKNOWN_HTTP_CLIENT"
-    return "UNKNOWN_HTTP_CLIENT"
+    if any(token in lower for token in ("axios", "fetch(", "urllib", "requests", "httpx", "httpclient", "resttemplate", "webclient")):
+        return "UNKNOWN_HTTP_CLIENT"
+    return "NO_HTTP_CLIENT"
 
 
 def _authentication_evidence(snapshot: DiscoverySnapshot, classifications: Tuple[FileClassification, ...], stack: set[str]) -> Tuple[str, ...]:
