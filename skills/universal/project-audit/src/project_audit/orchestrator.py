@@ -225,6 +225,24 @@ class Orchestrator:
             if evidence.work_item_ref == work_item.work_item_id:
                 evidence_for_item.append(evidence)
 
+        for attempt in work_item.attempts:
+            if attempt.receipt_ref is None:
+                continue
+            try:
+                receipt = self.store.load_receipt(attempt.receipt_ref)
+            except StateStoreError as exc:
+                raise OrchestratorError(
+                    f"AuditWorkItem {work_item.work_item_id}: attempt "
+                    f"{attempt.attempt_id} receipt_ref={attempt.receipt_ref} "
+                    "does not resolve to a persisted ExecutionReceipt."
+                ) from exc
+            if receipt.work_item_ref != work_item.work_item_id:
+                raise OrchestratorError(
+                    f"AuditWorkItem {work_item.work_item_id}: attempt "
+                    f"{attempt.attempt_id} receipt_ref={attempt.receipt_ref} "
+                    f"belongs to WorkItem {receipt.work_item_ref}."
+                )
+
         semantic = validate_work_item(
             work_item,
             [work_item.plan_ref],
