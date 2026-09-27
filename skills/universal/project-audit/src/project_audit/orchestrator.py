@@ -642,9 +642,9 @@ class Orchestrator:
     def prepare_recovery(self, interrupted_run_id: str) -> RecoveryBundle:
         """
         RECOVERY path (≠ RETRY): construct a fresh closed Plan → WorkItem → Run
-        graph from durable state. Historical state is never reused as mutable
-        execution state. Completed WorkItems are preserved; unfinished/failed
-        items are replayed from PLANNED in the new recovery graph.
+        graph from durable state. Historical execution attempts/receipts remain
+        attached to the interrupted WorkItem; completed results are carried into
+        the new graph through fresh REUSE Evidence lineage.
         """
         if not self.store.run_exists(interrupted_run_id):
             raise OrchestratorError(
@@ -660,8 +660,10 @@ class Orchestrator:
             )
 
         original_plan = self.store.load_plan(interrupted_run.plan_ref)
+        original_snapshot = self.store.load_snapshot(original_plan.target_snapshot_ref)
         new_plan_id = str(uuid.uuid4())
         recovery_items = []
+        preserved_completed = []
 
         for old_item_id in interrupted_run.work_item_refs:
             old_item = self.store.load_work_item(old_item_id)
@@ -669,34 +671,48 @@ class Orchestrator:
                 old_item.execution_state == ExecutionState.TERMINATED
                 and old_item.failure_state == WorkItemFailureState.NONE
             )
-            attempts = [
-                Attempt(
-                    attempt_id=attempt.attempt_id,
-                    started_at=attempt.started_at,
-                    finished_at=attempt.finished_at,
-                    failure_reason=attempt.failure_reason,
-                    receipt_ref=attempt.receipt_ref,
-                )
-                for attempt in old_item.attempts
-            ] if completed else []
 
-            recovery_items.append(
-                AuditWorkItem(
-                    work_item_id=str(uuid.uuid4()),
-                    plan_ref=new_plan_id,
-                    auditor=old_item.auditor,
-                    target_surface=old_item.target_surface,
-                    action=old_item.action,
-                    decision_basis=old_item.decision_basis
-                    + f"; recovery_from={interrupted_run_id}",
-                    effective_execution_policy=old_item.effective_execution_policy,
-                    data_egress_policy=old_item.data_egress_policy,
-                    execution_state=ExecutionState.TERMINATED if completed else ExecutionState.PLANNED,
-                    failure_state=WorkItemFailureState.NONE,
-                    attempts=attempts,
-                    artifact_refs=list(old_item.artifact_refs) if completed else [],
-                )
+            prior_evidence = []
+            if completed:
+                for evidence_id in self.store.list_evidence_ids():
+                    try:
+                        evidence = self.store.load_evidence(evidence_id)
+                    except StateStoreError:
+                        continue
+                    if (
+                        evidence.work_item_ref == old_item.work_item_id
+                        and evidence.target_snapshot_ref == original_snapshot.snapshot_fingerprint
+                        and evidence.validity == EvidenceValidity.VALID
+                    ):
+                        prior_evidence.append(evidence)
+
+            # A fresh recovery WorkItem cannot inherit historical Attempt/Receipt
+            # refs because Phase 18 requires every receipt_ref to belong to the
+            # current WorkItem. Preserve a successful item only when its canonical
+            # Evidence can be deterministically re-derived for the new identity.
+            preserve = completed and bool(prior_evidence)
+            action = WorkItemAction.REUSE if preserve else old_item.action
+            item = AuditWorkItem(
+                work_item_id=str(uuid.uuid4()),
+                plan_ref=new_plan_id,
+                auditor=old_item.auditor,
+                target_surface=old_item.target_surface,
+                action=action,
+                decision_basis=old_item.decision_basis
+                + f"; recovery_from={interrupted_run_id}"
+                + ("; recovery_preserved_via_derived_evidence=true" if preserve else ""),
+                effective_execution_policy=old_item.effective_execution_policy,
+                data_egress_policy=old_item.data_egress_policy,
+                # Completed state is materialized only after its fresh Evidence
+                # records are persisted below.
+                execution_state=ExecutionState.PLANNED,
+                failure_state=WorkItemFailureState.NONE,
+                attempts=[],
+                artifact_refs=[],
             )
+            recovery_items.append(item)
+            if preserve:
+                preserved_completed.append((item, tuple(prior_evidence)))
 
         recovery_plan = AuditPlan(
             plan_id=new_plan_id,
@@ -709,9 +725,26 @@ class Orchestrator:
             egress_policy=original_plan.egress_policy,
             budget_envelope=original_plan.budget_envelope,
         )
-        self.commit_snapshot(self.store.load_snapshot(original_plan.target_snapshot_ref))
+        self.commit_snapshot(original_snapshot)
         self.freeze_and_commit_plan(recovery_plan)
+
+        # Persist every fresh WorkItem before attaching Evidence, preserving the
+        # existing referential rule that Evidence points only to durable items.
         for item in recovery_items:
+            self.commit_work_item(item)
+
+        for item, prior_evidence in preserved_completed:
+            for prior in prior_evidence:
+                reused = derive_reused_evidence(
+                    prior,
+                    original_snapshot,
+                    item,
+                    generated_at=prior.provenance.generated_at,
+                    actor="project-audit/recovery-reuse",
+                )
+                self.commit_evidence(reused, item)
+                item.artifact_refs.append(f"evidence/{reused.evidence_id}.json")
+            item.terminate(failure_state=WorkItemFailureState.NONE)
             self.commit_work_item(item)
 
         recovery_run = AuditRun(
@@ -746,7 +779,6 @@ class Orchestrator:
             work_items=tuple(recovery_items),
             run=recovery_run,
         )
-
     # ------------------------------------------------------------------ #
     # Vertical Slice: full pipeline in one call (for testing/integration) #
     # ------------------------------------------------------------------ #
