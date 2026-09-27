@@ -174,6 +174,7 @@ class TestBlockedFailedPartialDistinction:
 
         # We need two different auditors for different items
         # Use a custom orchestrator approach: manually execute
+        plan.work_items = [wi_success, wi_blocked]
         orchestrator.commit_snapshot(target_snapshot)
         orchestrator.freeze_and_commit_plan(plan)
         run = AuditRun(
