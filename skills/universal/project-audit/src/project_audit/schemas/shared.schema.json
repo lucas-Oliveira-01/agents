@@ -27,7 +27,11 @@
       "properties": {
         "domain": { "type": "string" },
         "control_surface": { "type": "string" },
-        "defect_type": { "type": "string" }
+        "defect_type": { "type": "string" },
+        "identity_scope": {
+          "type": "string",
+          "description": "Stable SHA-256-derived scope discriminator for the logical finding identity"
+        }
       },
       "required": ["domain", "control_surface", "defect_type"],
       "additionalProperties": false
