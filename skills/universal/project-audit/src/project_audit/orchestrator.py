@@ -91,6 +91,10 @@ class SnapshotDriftError(RuntimeError):
     """Raised when snapshot drift is detected during execution (§18)."""
 
 
+class PublicationError(OrchestratorError):
+    """Raised when an AuditRun cannot cross the publication barrier."""
+
+
 @dataclass(frozen=True)
 class RecoveryBundle:
     """Fresh plan/run/work-item graph reconstructed from an interrupted run."""
@@ -249,6 +253,7 @@ class Orchestrator:
         work_items: List[AuditWorkItem],
         known_run_ids: Optional[List[str]] = None,
         interrupted_run_ids: Optional[List[str]] = None,
+        publication_transition: bool = False,
     ) -> ValidationReport:
         """Validate (structural + semantic), then persist the AuditRun."""
         errors = validate_audit_run(run.to_dict())
@@ -257,6 +262,22 @@ class Orchestrator:
                 f"AuditRun {run.run_id} schema validation failed:\n" + "\n".join(errors)
             )
         report = validate_run(run, plan, work_items, known_run_ids, interrupted_run_ids)
+        if run.publication_state == RunPublicationState.PUBLISHED_COMPLETE:
+            try:
+                existing_run = self.store.load_run(run.run_id)
+            except Exception:
+                existing_run = None
+            if (
+                not publication_transition
+                and (
+                    existing_run is None
+                    or existing_run.publication_state != RunPublicationState.PUBLISHED_COMPLETE
+                )
+            ):
+                raise OrchestratorError(
+                    f"AuditRun {run.run_id}: PUBLISHED_COMPLETE may only be committed "
+                    "through publish_run() after the NOT_PUBLISHED state exists."
+                )
         if report.has_errors:
             error_codes = [r.code for r in report.errors()]
             logger.error(
@@ -269,6 +290,92 @@ class Orchestrator:
         self.store.save_run(run)
         logger.info("AuditRun committed: %s (%s)", run.run_id, run.execution_completeness.value)
         return report
+
+    def publish_run(
+        self,
+        run: AuditRun,
+        plan: AuditPlan,
+        work_items: List[AuditWorkItem],
+        evidence_list: List[Evidence],
+        current_snapshot_fingerprint: str,
+    ) -> AuditRun:
+        """Cross the publication barrier after deterministic eligibility checks.
+
+        Publication does not mutate report artifacts. It atomically advances the
+        canonical AuditRun publication_state through the Orchestrator, the
+        single writer of Layer 2 state.
+        """
+        required = {
+            "00_inventory.md",
+            "01_coverage.md",
+            "02_analytical.md",
+            "03_audit_ledger.md",
+        }
+
+        if run.publication_state == RunPublicationState.PUBLISHED_COMPLETE:
+            paths_by_name = {Path(ref).name: Path(ref) for ref in run.artifact_refs}
+            missing = sorted(required - set(paths_by_name))
+            unsafe = [
+                str(paths_by_name[name])
+                for name in required & set(paths_by_name)
+                if (
+                    not paths_by_name[name].is_absolute()
+                    or paths_by_name[name].is_symlink()
+                    or not paths_by_name[name].is_file()
+                )
+            ]
+            if missing or unsafe:
+                raise PublicationError(
+                    f"Run {run.run_id} is marked PUBLISHED_COMPLETE but publication artifacts are unavailable or unsafe: "
+                    f"missing={missing}, unsafe={unsafe}"
+                )
+            return run
+
+        if run.publication_state != RunPublicationState.NOT_PUBLISHED:
+            raise PublicationError(
+                f"Run {run.run_id}: unsupported publication_state={run.publication_state.value}."
+            )
+
+        eligibility = self.check_publication_eligibility(
+            run,
+            plan,
+            work_items,
+            evidence_list,
+            current_snapshot_fingerprint,
+        )
+        if eligibility.has_errors:
+            codes = [result.code for result in eligibility.errors()]
+            raise PublicationError(
+                f"Run {run.run_id} failed the publication barrier: {codes}"
+            )
+
+        paths_by_name = {Path(ref).name: Path(ref) for ref in run.artifact_refs}
+        missing = sorted(required - set(paths_by_name))
+        unsafe = [
+            str(paths_by_name[name])
+            for name in required & set(paths_by_name)
+            if (
+                not paths_by_name[name].is_absolute()
+                or paths_by_name[name].is_symlink()
+                or not paths_by_name[name].is_file()
+            )
+        ]
+        if missing or unsafe:
+            raise PublicationError(
+                f"Run {run.run_id}: required publication artifacts are unavailable or unsafe: "
+                f"missing={missing}, unsafe={unsafe}"
+            )
+
+        run.publication_state = RunPublicationState.PUBLISHED_COMPLETE
+        self.commit_run(
+            run,
+            plan,
+            work_items,
+            known_run_ids=self.store.list_run_ids(),
+            publication_transition=True,
+        )
+        logger.info("AuditRun published: %s (PUBLISHED_COMPLETE)", run.run_id)
+        return run
 
     # ------------------------------------------------------------------ #
     # Snapshot drift detection (§18)                                      #

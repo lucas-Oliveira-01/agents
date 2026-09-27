@@ -13,7 +13,7 @@ from typing import Optional, Tuple
 from .classifiers import classify_applicability, classify_files, classify_stack
 from .discovery import DiscoverySnapshot, discover
 from .engineering_runner import EngineeringPassResult, execute_engineering_pass
-from .models import EgressPolicy, TargetMode
+from .models import EgressPolicy, RunCoverageCompleteness, RunExecutionCompleteness, RunFailureState, TargetMode
 from .normalization_runner import NormalizationResult, run_audit_normalize
 from .orchestrator import Orchestrator
 from .planner import PreparedAudit, prepare_audit
@@ -376,6 +376,26 @@ def _run_full_audit_unlocked(
                 run, prepared.plan, work_items, known_run_ids=orchestrator.store.list_run_ids(),
             )
             orchestrator.check_target_unchanged(root, run, prepared.plan, work_items)
+            if (
+                run.execution_completeness == RunExecutionCompleteness.COMPLETE
+                and run.coverage_completeness == RunCoverageCompleteness.FULL
+                and run.failure_state == RunFailureState.NONE
+            ):
+                evidence_by_item = {
+                    item.work_item_id for item in work_items
+                }
+                persisted_evidence = []
+                for evidence_id in orchestrator.store.list_evidence_ids():
+                    evidence = orchestrator.store.load_evidence(evidence_id)
+                    if evidence.work_item_ref in evidence_by_item:
+                        persisted_evidence.append(evidence)
+                orchestrator.publish_run(
+                    run,
+                    prepared.plan,
+                    work_items,
+                    persisted_evidence,
+                    prepared.snapshot.snapshot_fingerprint,
+                )
         except Exception:
             # Wipe only this attempt's outputs. Earlier successful runs remain intact.
             for path in final_paths:
