@@ -461,6 +461,7 @@ class StateStore:
                 domain=fp["domain"],
                 control_surface=fp["control_surface"],
                 defect_type=fp["defect_type"],
+                identity_scope=fp.get("identity_scope", ""),
             ),
             status=FindingStatus(d["status"]),
             lifecycle=FindingLifecycle(d["lifecycle"]),
