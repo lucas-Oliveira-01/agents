@@ -462,11 +462,14 @@ def render_semantic_findings(
         ])
         candidate_locations = candidate.locations or ((candidate.location,) if candidate.location else ())
         if candidate_locations:
-            lines.append(
-                "Locations: {}".format(
-                    " | ".join(_format_location(location) for location in candidate_locations)
+            if len(candidate_locations) == 1:
+                lines.append("Location: {}".format(_format_location(candidate_locations[0])))
+            else:
+                lines.append(
+                    "Locations: {}".format(
+                        " | ".join(_format_location(location) for location in candidate_locations)
+                    )
                 )
-            )
         lines.extend([
             "Evidence:",
             candidate.evidence,
