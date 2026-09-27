@@ -63,3 +63,9 @@ O runtime agora persiste um lineage imutável e auxiliar de `ClassificationResul
 Quando o lineage histórico não existe, a decisão falha fechado para `REAUDIT`. Mudanças globais de ProjectProfile, stack, technology-surface ou file classification não ampliam o escopo sem uma dependência explícita.
 
 Não houve nova entidade canônica de Layer 2 nem alteração dos schemas JSON canônicos.
+
+## Phase 13 — Applicability Coverage Closure
+
+The deterministic file classifier and Engineering Auditor are now connected for `BUILD/MANIFESTS`, `CONFIGURATION/SURFACE`, and `DOCUMENTATION/BASELINE`. When corresponding artifacts are discovered, each surface becomes an `APPLICABLE` planning decision and executable Engineering WorkItem; when none is discovered, the state remains `NOT_DETERMINABLE` rather than being treated as absent.
+
+This closes a planning-coverage gap without adding new canonical entities, schema fields, WorkItem actions, LLM calls, or OmniRoute responsibilities. Existing coverage derivation remains authoritative and now receives Evidence from these already-supported deterministic handlers when the surfaces are present.

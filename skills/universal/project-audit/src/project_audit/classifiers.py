@@ -195,6 +195,30 @@ def classify_applicability(snapshot: DiscoverySnapshot, stack: Iterable[str]) ->
     infra_evidence = tuple(p for p in paths if Path(p).name in {"dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"})
     add("INFRASTRUCTURE", "CONTAINERS", ApplicabilityState.APPLICABLE if "DOCKER" in stack_set else ApplicabilityState.NOT_DETERMINABLE, "Docker artifacts discovered" if "DOCKER" in stack_set else "No deterministic container indicator", infra_evidence[:8])
 
+    build_evidence = tuple(item.path for item in classifications if item.kind == FileKind.BUILD)
+    add(
+        "BUILD",
+        "MANIFESTS",
+        ApplicabilityState.APPLICABLE if build_evidence else ApplicabilityState.NOT_DETERMINABLE,
+        "Build/dependency manifests were discovered" if build_evidence else "No build/dependency manifest was discovered; absence is not proof of no build mechanism",
+        build_evidence[:8],
+    )
+    configuration_evidence = tuple(item.path for item in classifications if item.kind == FileKind.CONFIG)
+    add(
+        "CONFIGURATION",
+        "SURFACE",
+        ApplicabilityState.APPLICABLE if configuration_evidence else ApplicabilityState.NOT_DETERMINABLE,
+        "Configuration artifacts were discovered" if configuration_evidence else "No dedicated configuration artifact was discovered; absence is not proof of no configuration surface",
+        configuration_evidence[:8],
+    )
+    documentation_evidence = tuple(item.path for item in classifications if item.kind == FileKind.DOCUMENTATION)
+    add(
+        "DOCUMENTATION",
+        "BASELINE",
+        ApplicabilityState.APPLICABLE if documentation_evidence else ApplicabilityState.NOT_DETERMINABLE,
+        "Documentation artifacts were discovered" if documentation_evidence else "No documentation artifact was discovered; absence is not proof of undocumented operation",
+        documentation_evidence[:8],
+    )
     http_evidence = tuple(
         item.path for item in snapshot.files
         if not item.binary and any(
