@@ -13,7 +13,7 @@ from typing import Optional, Tuple
 from .classifiers import classify_applicability, classify_files, classify_stack
 from .discovery import DiscoverySnapshot, discover
 from .engineering_runner import EngineeringPassResult, execute_engineering_pass
-from .models import EgressPolicy, TargetMode
+from .models import EgressPolicy, RunCoverageCompleteness, RunExecutionCompleteness, RunFailureState, TargetMode
 from .normalization_runner import NormalizationResult, run_audit_normalize
 from .orchestrator import Orchestrator
 from .planner import PreparedAudit, prepare_audit
