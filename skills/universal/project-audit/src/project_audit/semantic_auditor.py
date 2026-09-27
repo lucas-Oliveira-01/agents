@@ -31,7 +31,6 @@ _ALLOWED_SEVERITIES = {"P0", "P1", "P2", "P3", "INFO"}
 _ALLOWED_CONFIDENCES = {"HIGH", "MEDIUM", "LOW"}
 
 
-@dataclass(frozen=True)
 _TYPE_ALIASES = {
     "VULNERABILITY": "VULNERABILITY",
     "WEAKNESS": "VULNERABILITY",
@@ -106,6 +105,7 @@ def _normalize_location(value: Any) -> Optional[Dict[str, Any]]:
     return normalized
 
 
+@dataclass(frozen=True)
 class SemanticFindingCandidate:
     title: str
     category: str
