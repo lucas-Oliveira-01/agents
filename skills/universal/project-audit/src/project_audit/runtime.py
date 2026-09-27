@@ -25,6 +25,11 @@ from .state_store import AuditWriterLock, StateStore
 from .finding_lifecycle import preserve_reused_findings, reconcile_finding_lifecycle
 from .incremental import match_previous_evidence, plan_incremental_actions_stable
 from .change_impact import ChangeImpact, build_change_impact
+from .classification_lineage import (
+    build_classification_lineage,
+    build_reclassification_impact,
+    missing_reclassification_impact,
+)
 
 
 @dataclass(frozen=True)
@@ -115,6 +120,11 @@ def _run_full_audit_unlocked(
 
     reusable_evidence_by_work_item = None
     incremental_impact = None
+    classification_impact = None
+    current_classification_lineage = build_classification_lineage(
+        prepared.snapshot.snapshot_fingerprint,
+        prepared.classification_results,
+    )
     preserved_finding_keys = ()
     if previous_run_ref is not None:
         previous_run = orchestrator.store.load_run(previous_run_ref)
@@ -130,6 +140,22 @@ def _run_full_audit_unlocked(
             )
         previous_work_items = list(previous_plan.work_items)
         incremental_impact = build_change_impact(previous_snapshot, prepared.snapshot)
+        if orchestrator.store.classification_lineage_exists(
+            previous_snapshot.snapshot_fingerprint
+        ):
+            previous_classification_lineage = orchestrator.store.load_classification_lineage(
+                previous_snapshot.snapshot_fingerprint
+            )
+            classification_impact = build_reclassification_impact(
+                previous_classification_lineage,
+                current_classification_lineage,
+                prepared.work_items,
+            )
+        else:
+            classification_impact = missing_reclassification_impact(
+                prepared.snapshot.snapshot_fingerprint,
+                prepared.work_items,
+            )
         previous_evidence_candidates = {}
         for evidence_id in orchestrator.store.list_evidence_ids():
             evidence = orchestrator.store.load_evidence(evidence_id)
@@ -154,6 +180,7 @@ def _run_full_audit_unlocked(
             previous_snapshot,
             prepared.snapshot,
             change_impact=incremental_impact,
+            classification_impact=classification_impact,
         )
         reusable_evidence_by_work_item = dict(
             match_previous_evidence(
@@ -162,6 +189,8 @@ def _run_full_audit_unlocked(
                 previous_evidence,
             )
         )
+
+    orchestrator.store.save_classification_lineage(current_classification_lineage)
 
     engineering = execute_engineering_pass(
         orchestrator,

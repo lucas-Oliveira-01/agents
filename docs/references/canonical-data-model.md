@@ -127,3 +127,12 @@ Implemented post-baseline extensions include durable FindingRecord lifecycle per
 Change Impact and Reaudit Necessity are implemented as deterministic planning analysis, not as a new persisted Layer 2 entity. The implementation compares immutable TargetSnapshot input fingerprints and methodology state, propagates impact through existing Evidence dependencies, and explains the existing incremental action in AuditWorkItem.decision_basis.
 
 No Phase 11 schema field is authorized by this model. Rename continuity is represented through deterministic path aliases during incremental evaluation and fresh derived Evidence; historical Evidence remains immutable.
+
+
+## Phase 12 — Classification Lineage & Reclassification
+
+Classification lineage is an auxiliary immutable planning artifact associated with a `TargetSnapshot` fingerprint. It records the deterministic `ClassificationResult` set needed to compare planning context across incremental runs, but it is not a new canonical Layer 2 entity and does not add fields to the canonical JSON schemas.
+
+The lineage is stored separately from `TargetSnapshot`, `AuditPlan`, `AuditWorkItem`, `Evidence`, `AuditRun`, and `FindingRecord`. Conflicting rewrites for an existing snapshot reference fail closed.
+
+Only explicitly demonstrated classification dependencies may broaden reconsideration of WorkItems. Current direct dependencies are `task-classifier` → exact target surface and `applicability:<category>:<subcategory>` → matching WorkItem target surface. Missing historical lineage fails closed to `REAUDIT`.

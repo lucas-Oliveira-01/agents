@@ -27,6 +27,7 @@ from typing import Iterable, Mapping, Optional, Tuple
 import uuid
 
 from .change_impact import ChangeImpact, ChangeKind, build_change_impact
+from .classification_lineage import ReclassificationImpact
 from .models import (
     AuditWorkItem,
     Evidence,
@@ -405,6 +406,7 @@ def plan_incremental_actions_stable(
     previous_snapshot: TargetSnapshot,
     current_snapshot: TargetSnapshot,
     change_impact: Optional[ChangeImpact] = None,
+    classification_impact: Optional[ReclassificationImpact] = None,
 ) -> Tuple[IncrementalBinding, ...]:
     """Apply the deterministic incremental matrix across regenerated WorkItems."""
     current = tuple(current_work_items)
@@ -449,6 +451,21 @@ def plan_incremental_actions_stable(
             item.auditor,
         )
         decision = necessity.decision
+        classification_reason = None
+        if (
+            classification_impact is not None
+            and (
+                not classification_impact.history_complete
+                or classification_impact.affects(item)
+            )
+        ):
+            classification_reason = (
+                "classification_history_missing"
+                if not classification_impact.history_complete
+                else "classification_changed"
+            )
+            if decision != IncrementalDecision.INVALIDATE:
+                decision = IncrementalDecision.REAUDIT
         bind_decision_to_work_item(item, decision)
         impact_label = ",".join(necessity.change_kinds) if necessity.change_kinds else "NONE"
         path_label = ",".join(necessity.impacted_paths) if necessity.impacted_paths else "NONE"
@@ -456,6 +473,8 @@ def plan_incremental_actions_stable(
             f"incremental_decision={decision.value}; impact={impact_label}; "
             f"paths={path_label}; reason={','.join(necessity.reasons)}"
         )
+        if classification_reason is not None:
+            item.decision_basis += "; " + classification_reason
         bindings.append(
             IncrementalBinding(
                 item.work_item_id,

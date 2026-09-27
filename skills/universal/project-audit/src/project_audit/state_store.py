@@ -17,6 +17,7 @@ Storage layout under <store_root>/:
   evidences/<evidence_id>.json
   audit_runs/<run_id>.json
   execution_receipts/<receipt_id>.json
+  classification_lineage/<snapshot_fingerprint>.json  # auxiliary immutable planning artifact
 
 Recovery (ADR-07): load by ID from disk, reconstruct state.
 The Orchestrator reconciles recovered state against the disk artifacts.
@@ -33,6 +34,8 @@ import socket
 import time
 from typing import Dict, List, Optional
 
+from .classification import ClassificationResult
+from .classification_lineage import ClassificationLineage
 from .models import (
     ApplicabilityDecision,
     Attempt,
@@ -271,6 +274,7 @@ class StateStore:
             "runs": self.root / "audit_runs",
             "receipts": self.root / "execution_receipts",
             "findings": self.root / "findings",
+            "classification_lineage": self.root / "classification_lineage",
         }
         for d in self._dirs.values():
             d.mkdir(parents=True, exist_ok=True)
@@ -384,6 +388,51 @@ class StateStore:
             attempts=attempts,
             artifact_refs=list(d.get("artifact_refs", [])),
         )
+
+    # ---- Classification lineage (auxiliary immutable planning artifact) ----
+
+    def save_classification_lineage(self, lineage: ClassificationLineage) -> None:
+        path = self._dirs["classification_lineage"] / f"{lineage.snapshot_ref}.json"
+        if path.exists():
+            existing = self.load_classification_lineage(lineage.snapshot_ref)
+            if existing.to_dict() != lineage.to_dict():
+                raise StateStoreError(
+                    "Classification lineage is immutable; conflicting rewrite for "
+                    f"snapshot {lineage.snapshot_ref} is not allowed."
+                )
+            return
+        _atomic_write(path, lineage.to_dict())
+
+    def load_classification_lineage(self, snapshot_ref: str) -> ClassificationLineage:
+        path = self._dirs["classification_lineage"] / f"{snapshot_ref}.json"
+        d = _read_json(path)
+        results = tuple(
+            ClassificationResult(
+                classifier_id=item["classifier_id"],
+                classifier_version=item["classifier_version"],
+                input_refs=tuple(item.get("input_refs", [])),
+                result=item["result"],
+                confidence=item["confidence"],
+                rationale=item["rationale"],
+                provenance=item.get(
+                    "provenance", "project-audit/deterministic-classification"
+                ),
+            )
+            for item in d.get("results", [])
+        )
+        lineage = ClassificationLineage.create(
+            snapshot_ref=d["snapshot_ref"],
+            results=results,
+        )
+        if lineage.lineage_fingerprint != d.get("lineage_fingerprint"):
+            raise StateStoreError(
+                "Classification lineage fingerprint mismatch; refusing corrupted "
+                f"lineage for snapshot {snapshot_ref}."
+            )
+        return lineage
+
+    def classification_lineage_exists(self, snapshot_ref: str) -> bool:
+        return (self._dirs["classification_lineage"] / f"{snapshot_ref}.json").exists()
 
     # ---- Finding lifecycle ----
 
