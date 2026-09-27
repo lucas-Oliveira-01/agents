@@ -242,6 +242,20 @@ def classify_applicability(snapshot: DiscoverySnapshot, stack: Iterable[str]) ->
     file_surface = any(token in " ".join(paths) for token in ("upload", "download", "multipart", "attachment"))
     add("SECURITY", "FILE_SECURITY", ApplicabilityState.APPLICABLE if file_surface else ApplicabilityState.NOT_DETERMINABLE, "File-transfer surface indicated by paths" if file_surface else "No decisive file-transfer evidence")
 
+    security_inspectable = tuple(
+        item.path
+        for item in classifications
+        if item.kind not in {FileKind.GENERATED, FileKind.UNKNOWN, FileKind.GIT}
+    )
+    add(
+        "SECURITY",
+        "DEBUG_EXPOSURE",
+        ApplicabilityState.APPLICABLE if security_inspectable else ApplicabilityState.NOT_DETERMINABLE,
+        "Inspectable project artifacts are available for deterministic debug-exposure review"
+        if security_inspectable
+        else "No inspectable project artifact was discovered; absence is not proof that debug exposure is impossible",
+        security_inspectable[:8],
+    )
     return tuple(decisions)
 
 
