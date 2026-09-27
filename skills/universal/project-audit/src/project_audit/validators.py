@@ -566,6 +566,7 @@ def validate_work_item_state_machine(work_item: AuditWorkItem) -> ValidationResu
         state == ExecutionState.TERMINATED
         and not attempts
         and work_item.action == WorkItemAction.REUSE
+        and work_item.failure_state == WorkItemFailureState.NONE
     ):
         return _pass(
             "WORK_ITEM_REUSE_STATE_VALID",
