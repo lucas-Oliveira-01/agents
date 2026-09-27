@@ -473,6 +473,7 @@ class TestPublicationEligibility:
         )
 
     def test_complete_clean_run_can_publish(self, audit_plan, target_snapshot, work_item):
+        audit_plan.work_items = [work_item]
         run = self._make_run(audit_plan, target_snapshot, work_item_ref=work_item.work_item_id)
         report = can_publish(run, [work_item], [], target_snapshot.snapshot_fingerprint, audit_plan)
         assert not report.has_errors
