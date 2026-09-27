@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
@@ -70,6 +71,18 @@ def _score(path: str, classification: FileClassification, category: str, subcate
     return score
 
 
+def _relationship_terms(content: str) -> Tuple[str, ...]:
+    """Extract deterministic cross-file identifiers used for context expansion."""
+    terms = set()
+    for pattern in (
+        r"\bclass\s+([A-Za-z_][A-Za-z0-9_]*)",
+        r"\binterface\s+([A-Za-z_][A-Za-z0-9_]*)",
+        r"\b(?:from|import)\s+([A-Za-z_][A-Za-z0-9_.]*)",
+        r"\bnew\s+([A-Za-z_][A-Za-z0-9_]*)",
+    ):
+        terms.update(match.lower() for match in re.findall(pattern, content))
+    return tuple(sorted(terms))
+
 def build_context(
     snapshot: DiscoverySnapshot,
     target_surface: str,
@@ -87,9 +100,43 @@ def build_context(
         and not item.path.startswith(".git/")
     ]
 
+    base_scores = {
+        item.path: _score(item.path, item, category, subcategory)
+        for item in candidates
+    }
+
+    # Deterministic one-hop context expansion: first rank the strongest files,
+    # then reward candidates referenced by their class/import symbols. This
+    # keeps the hard max_files/max_total_bytes bounds while improving
+    # route -> controller -> service -> DAO style coverage.
+    seed_count = min(max_files, 4)
+    seeds = sorted(
+        candidates,
+        key=lambda item: (-base_scores[item.path], item.path),
+    )[:seed_count]
+    relationship_terms = set()
+    for classification in seeds:
+        relationship_terms.update(
+            _relationship_terms(_read(snapshot, classification.path, max_bytes_per_file // 2))
+        )
+
+    relationship_scores = {}
+    for classification in candidates:
+        lower_path = classification.path.lower()
+        stem = Path(lower_path).stem
+        basename = Path(lower_path).name
+        bonus = 0
+        for term in relationship_terms:
+            if term and (term in lower_path or term in stem or term in basename):
+                bonus += 8
+        relationship_scores[classification.path] = min(bonus, 24)
+
     ranked = sorted(
         candidates,
-        key=lambda item: (-_score(item.path, item, category, subcategory), item.path),
+        key=lambda item: (
+            -(base_scores[item.path] + relationship_scores[item.path]),
+            item.path,
+        ),
     )
 
     items: List[ContextItem] = []
