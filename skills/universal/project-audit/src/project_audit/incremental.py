@@ -496,6 +496,35 @@ def _remap_reference(value: str, path_aliases: Optional[Mapping[str, str]]) -> s
     return replacement + value[len(normalized):]
 
 
+def derive_stale_evidence(
+    prior: Evidence,
+    current_snapshot: TargetSnapshot,
+    *,
+    generated_at,
+    actor: str = "project-audit/snapshot-drift",
+) -> Evidence:
+    """Create a fresh immutable STALE Evidence record without rewriting history."""
+    return Evidence(
+        evidence_id=str(uuid.uuid4()),
+        target_snapshot_ref=prior.target_snapshot_ref,
+        work_item_ref=prior.work_item_ref,
+        source_refs=tuple(prior.source_refs),
+        dependencies=tuple(prior.dependencies),
+        validity=EvidenceValidity.STALE,
+        provenance=Provenance(
+            actor=actor,
+            generated_at=generated_at,
+            policy_version=current_snapshot.methodology_state.policy_version,
+        ),
+        fingerprint=prior.fingerprint,
+        provider=prior.provider,
+        model=prior.model,
+        raw_output=prior.raw_output,
+        raw_output_sha256=prior.raw_output_sha256,
+        derived_from_evidence_ref=prior.evidence_id,
+    )
+
+
 def derive_reused_evidence(
     prior: Evidence,
     current_snapshot: TargetSnapshot,
