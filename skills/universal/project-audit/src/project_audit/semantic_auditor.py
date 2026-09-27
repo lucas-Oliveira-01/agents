@@ -160,7 +160,17 @@ def _parse_candidate(item: Any) -> SemanticFindingCandidate:
     )
 
 
-def _parse_output(payload: Any) -> Tuple[SemanticFindingCandidate, ...]:
+def _parse_output(
+    payload: Any,
+    *,
+    tolerate_invalid: bool = False,
+):
+    """Parse canonical candidates, optionally salvaging valid siblings.
+
+    The default remains strict for callers that rely on the historical helper
+    contract. SemanticAuditor uses the tolerant mode at the trust boundary
+    so one malformed candidate cannot erase valid findings.
+    """
     if isinstance(payload, list):
         findings = payload
     elif isinstance(payload, dict):
@@ -169,43 +179,97 @@ def _parse_output(payload: Any) -> Tuple[SemanticFindingCandidate, ...]:
             raise SemanticOutputError("semantic worker output must contain a findings array")
     else:
         raise SemanticOutputError("semantic worker output must be a JSON object or list")
-    
-    return tuple(_parse_candidate(item) for item in findings)
+
+    if not tolerate_invalid:
+        return tuple(_parse_candidate(item) for item in findings)
+
+    candidates = []
+    raw_errors = []
+    for index, item in enumerate(findings):
+        try:
+            candidates.append(_parse_candidate(item))
+        except SemanticOutputError as exc:
+            raw_errors.append(
+                {
+                    "stage": "canonical_candidate_validation",
+                    "index": index,
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                    "raw": item,
+                }
+            )
+    return tuple(candidates), tuple(raw_errors)
 
 
-def _validate_candidates_against_context(
-    candidates: Tuple[SemanticFindingCandidate, ...],
+def _validate_candidate_against_context(
+    candidate: SemanticFindingCandidate,
     context: ContextBundle,
 ) -> None:
     context_files = {
         item.path: item.content
         for item in context.items
     }
-    for candidate in candidates:
-        if candidate.location is None:
-            continue
-        file_path = candidate.location.get("file")
-        if not isinstance(file_path, str) or not file_path:
-            raise SemanticOutputError("location.file must identify a supplied context file")
-        if file_path not in context_files:
-            raise SemanticOutputError(
-                "finding location references a file outside the supplied context: "
-                + file_path
-            )
-        content_lines = context_files[file_path].splitlines()
-        if isinstance(candidate.location.get("line"), int):
-            if candidate.location["line"] > len(content_lines):
-                raise SemanticOutputError(
-                    "finding location line exceeds the supplied context for " + file_path
-                )
-        if isinstance(candidate.location.get("line_start"), int) and isinstance(
-            candidate.location.get("line_end"), int
-        ):
-            if candidate.location["line_start"] > len(content_lines) or candidate.location["line_end"] > len(content_lines):
-                raise SemanticOutputError(
-                    "finding location range exceeds the supplied context for " + file_path
-                )
+    if candidate.location is None:
+        return
 
+    file_path = candidate.location.get("file")
+    if not isinstance(file_path, str) or not file_path:
+        raise SemanticOutputError("location.file must identify a supplied context file")
+    if file_path not in context_files:
+        raise SemanticOutputError(
+            "finding location references a file outside the supplied context: "
+            + file_path
+        )
+
+    content_lines = context_files[file_path].splitlines()
+    if isinstance(candidate.location.get("line"), int):
+        if candidate.location["line"] > len(content_lines):
+            raise SemanticOutputError(
+                "finding location line exceeds the supplied context for " + file_path
+            )
+    if isinstance(candidate.location.get("line_start"), int) and isinstance(
+        candidate.location.get("line_end"), int
+    ):
+        if (
+            candidate.location["line_start"] > len(content_lines)
+            or candidate.location["line_end"] > len(content_lines)
+        ):
+            raise SemanticOutputError(
+                "finding location range exceeds the supplied context for " + file_path
+            )
+
+
+def _validate_candidates_against_context(
+    candidates: Tuple[SemanticFindingCandidate, ...],
+    context: ContextBundle,
+) -> None:
+    """Historical strict wrapper retained for existing callers/tests."""
+    for candidate in candidates:
+        _validate_candidate_against_context(candidate, context)
+
+
+def _validate_candidates_against_context_tolerant(
+    candidates: Tuple[SemanticFindingCandidate, ...],
+    context: ContextBundle,
+):
+    valid = []
+    raw_errors = []
+    for index, candidate in enumerate(candidates):
+        try:
+            _validate_candidate_against_context(candidate, context)
+        except SemanticOutputError as exc:
+            raw_errors.append(
+                {
+                    "stage": "evidence_context_validation",
+                    "index": index,
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                    "raw": candidate.location,
+                }
+            )
+        else:
+            valid.append(candidate)
+    return tuple(valid), tuple(raw_errors)
 
 def _build_prompt(context: ContextBundle) -> str:
     serialized = json.dumps(
@@ -305,6 +369,32 @@ class SemanticAuditor:
             or (delegated_evidence.raw_output if delegated_evidence is not None else None)
         )
 
+        coverage_status = (
+            audit_contract.state
+            if audit_contract is not None
+            else None
+        )
+
+        # Preserve the semantic failure taxonomy from the official L3 contract.
+        # WorkerPort maps non-success transport outcomes to non-zero exit codes,
+        # but SCHEMA_VIOLATION is a semantic contract failure, not infrastructure.
+        if coverage_status == DelegationExecutionState.SCHEMA_VIOLATION:
+            return SemanticReviewResult(
+                work_item.work_item_id,
+                work_item.target_surface,
+                "SCHEMA_VIOLATION",
+                sensitivity,
+                tuple(),
+                self._fingerprint(delegated_evidence) if delegated_evidence else None,
+                receipt,
+                delegated_evidence,
+                audit_contract=audit_contract,
+                raw_errors=tuple(audit_contract.raw_errors),
+                provider=provider,
+                model=model,
+                raw_output=raw_output,
+            )
+
         if receipt.exit_code == 126:
             return SemanticReviewResult(
                 work_item.work_item_id,
@@ -339,36 +429,34 @@ class SemanticAuditor:
                 raw_output=raw_output,
             )
 
-        coverage_status = audit_contract.state if audit_contract is not None else None
-        if coverage_status == DelegationExecutionState.SCHEMA_VIOLATION:
-            return SemanticReviewResult(
-                work_item.work_item_id,
-                work_item.target_surface,
-                "SCHEMA_VIOLATION",
-                sensitivity,
-                tuple(),
-                self._fingerprint(delegated_evidence),
-                receipt,
-                delegated_evidence,
-                audit_contract=audit_contract,
-                raw_errors=tuple(audit_contract.raw_errors),
-                provider=provider,
-                model=model,
-                raw_output=raw_output,
-            )
-
         try:
             if delegated_result is None or delegated_result.output_payload is None:
                 raise SemanticOutputError("semantic worker returned no output payload")
-            candidates = _parse_output(delegated_result.output_payload)
-            _validate_candidates_against_context(candidates, context)
+            candidates, parse_errors = _parse_output(
+                delegated_result.output_payload,
+                tolerate_invalid=True,
+            )
+            candidates, context_errors = _validate_candidates_against_context_tolerant(
+                candidates,
+                context,
+            )
+            canonical_errors = tuple(parse_errors) + tuple(context_errors)
         except SemanticOutputError as exc:
-            errors = list(audit_contract.raw_errors if audit_contract is not None else ())
-            errors.append({
-                "error_type": type(exc).__name__,
-                "message": str(exc),
-                "raw": raw_output,
-            })
+            candidates = tuple()
+            canonical_errors = (
+                {
+                    "stage": "canonical_output_validation",
+                    "error_type": type(exc).__name__,
+                    "message": str(exc),
+                    "raw": raw_output,
+                },
+            )
+
+        accumulated_errors = tuple(
+            audit_contract.raw_errors if audit_contract is not None else ()
+        ) + tuple(canonical_errors)
+
+        if canonical_errors and not candidates:
             return SemanticReviewResult(
                 work_item.work_item_id,
                 work_item.target_surface,
@@ -379,11 +467,18 @@ class SemanticAuditor:
                 receipt,
                 delegated_evidence,
                 audit_contract=audit_contract,
-                raw_errors=tuple(errors),
+                raw_errors=accumulated_errors,
                 provider=provider,
                 model=model,
                 raw_output=raw_output,
             )
+
+        review_status = (
+            "PARTIAL_COVERAGE"
+            if canonical_errors
+            or coverage_status == DelegationExecutionState.PARTIAL_COVERAGE
+            else "COMPLETED"
+        )
 
         evidence = Evidence(
             evidence_id=str(uuid.uuid4()),
@@ -402,16 +497,14 @@ class SemanticAuditor:
         return SemanticReviewResult(
             work_item.work_item_id,
             work_item.target_surface,
-            "PARTIAL_COVERAGE"
-            if coverage_status == DelegationExecutionState.PARTIAL_COVERAGE
-            else "COMPLETED",
+            review_status,
             sensitivity,
             candidates,
             self._fingerprint(delegated_evidence),
             receipt,
             evidence,
             audit_contract=audit_contract,
-            raw_errors=tuple(audit_contract.raw_errors if audit_contract is not None else ()),
+            raw_errors=accumulated_errors,
             provider=provider,
             model=model,
             raw_output=raw_output,
