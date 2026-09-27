@@ -72,7 +72,7 @@ def test_frozen_plan_rejects_top_level_and_nested_mutation(audit_plan):
     with pytest.raises(AttributeError):
         audit_plan.applicability_decisions[0].evidence_refs.append("hacked")
 
-    with pytest.raises(dataclasses.FrozenInstanceError):
+    with pytest.raises(ImmutablePlanError):
         audit_plan.execution_policy = dataclasses.replace(
             audit_plan.execution_policy,
             max_retries=99,
