@@ -431,6 +431,22 @@ def validate_run_work_item_references(
     """Run refs, plan refs and supplied WorkItems must form one closed set."""
     actual_ids = [wi.work_item_id for wi in work_items]
     refs = list(run.work_item_refs)
+    declared_plan_ids = [wi.work_item_id for wi in plan.work_items]
+    if len(declared_plan_ids) != len(set(declared_plan_ids)):
+        return _error(
+            "PLAN_DUPLICATE_WORK_ITEM_REF",
+            f"AuditPlan {plan.plan_id} contains duplicate WorkItem references.",
+        )
+    if not set(refs).issubset(set(declared_plan_ids)):
+        return _error(
+            "RUN_PLAN_WORK_ITEM_SET_MISMATCH",
+            f"AuditRun {run.run_id} contains WorkItem refs not declared by the immutable AuditPlan.",
+            {
+                "run_refs": sorted(refs),
+                "plan_refs": sorted(declared_plan_ids),
+                "undeclared_refs": sorted(set(refs) - set(declared_plan_ids)),
+            },
+        )
     if len(refs) != len(set(refs)):
         return _error(
             "RUN_DUPLICATE_WORK_ITEM_REF",
@@ -1185,17 +1201,26 @@ def validate_work_item(
     work_item: AuditWorkItem,
     known_plan_ids: List[str],
     evidence_for_item: Optional[List[Evidence]] = None,
+    *,
+    defer_reuse_validation: bool = False,
 ) -> ValidationReport:
-    """Run all semantic validators applicable to a single AuditWorkItem."""
+    """Run all semantic validators applicable to a single AuditWorkItem.
+
+    Planned/running REUSE items may not have materialized the historical
+    Evidence edge yet. The execution boundary can therefore defer the
+    existence/validity check until the REUSE transaction derives Evidence,
+    while the public validator remains strict by default.
+    """
     evidence_for_item = evidence_for_item or []
     results = [
         validate_work_item_plan_ref(work_item, known_plan_ids),
         validate_work_item_state_machine(work_item),
         validate_attempt_ordering(work_item),
         validate_execution_gate(work_item),
-        validate_reuse_action_has_valid_evidence(work_item, evidence_for_item),
-        validate_evidence_invalid_not_reused(work_item, evidence_for_item),
     ]
+    if not defer_reuse_validation:
+        results.append(validate_reuse_action_has_valid_evidence(work_item, evidence_for_item))
+    results.append(validate_evidence_invalid_not_reused(work_item, evidence_for_item))
     return ValidationReport(results=results)
 
 

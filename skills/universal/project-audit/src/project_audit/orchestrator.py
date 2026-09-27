@@ -63,7 +63,7 @@ from .schema_validator import (
     validate_evidence,
     validate_target_snapshot,
 )
-from .state_store import StateStore
+from .state_store import StateStore, StateStoreError
 from .validators import (
     ValidationReport,
     can_publish,
@@ -192,13 +192,55 @@ class Orchestrator:
     # ------------------------------------------------------------------ #
 
     def commit_work_item(self, work_item: AuditWorkItem) -> None:
-        """Validate and persist a single AuditWorkItem."""
+        """Validate, then persist a single AuditWorkItem.
+
+        A WorkItem may only cross the persistence boundary when its referenced
+        Plan exists and its own state-machine/policy semantics are valid.
+        Structural JSON Schema validation alone is insufficient for canonical
+        Layer 2 state.
+        """
         errors = validate_audit_work_item(work_item.to_dict())
         if errors:
             raise SchemaValidationError(
                 f"AuditWorkItem {work_item.work_item_id} schema validation failed:\n"
                 + "\n".join(errors)
             )
+
+        try:
+            # Load only the Plan identity so not-yet-persisted sibling WorkItems
+            # do not block the semantic gate.
+            self.store.load_plan(work_item.plan_ref, work_items=[])
+        except StateStoreError as exc:
+            raise OrchestratorError(
+                f"AuditWorkItem {work_item.work_item_id}: plan_ref={work_item.plan_ref} "
+                "does not resolve to a persisted AuditPlan."
+            ) from exc
+
+        evidence_for_item = []
+        for evidence_id in self.store.list_evidence_ids():
+            try:
+                evidence = self.store.load_evidence(evidence_id)
+            except StateStoreError:
+                continue
+            if evidence.work_item_ref == work_item.work_item_id:
+                evidence_for_item.append(evidence)
+
+        semantic = validate_work_item(
+            work_item,
+            [work_item.plan_ref],
+            evidence_for_item,
+            defer_reuse_validation=(
+                work_item.action == WorkItemAction.REUSE
+                and work_item.execution_state != ExecutionState.TERMINATED
+                and not evidence_for_item
+            ),
+        )
+        if semantic.has_errors:
+            raise OrchestratorError(
+                f"AuditWorkItem semantic validation failed for {work_item.work_item_id}: "
+                f"{[result.code for result in semantic.errors()]}"
+            )
+
         self.store.save_work_item(work_item)
         logger.debug("WorkItem committed: %s (%s)", work_item.work_item_id, work_item.execution_state.value)
 
@@ -683,7 +725,18 @@ class Orchestrator:
         # 1. Commit snapshot
         snapshot = self.commit_snapshot(snapshot)
 
-        # 2. Freeze and commit plan
+        # 2. Close the Plan graph before freezing it. A vertical-slice caller
+        # may provide WorkItems separately, but the canonical frozen Plan must
+        # own exactly the same WorkItem reference set as the resulting Run.
+        supplied_ids = [wi.work_item_id for wi in work_items]
+        plan_ids = [wi.work_item_id for wi in plan.work_items]
+        if plan_ids and set(plan_ids) != set(supplied_ids):
+            raise OrchestratorError(
+                f"AuditPlan {plan.plan_id} WorkItem set does not match the supplied vertical-slice WorkItems."
+            )
+        if not plan_ids:
+            plan.work_items = list(work_items)
+
         plan = self.freeze_and_commit_plan(plan)
 
         # 3. Create AuditRun

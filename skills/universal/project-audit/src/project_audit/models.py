@@ -703,12 +703,16 @@ class ApplicabilityState(str, Enum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
     UNKNOWN = "UNKNOWN"
 
-@dataclass
+@dataclass(frozen=True)
 class ApplicabilityDecision:
     domain: str
     applicable: ApplicabilityState
     decision_basis: str
-    evidence_refs: List[str]  # uuid refs
+    evidence_refs: Tuple[str, ...]  # uuid refs
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.evidence_refs, tuple):
+            object.__setattr__(self, "evidence_refs", tuple(self.evidence_refs))
 
     def to_dict(self) -> dict:
         return {
@@ -719,7 +723,7 @@ class ApplicabilityDecision:
         }
 
 
-@dataclass
+@dataclass(frozen=True)
 class BudgetEnvelope:
     max_tokens: Optional[int] = None
     max_cost_usd: Optional[float] = None
@@ -759,6 +763,25 @@ class AuditPlan:
     budget_envelope: Optional[BudgetEnvelope] = None
     frozen_at: Optional[datetime] = None  # None = not yet frozen
 
+    def __post_init__(self) -> None:
+        # StateStore reconstructs frozen plans from JSON. Normalize their
+        # collection fields before exposing the object so a reloaded frozen
+        # plan cannot be mutated through list aliases.
+        if self.frozen_at is not None:
+            object.__setattr__(self, "requested_scope", tuple(self.requested_scope))
+            object.__setattr__(
+                self, "applicability_decisions", tuple(self.applicability_decisions)
+            )
+            object.__setattr__(self, "resolved_scope", tuple(self.resolved_scope))
+            object.__setattr__(self, "work_items", tuple(self.work_items))
+
+    def __setattr__(self, name: str, value) -> None:
+        if getattr(self, "frozen_at", None) is not None:
+            raise ImmutablePlanError(
+                f"Cannot mutate frozen AuditPlan {getattr(self, 'plan_id', '<uninitialized>')}."
+            )
+        object.__setattr__(self, name, value)
+
     @property
     def is_frozen(self) -> bool:
         return self.frozen_at is not None
@@ -769,16 +792,15 @@ class AuditPlan:
             raise ImmutablePlanError(
                 f"AuditPlan {self.plan_id} is already frozen at {self.frozen_at.isoformat()}."
             )
-        self.frozen_at = at or datetime.now(timezone.utc)
-        # Deep immutability: convert mutable collections to tuples
-        if hasattr(self, "requested_scope"):
-            self.requested_scope = tuple(self.requested_scope)  # type: ignore
-        if hasattr(self, "applicability_decisions"):
-            self.applicability_decisions = tuple(self.applicability_decisions)  # type: ignore
-        if hasattr(self, "resolved_scope"):
-            self.resolved_scope = tuple(self.resolved_scope)  # type: ignore
-        if hasattr(self, "work_items"):
-            self.work_items = tuple(self.work_items)  # type: ignore
+        # Convert collections before setting frozen_at so the custom
+        # __setattr__ guard does not block the one-time transition.
+        object.__setattr__(self, "requested_scope", tuple(self.requested_scope))
+        object.__setattr__(
+            self, "applicability_decisions", tuple(self.applicability_decisions)
+        )
+        object.__setattr__(self, "resolved_scope", tuple(self.resolved_scope))
+        object.__setattr__(self, "work_items", tuple(self.work_items))
+        object.__setattr__(self, "frozen_at", at or datetime.now(timezone.utc))
 
     def _assert_mutable(self, operation: str) -> None:
         if self.is_frozen:

@@ -136,3 +136,12 @@ Classification lineage is an auxiliary immutable planning artifact associated wi
 The lineage is stored separately from `TargetSnapshot`, `AuditPlan`, `AuditWorkItem`, `Evidence`, `AuditRun`, and `FindingRecord`. Conflicting rewrites for an existing snapshot reference fail closed.
 
 Only explicitly demonstrated classification dependencies may broaden reconsideration of WorkItems. Current direct dependencies are `task-classifier` → exact target surface and `applicability:<category>:<subcategory>` → matching WorkItem target surface. Missing historical lineage fails closed to `REAUDIT`.
+
+
+## Phase 16 — State Integrity Closure
+
+The frozen-at-start contract is now enforced at the object and persistence boundaries. AuditPlan rejects field reassignment after freeze and persists collection fields in immutable tuple form, including after reload. ApplicabilityDecision and BudgetEnvelope are immutable value objects.
+
+The Orchestrator WorkItem commit gate requires a durable plan reference and passes the WorkItem through the composite semantic validators before StateStore persistence. AuditRun WorkItem references must exactly match the immutable WorkItem set declared by its Plan.
+
+No new canonical entity or JSON schema field is introduced.
