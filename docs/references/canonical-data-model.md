@@ -152,3 +152,10 @@ No new canonical entity or JSON schema field is introduced.
 The immutable Layer 2 contract is now enforced at construction, reload, and persistence boundaries. ProjectState nested collections, Evidence source/dependency references, and ExecutionReceipt argument/artifact references are normalized to tuples. The Orchestrator rejects Receipt or Evidence persistence when their WorkItem references do not resolve to durable state; Evidence is checked against the persisted WorkItem and its canonical Plan/Snapshot.
 
 No new canonical entity or schema field is introduced.
+
+
+## Phase 18 — Execution History Integrity Closure
+
+The mutable execution trail is now closed at the retry and persistence boundaries. A rejected retry cannot partially transition a WorkItem. Non-null Attempt.receipt_ref values must resolve to durable ExecutionReceipt records belonging to the same WorkItem before that WorkItem is persisted.
+
+No new canonical entity or schema field is introduced.

@@ -223,7 +223,6 @@ def test_semantic_review_uses_second_attempt_and_persists_receipt(tmp_path: Path
     first.finish(
         datetime.now(timezone.utc),
         exit_code=0,
-        receipt_ref=str(uuid.uuid4()),
     )
     work_item.terminate(failure_state=WorkItemFailureState.NONE)
     orchestrator.commit_work_item(work_item)
