@@ -249,7 +249,14 @@ class Orchestrator:
     # ------------------------------------------------------------------ #
 
     def commit_receipt(self, receipt: ExecutionReceipt) -> None:
-        """Persist an ExecutionReceipt (evidence of execution)."""
+        """Validate the WorkItem reference, then persist an ExecutionReceipt."""
+        try:
+            self.store.load_work_item(receipt.work_item_ref)
+        except StateStoreError as exc:
+            raise OrchestratorError(
+                f"ExecutionReceipt {receipt.receipt_id}: work_item_ref={receipt.work_item_ref} "
+                "does not resolve to a persisted AuditWorkItem."
+            ) from exc
         self.store.save_receipt(receipt)
         logger.debug("ExecutionReceipt committed: %s", receipt.receipt_id)
 
@@ -265,10 +272,27 @@ class Orchestrator:
                 f"Evidence {evidence.evidence_id} schema validation failed:\n"
                 + "\n".join(errors)
             )
-        # Cross-object semantic gate: evidence must belong to the exact
-        # immutable snapshot referenced by the work item's plan.
+        # Cross-object referential gate: Evidence must attach to a WorkItem
+        # that has already crossed the persistence boundary. Do not trust only
+        # the transient object supplied by the caller.
         try:
-            plan = self.store.load_plan(work_item.plan_ref, work_items=[])
+            persisted_work_item = self.store.load_work_item(evidence.work_item_ref)
+        except StateStoreError as exc:
+            raise OrchestratorError(
+                f"Evidence {evidence.evidence_id}: work_item_ref={evidence.work_item_ref} "
+                "does not resolve to a persisted AuditWorkItem."
+            ) from exc
+        if persisted_work_item.plan_ref != work_item.plan_ref:
+            raise OrchestratorError(
+                f"Evidence {evidence.evidence_id}: supplied WorkItem "
+                f"{work_item.work_item_id} resolves to plan {work_item.plan_ref}, "
+                f"but persisted WorkItem resolves to plan {persisted_work_item.plan_ref}."
+            )
+
+        # Cross-object semantic gate: evidence must belong to the exact
+        # immutable snapshot referenced by the persisted WorkItem's plan.
+        try:
+            plan = self.store.load_plan(persisted_work_item.plan_ref, work_items=[])
             snapshot = self.store.load_snapshot(plan.target_snapshot_ref)
         except Exception as exc:
             raise OrchestratorError(
@@ -276,7 +300,11 @@ class Orchestrator:
                 "resolvable plan/snapshot context."
             ) from exc
 
-        semantic = validate_evidence_snapshot_consistency(evidence, work_item, snapshot)
+        semantic = validate_evidence_snapshot_consistency(
+            evidence,
+            persisted_work_item,
+            snapshot,
+        )
         if semantic.is_error:
             raise OrchestratorError(
                 f"Evidence semantic validation failed: {semantic.code}: {semantic.message}"
