@@ -71,20 +71,109 @@ def _score(path: str, classification: FileClassification, category: str, subcate
     return score
 
 
-def _relationship_terms(content: str) -> Tuple[str, ...]:
-    """Extract deterministic cross-file identifiers used for context expansion."""
-    terms = set()
-    for pattern in (
-        r"\bclass\s+([A-Za-z_][A-Za-z0-9_]*)",
-        r"\binterface\s+([A-Za-z_][A-Za-z0-9_]*)",
-        r"\b(?:from|import)\s+([A-Za-z_][A-Za-z0-9_.]*)",
-        r"\bnew\s+([A-Za-z_][A-Za-z0-9_]*)",
+def _relationship_refs(content: str) -> Tuple[str, ...]:
+    """Extract deterministic relationship references from source text."""
+    refs = set()
+
+    for match in re.findall(
+        r"^\s*(?:import|using)\s+(?:static\s+)?([A-Za-z_][A-Za-z0-9_.]*)",
+        content,
+        flags=re.MULTILINE,
     ):
-        for match in re.findall(pattern, content):
-            normalized = match.lower()
-            terms.add(normalized)
-            terms.add(normalized.rsplit(".", 1)[-1])
-    return tuple(sorted(terms))
+        refs.add(match)
+
+    for match in re.findall(
+        r"^\s*from\s+([A-Za-z_][A-Za-z0-9_.]*)\s+import\s+([A-Za-z_][A-Za-z0-9_,*\s]*)",
+        content,
+        flags=re.MULTILINE,
+    ):
+        module, imported = match
+        refs.add(module)
+        for symbol in imported.split(","):
+            symbol = symbol.strip().split(" as ", 1)[0].strip()
+            if symbol and symbol != "*":
+                refs.add(symbol)
+                refs.add(module + "." + symbol)
+
+    for pattern in (
+        r"\bnew\s+([A-Z][A-Za-z0-9_]*)",
+        r"\b([A-Z][A-Za-z0-9_]*(?:Service|Repository|Controller|Client|Provider|Manager|Gateway|Dao|Store|Handler|UseCase))\s+[a-z_][A-Za-z0-9_]*\b",
+        r"\b([A-Z][A-Za-z0-9_]*)::[A-Za-z_][A-Za-z0-9_]*",
+    ):
+        refs.update(re.findall(pattern, content))
+
+    return tuple(sorted(refs))
+
+
+def _relationship_indexes(
+    candidates: List[FileClassification],
+) -> Tuple[dict, dict]:
+    """Build exact normalized path/stem indexes for symbol resolution."""
+    by_path = {
+        item.path.lower().replace("\\\\", "/"): item.path
+        for item in candidates
+    }
+    by_stem = {}
+    for item in candidates:
+        stem = Path(item.path).stem.lower()
+        by_stem.setdefault(stem, []).append(item.path)
+    return by_path, by_stem
+
+
+def _resolve_relationship_refs(
+    refs: Tuple[str, ...],
+    *,
+    by_path: dict,
+    by_stem: dict,
+) -> Tuple[str, ...]:
+    """Resolve FQNs/modules and exact symbols to repository files.
+
+    Resolution is intentionally narrow: exact normalized path/module matches
+    and exact unique filename stems only. No substring or fuzzy matching is
+    used, which avoids collisions such as UserService/UserServiceTest.
+    """
+    resolved = set()
+    known_suffixes = (".py", ".java", ".kt", ".kts", ".scala", ".go", ".ts", ".tsx", ".js", ".jsx", ".cs", ".rb", ".rs")
+
+    for ref in refs:
+        clean = ref.strip().strip(";")
+        if not clean:
+            continue
+
+        dotted = clean.replace("::", ".")
+        slash = dotted.replace(".", "/").strip("/").lower()
+        if slash:
+            for suffix in known_suffixes:
+                candidate = slash + suffix
+                if candidate in by_path:
+                    resolved.add(by_path[candidate])
+            init_path = slash + "/__init__.py"
+            if init_path in by_path:
+                resolved.add(by_path[init_path])
+
+        symbol = clean.rsplit(".", 1)[-1].rsplit("::", 1)[-1]
+        matches = by_stem.get(symbol.lower(), ())
+        if len(matches) == 1:
+            resolved.add(matches[0])
+
+    return tuple(sorted(resolved))
+
+
+def _relationship_paths(
+    snapshot: DiscoverySnapshot,
+    classification: FileClassification,
+    candidates: List[FileClassification],
+    *,
+    max_bytes_per_file: int,
+    by_path: dict,
+    by_stem: dict,
+) -> Tuple[str, ...]:
+    content = _read(snapshot, classification.path, max_bytes_per_file)
+    if not content:
+        return ()
+    refs = _relationship_refs(content)
+    return _resolve_relationship_refs(refs, by_path=by_path, by_stem=by_stem)
+
 
 def build_context(
     snapshot: DiscoverySnapshot,
@@ -108,63 +197,112 @@ def build_context(
         for item in candidates
     }
 
-    # Deterministic one-hop context expansion: first rank the strongest files,
-    # then reward candidates referenced by their class/import symbols. This
-    # keeps the hard max_files/max_total_bytes bounds while improving
-    # route -> controller -> service -> DAO style coverage.
-    seed_count = min(max_files, 4)
-    seeds = sorted(
-        candidates,
-        key=lambda item: (-base_scores[item.path], item.path),
-    )[:seed_count]
-    relationship_terms = set()
-    for classification in seeds:
-        relationship_terms.update(
-            _relationship_terms(_read(snapshot, classification.path, max_bytes_per_file // 2))
-        )
-
-    relationship_scores = {}
-    for classification in candidates:
-        lower_path = classification.path.lower()
-        stem = Path(lower_path).stem
-        basename = Path(lower_path).name
-        bonus = 0
-        for term in relationship_terms:
-            if term and (term in lower_path or term in stem or term in basename):
-                bonus += 8
-        relationship_scores[classification.path] = min(bonus, 24)
-
+    # Bounded breadth-first expansion: select the strongest seed, resolve
+    # exact relationships from that file, consume the relationship frontier
+    # before falling back to global score ranking, and stop at the same hard
+    # file/byte limits as the legacy selector.
     ranked = sorted(
         candidates,
-        key=lambda item: (
-            -(base_scores[item.path] + relationship_scores[item.path]),
-            item.path,
-        ),
+        key=lambda item: (-base_scores[item.path], item.path),
     )
+    by_path, by_stem = _relationship_indexes(candidates)
 
-    items: List[ContextItem] = []
+    selected: List[ContextItem] = []
+    selected_paths = set()
     total_bytes = 0
-    for classification in ranked[:max_files]:
-        record = snapshot.file(classification.path)
+
+    # frontier[path] = (graph_depth, parent_rank, base_score)
+    frontier = {}
+    next_seed_index = 0
+    relation_depth = {}
+
+    def add_relationships(source_path: str, depth: int, parent_rank: int) -> None:
+        source = next(
+            (item for item in candidates if item.path == source_path),
+            None,
+        )
+        if source is None:
+            return
+        for related_path in _relationship_paths(
+            snapshot,
+            source,
+            candidates,
+            max_bytes_per_file=max_bytes_per_file,
+            by_path=by_path,
+            by_stem=by_stem,
+        ):
+            if related_path in selected_paths:
+                continue
+            candidate_depth = depth + 1
+            previous_depth = relation_depth.get(related_path)
+            if previous_depth is not None and previous_depth <= candidate_depth:
+                continue
+            relation_depth[related_path] = candidate_depth
+            related_score = base_scores[related_path]
+            frontier[related_path] = (
+                candidate_depth,
+                parent_rank,
+                related_score,
+            )
+
+    while len(selected) < max_files:
+        chosen = None
+
+        if frontier:
+            chosen_path = min(
+                frontier,
+                key=lambda item: (
+                    frontier[item][0],
+                    -frontier[item][2],
+                    frontier[item][1],
+                    item,
+                ),
+            )
+            chosen = next(
+                item for item in candidates if item.path == chosen_path
+            )
+            frontier.pop(chosen_path, None)
+        else:
+            while next_seed_index < len(ranked) and ranked[next_seed_index].path in selected_paths:
+                next_seed_index += 1
+            if next_seed_index >= len(ranked):
+                break
+            chosen = ranked[next_seed_index]
+            next_seed_index += 1
+
+        if chosen is None:
+            break
+
+        record = snapshot.file(chosen.path)
         if record is None or record.sha256 is None:
             continue
-        content = _read(snapshot, classification.path, max_bytes_per_file)
+        content = _read(snapshot, chosen.path, max_bytes_per_file)
         if not content:
             continue
+
         encoded_size = len(content.encode("utf-8"))
         if total_bytes + encoded_size > max_total_bytes:
             remaining = max_total_bytes - total_bytes
             if remaining <= 0:
                 break
             content = content.encode("utf-8")[:remaining].decode("utf-8", errors="ignore")
-        items.append(
+
+        selected_paths.add(chosen.path)
+        selected.append(
             ContextItem(
-                path=classification.path,
+                path=chosen.path,
                 content=content,
                 sha256=record.sha256,
             )
         )
         total_bytes += len(content.encode("utf-8"))
+
+        if total_bytes >= max_total_bytes:
+            break
+
+        parent_rank = ranked.index(chosen)
+        current_depth = relation_depth.get(chosen.path, 0)
+        add_relationships(chosen.path, current_depth, parent_rank)
 
     canonical = {
         "target_surface": target_surface,
