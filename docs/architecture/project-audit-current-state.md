@@ -54,3 +54,12 @@ A análise incremental agora possui um elo determinístico explícito entre muda
 A matriz existente continua sendo a autoridade de execução: `INVALIDATE > REAUDIT > REVALIDATE > REUSE`. Renames só preservam REUSE quando a continuidade é demonstrada por uma correspondência única de fingerprint; Evidence derivada recebe referências de caminho atualizadas sem alterar o registro histórico.
 
 Não houve expansão do schema canônico, introdução de SLM/LLM para Change Impact ou mudança de responsabilidade do OmniRoute.
+
+
+## Phase 12 — Classification Lineage & Reclassification
+
+O runtime agora persiste um lineage imutável e auxiliar de `ClassificationResult` indexado pelo `TargetSnapshot`. Auditorias incrementais com `previous_run_ref` comparam deterministicamente os resultados históricos e atuais; mudanças materiais em `task-classifier` ou em classificações de applicability reconsideram somente os WorkItems demonstravelmente dependentes.
+
+Quando o lineage histórico não existe, a decisão falha fechado para `REAUDIT`. Mudanças globais de ProjectProfile, stack, technology-surface ou file classification não ampliam o escopo sem uma dependência explícita.
+
+Não houve nova entidade canônica de Layer 2 nem alteração dos schemas JSON canônicos.
