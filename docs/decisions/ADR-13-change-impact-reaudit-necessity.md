@@ -1,6 +1,6 @@
 # ADR 13: Change Impact and Reaudit Necessity
 
-**Status:** Proposed
+**Status:** Accepted — implemented by Phase 11
 
 ## Context
 
@@ -235,3 +235,7 @@ Negative:
 
 - Dependency metadata must become sufficiently precise for impact propagation to be useful.
 - Ambiguous relationships intentionally increase REAUDIT rather than allowing optimistic cache reuse.
+
+## Implementation record
+
+Implemented in `project-audit` Phase 11. The change-impact computation is deterministic and feeds the existing incremental matrix without adding canonical schema fields. See `docs/architecture/phase11-change-impact-reaudit.md` and `test_phase11_change_impact.py` for the executable acceptance boundary.

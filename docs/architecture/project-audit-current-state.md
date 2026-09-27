@@ -45,3 +45,12 @@ O conjunto atual passou em CI com 100% de sucesso nas versões Py 3.9 e 3.13, po
 - Detecção e Bloqueio de credenciais antes do transporte MCP.
 
 Com a consolidação na `main`, a suíte do Project Audit deixou de ser um projeto isolado e atua agora como o Orquestrador L2 principal do framework Antigravity Skills.
+
+
+## Phase 11 — Change Impact & Reaudit Necessity
+
+A análise incremental agora possui um elo determinístico explícito entre mudança de snapshot e decisão de execução. Para auditorias com `previous_run_ref`, o runtime calcula eventos de Change Impact, propaga o impacto por source/dependency Evidence e registra a justificativa da decisão no `AuditWorkItem.decision_basis`.
+
+A matriz existente continua sendo a autoridade de execução: `INVALIDATE > REAUDIT > REVALIDATE > REUSE`. Renames só preservam REUSE quando a continuidade é demonstrada por uma correspondência única de fingerprint; Evidence derivada recebe referências de caminho atualizadas sem alterar o registro histórico.
+
+Não houve expansão do schema canônico, introdução de SLM/LLM para Change Impact ou mudança de responsabilidade do OmniRoute.

@@ -26,6 +26,7 @@ from enum import Enum
 from typing import Iterable, Mapping, Optional, Tuple
 import uuid
 
+from .change_impact import ChangeImpact, ChangeKind, build_change_impact
 from .models import (
     AuditWorkItem,
     Evidence,
@@ -172,10 +173,12 @@ def _current_value(
     node: DependencyNode,
     snapshot: TargetSnapshot,
     auditor: str,
+    path_aliases: Optional[Mapping[str, str]] = None,
 ) -> Optional[str]:
     inputs = _snapshot_inputs(snapshot)
     if node.kind in (DependencyKind.SOURCE, DependencyKind.SEMANTIC):
-        return inputs.get(node.key)
+        key = (path_aliases or {}).get(node.key, node.key)
+        return inputs.get(key)
     if node.kind == DependencyKind.METHODOLOGY_CONTRACT:
         return snapshot.methodology_state.audit_contract_version
     if node.kind == DependencyKind.METHODOLOGY_POLICY:
@@ -190,6 +193,8 @@ def decide_incremental_action(
     previous_snapshot: TargetSnapshot,
     current_snapshot: TargetSnapshot,
     auditor: str,
+    *,
+    path_aliases: Optional[Mapping[str, str]] = None,
 ) -> IncrementalDecision:
     """Apply the frozen ADR-04 precedence:
     INVALIDATE > REAUDIT > REVALIDATE > REUSE.
@@ -209,7 +214,7 @@ def decide_incremental_action(
         if node.kind in (DependencyKind.SOURCE, DependencyKind.SEMANTIC):
             if node.observed_fingerprint is None:
                 return IncrementalDecision.REAUDIT
-            if _current_value(node, current_snapshot, auditor) is None:
+            if _current_value(node, current_snapshot, auditor, path_aliases) is None:
                 return IncrementalDecision.INVALIDATE
 
     # Breaking methodology invalidates the old assessment's compatibility.
@@ -222,12 +227,12 @@ def decide_incremental_action(
 
     # Source changes invalidate reuse and require substantive re-analysis.
     for node in graph.source_nodes:
-        if node.observed_fingerprint != _current_value(node, current_snapshot, auditor):
+        if node.observed_fingerprint != _current_value(node, current_snapshot, auditor, path_aliases):
             return IncrementalDecision.REAUDIT
 
     # Loosely coupled semantic dependency changes require cheap revalidation.
     for node in graph.semantic_nodes:
-        if node.observed_fingerprint != _current_value(node, current_snapshot, auditor):
+        if node.observed_fingerprint != _current_value(node, current_snapshot, auditor, path_aliases):
             return IncrementalDecision.REVALIDATE
 
     # Auditor implementation drift affects the assessment, not the observed fact.
@@ -307,6 +312,60 @@ class IncrementalBinding:
     decision: IncrementalDecision
 
 
+@dataclass(frozen=True)
+class ReauditNecessity:
+    """Deterministic explanation of the existing incremental action matrix."""
+
+    decision: IncrementalDecision
+    reasons: Tuple[str, ...]
+    impacted_paths: Tuple[str, ...]
+    change_kinds: Tuple[str, ...]
+
+
+def assess_reaudit_necessity(
+    evidence: Evidence,
+    impact: ChangeImpact,
+    previous_snapshot: TargetSnapshot,
+    current_snapshot: TargetSnapshot,
+    auditor: str,
+) -> ReauditNecessity:
+    """Explain the existing incremental decision using Change Impact facts."""
+    match = impact.impact_for_evidence(evidence.source_refs, evidence.dependencies)
+    decision = decide_incremental_action(
+        evidence,
+        previous_snapshot,
+        current_snapshot,
+        auditor,
+        path_aliases=impact.rename_map,
+    )
+    reasons = []
+    kind_values = {kind.value for kind in match.change_kinds}
+    if impact.methodology_changed:
+        reasons.append("methodology_changed")
+    if match.source_paths:
+        if ChangeKind.RENAMED.value in kind_values and decision == IncrementalDecision.REUSE:
+            reasons.append("deterministic_rename_continuity")
+        else:
+            reasons.append("source_dependency_impacted")
+    if match.dependency_paths:
+        reasons.append("semantic_dependency_impacted")
+    if not reasons:
+        if evidence.validity == EvidenceValidity.STALE:
+            reasons.append("evidence_stale")
+        elif decision == IncrementalDecision.REUSE:
+            reasons.append("no_relevant_change")
+        elif decision == IncrementalDecision.REAUDIT:
+            reasons.append("insufficient_or_broken_dependency_context")
+        else:
+            reasons.append("assessment_requires_revalidation")
+    return ReauditNecessity(
+        decision=decision,
+        reasons=tuple(sorted(set(reasons))),
+        impacted_paths=tuple(sorted(set(match.source_paths + match.dependency_paths))),
+        change_kinds=tuple(kind.value for kind in match.change_kinds),
+    )
+
+
 def stable_work_item_key(work_item: AuditWorkItem) -> Tuple[str, str]:
     """Logical WorkItem identity independent of generated UUIDs."""
     return work_item.auditor, work_item.target_surface
@@ -345,55 +404,77 @@ def plan_incremental_actions_stable(
     previous_evidence: Mapping[str, Evidence],
     previous_snapshot: TargetSnapshot,
     current_snapshot: TargetSnapshot,
+    change_impact: Optional[ChangeImpact] = None,
 ) -> Tuple[IncrementalBinding, ...]:
     """Apply the deterministic incremental matrix across regenerated WorkItems."""
     current = tuple(current_work_items)
+    previous = tuple(previous_work_items)
     evidence_by_current = match_previous_evidence(
-        current, previous_work_items, previous_evidence
+        current, previous, previous_evidence
     )
-    previous_by_current = {
-        current_item.work_item_id: previous
-        for current_item in current
-        for previous in previous_work_items
-        if stable_work_item_key(current_item) == stable_work_item_key(previous)
-    }
+    previous_index = {}
+    for item in previous:
+        previous_index.setdefault(stable_work_item_key(item), []).append(item)
 
+    impact = change_impact or build_change_impact(previous_snapshot, current_snapshot)
     bindings = []
+
     for item in current:
         evidence = evidence_by_current.get(item.work_item_id)
-        previous = previous_by_current.get(item.work_item_id)
+        matches = previous_index.get(stable_work_item_key(item), [])
+        previous_item = matches[0] if len(matches) == 1 else None
+
         if evidence is None:
             decision = IncrementalDecision.REAUDIT
             item.action = WorkItemAction.REAUDIT
             item.decision_basis = (
-                "incremental_decision=REAUDIT; reason=missing_or_ambiguous_prior_evidence"
+                "incremental_decision=REAUDIT; impact=unproven_prior_evidence;"
+                " reason=missing_or_ambiguous_prior_evidence"
             )
             bindings.append(
                 IncrementalBinding(
                     item.work_item_id,
-                    previous.work_item_id if previous is not None else None,
+                    previous_item.work_item_id if previous_item is not None else None,
                     None,
                     decision,
                 )
             )
             continue
 
-        decision = decide_incremental_action(
+        necessity = assess_reaudit_necessity(
             evidence,
+            impact,
             previous_snapshot,
             current_snapshot,
             item.auditor,
         )
+        decision = necessity.decision
         bind_decision_to_work_item(item, decision)
+        impact_label = ",".join(necessity.change_kinds) if necessity.change_kinds else "NONE"
+        path_label = ",".join(necessity.impacted_paths) if necessity.impacted_paths else "NONE"
+        item.decision_basis = (
+            f"incremental_decision={decision.value}; impact={impact_label}; "
+            f"paths={path_label}; reason={','.join(necessity.reasons)}"
+        )
         bindings.append(
             IncrementalBinding(
                 item.work_item_id,
-                previous.work_item_id if previous is not None else None,
+                previous_item.work_item_id if previous_item is not None else None,
                 evidence.evidence_id,
                 decision,
             )
         )
     return tuple(bindings)
+
+
+def _remap_reference(value: str, path_aliases: Optional[Mapping[str, str]]) -> str:
+    if not path_aliases:
+        return value
+    normalized = normalize_input_ref(value)
+    replacement = path_aliases.get(normalized)
+    if replacement is None:
+        return value
+    return replacement + value[len(normalized):]
 
 
 def derive_reused_evidence(
@@ -403,14 +484,15 @@ def derive_reused_evidence(
     *,
     generated_at,
     actor: str = "project-audit/incremental-reuse",
+    path_aliases: Optional[Mapping[str, str]] = None,
 ) -> Evidence:
     """Create a fresh immutable Evidence record for a safe REUSE decision."""
     return Evidence(
         evidence_id=str(uuid.uuid4()),
         target_snapshot_ref=current_snapshot.snapshot_fingerprint,
         work_item_ref=current_work_item.work_item_id,
-        source_refs=tuple(prior.source_refs),
-        dependencies=tuple(prior.dependencies),
+        source_refs=tuple(_remap_reference(value, path_aliases) for value in prior.source_refs),
+        dependencies=tuple(_remap_reference(value, path_aliases) for value in prior.dependencies),
         validity=EvidenceValidity.VALID,
         provenance=Provenance(
             actor=actor,

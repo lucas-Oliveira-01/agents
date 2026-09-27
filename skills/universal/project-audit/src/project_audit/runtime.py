@@ -24,6 +24,7 @@ from .verifier import VerificationResult, candidate_identity, consolidated_revie
 from .state_store import AuditWriterLock, StateStore
 from .finding_lifecycle import preserve_reused_findings, reconcile_finding_lifecycle
 from .incremental import match_previous_evidence, plan_incremental_actions_stable
+from .change_impact import ChangeImpact, build_change_impact
 
 
 @dataclass(frozen=True)
@@ -113,6 +114,7 @@ def _run_full_audit_unlocked(
     orchestrator = Orchestrator(StateStore(resolved_state_dir))
 
     reusable_evidence_by_work_item = None
+    incremental_impact = None
     preserved_finding_keys = ()
     if previous_run_ref is not None:
         previous_run = orchestrator.store.load_run(previous_run_ref)
@@ -127,6 +129,7 @@ def _run_full_audit_unlocked(
                 "previous_run_ref uses a different TargetMode than the current audit."
             )
         previous_work_items = list(previous_plan.work_items)
+        incremental_impact = build_change_impact(previous_snapshot, prepared.snapshot)
         previous_evidence_candidates = {}
         for evidence_id in orchestrator.store.list_evidence_ids():
             evidence = orchestrator.store.load_evidence(evidence_id)
@@ -150,6 +153,7 @@ def _run_full_audit_unlocked(
             previous_evidence,
             previous_snapshot,
             prepared.snapshot,
+            change_impact=incremental_impact,
         )
         reusable_evidence_by_work_item = dict(
             match_previous_evidence(
@@ -168,6 +172,7 @@ def _run_full_audit_unlocked(
         semantic_worker=semantic_worker,
         previous_run_ref=previous_run_ref,
         reusable_evidence_by_work_item=reusable_evidence_by_work_item,
+        reuse_path_aliases=dict(incremental_impact.rename_map) if incremental_impact else None,
     )
     security = execute_security_pass(
         orchestrator,
@@ -177,6 +182,7 @@ def _run_full_audit_unlocked(
         engineering.run,
         semantic_worker=semantic_worker,
         reusable_evidence_by_work_item=reusable_evidence_by_work_item,
+        reuse_path_aliases=dict(incremental_impact.rename_map) if incremental_impact else None,
     )
 
     semantic_reviews = tuple(engineering.semantic_reviews) + tuple(security.semantic_reviews)

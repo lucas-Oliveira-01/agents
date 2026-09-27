@@ -35,6 +35,7 @@ from .normalization_runner import NormalizationResult, run_audit_normalize
 from .delegation import WorkerExecution
 from .autofix import AutoFixError, FixCandidate, FixLedger, logical_finding_key, run_immutable_fix
 from .verifier import IndependentVerifier, VerificationResult, VerificationVerdict, candidate_identity, consolidated_reviews, verify_semantic_reviews
+from .change_impact import ChangeImpact, ChangeEvent, ChangeKind, EvidenceImpact, build_change_impact
 from .incremental import (
     IncrementalDecision,
     DependencyKind,
@@ -79,7 +80,8 @@ __all__ = [
     "TargetMode", "WorkingTreeState",
     "OmniRouteDelegationBackend", "create_local_omniroute_backend",
     "IncrementalDecision", "DependencyKind", "DependencyNode", "EvidenceDependencyGraph",
-    "IncrementalBinding",
+    "IncrementalBinding", "ReauditNecessity", "assess_reaudit_necessity",
+    "ChangeImpact", "ChangeEvent", "ChangeKind", "EvidenceImpact", "build_change_impact",
     "IndependentVerifier", "VerificationResult", "VerificationVerdict", "candidate_identity", "verify_semantic_reviews", "consolidated_reviews",
     "AutoFixError", "FixCandidate", "FixLedger", "logical_finding_key", "run_immutable_fix",
     "decide_incremental_action", "build_dependency_graph", "plan_incremental_actions",

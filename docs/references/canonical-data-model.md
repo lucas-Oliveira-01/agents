@@ -122,6 +122,8 @@ This model is implemented by the post-Phase-10 runtime. Earlier phase records ma
 
 Implemented post-baseline extensions include durable FindingRecord lifecycle persistence and immutable Evidence lineage through `derived_from_evidence_ref` for safe incremental reuse. Cross-run WorkItem matching uses logical identity (auditor + target_surface), never generated UUIDs.
 
-## Phase 11 boundary
+## Phase 11 — Change Impact & Reaudit Necessity
 
-Change Impact and Reaudit Necessity are not part of this model yet. Their ontology and propagation rules require a dedicated architectural decision before implementation. No Phase 11 schema field is authorized by this document.
+Change Impact and Reaudit Necessity are implemented as deterministic planning analysis, not as a new persisted Layer 2 entity. The implementation compares immutable TargetSnapshot input fingerprints and methodology state, propagates impact through existing Evidence dependencies, and explains the existing incremental action in AuditWorkItem.decision_basis.
+
+No Phase 11 schema field is authorized by this model. Rename continuity is represented through deterministic path aliases during incremental evaluation and fresh derived Evidence; historical Evidence remains immutable.

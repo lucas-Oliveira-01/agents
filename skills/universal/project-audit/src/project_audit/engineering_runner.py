@@ -54,6 +54,7 @@ def execute_engineering_pass(
     target_snapshot: Optional[object] = None,
     previous_run_ref: Optional[str] = None,
     reusable_evidence_by_work_item: Optional[dict[str, Evidence]] = None,
+    reuse_path_aliases: Optional[dict[str, str]] = None,
 ) -> EngineeringPassResult:
     """Execute only non-security WorkItems as PASS 1 of the single-agent audit."""
     auditor = auditor or EngineeringAuditor()
@@ -134,6 +135,7 @@ def execute_engineering_pass(
                     snapshot,
                     item,
                     generated_at=finished,
+                    path_aliases=reuse_path_aliases,
                 )
                 orchestrator.commit_evidence(reused, item)
                 attempt.finish(
