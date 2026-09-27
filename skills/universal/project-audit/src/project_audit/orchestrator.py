@@ -63,7 +63,7 @@ from .schema_validator import (
     validate_evidence,
     validate_target_snapshot,
 )
-from .state_store import StateStore
+from .state_store import StateStore, StateStoreError
 from .validators import (
     ValidationReport,
     can_publish,
@@ -683,7 +683,18 @@ class Orchestrator:
         # 1. Commit snapshot
         snapshot = self.commit_snapshot(snapshot)
 
-        # 2. Freeze and commit plan
+        # 2. Close the Plan graph before freezing it. A vertical-slice caller
+        # may provide WorkItems separately, but the canonical frozen Plan must
+        # own exactly the same WorkItem reference set as the resulting Run.
+        supplied_ids = [wi.work_item_id for wi in work_items]
+        plan_ids = [wi.work_item_id for wi in plan.work_items]
+        if plan_ids and set(plan_ids) != set(supplied_ids):
+            raise OrchestratorError(
+                f"AuditPlan {plan.plan_id} WorkItem set does not match the supplied vertical-slice WorkItems."
+            )
+        if not plan_ids:
+            plan.work_items = list(work_items)
+
         plan = self.freeze_and_commit_plan(plan)
 
         # 3. Create AuditRun
