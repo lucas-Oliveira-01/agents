@@ -151,6 +151,18 @@ class AuditWriterLock(AbstractContextManager):
         self.release()
 
 
+def _write_once(path: Path, data: dict, entity_name: str, entity_id: str) -> None:
+    """Persist an immutable entity once; identical rewrites are idempotent."""
+    if path.exists():
+        existing = _read_json(path)
+        if existing != data:
+            raise StateStoreError(
+                f"{entity_name} is immutable; conflicting rewrite for {entity_id} is not allowed."
+            )
+        return
+    _atomic_write(path, data)
+
+
 def _atomic_write(path: Path, data: dict) -> None:
     """
     Atomic write via tempfile + rename.
@@ -283,7 +295,7 @@ class StateStore:
 
     def save_snapshot(self, snapshot: TargetSnapshot) -> None:
         path = self._dirs["snapshots"] / f"{snapshot.snapshot_fingerprint}.json"
-        _atomic_write(path, snapshot.to_dict())
+        _write_once(path, snapshot.to_dict(), "TargetSnapshot", snapshot.snapshot_fingerprint)
 
     def load_snapshot(self, fingerprint: str) -> TargetSnapshot:
         path = self._dirs["snapshots"] / f"{fingerprint}.json"
@@ -322,7 +334,7 @@ class StateStore:
 
     def save_plan(self, plan: AuditPlan) -> None:
         path = self._dirs["plans"] / f"{plan.plan_id}.json"
-        _atomic_write(path, plan.to_dict())
+        _write_once(path, plan.to_dict(), "AuditPlan", plan.plan_id)
 
     def load_plan(self, plan_id: str, work_items: Optional[List[AuditWorkItem]] = None) -> AuditPlan:
         path = self._dirs["plans"] / f"{plan_id}.json"
@@ -474,7 +486,7 @@ class StateStore:
 
     def save_evidence(self, evidence: Evidence) -> None:
         path = self._dirs["evidence"] / f"{evidence.evidence_id}.json"
-        _atomic_write(path, evidence.to_dict())
+        _write_once(path, evidence.to_dict(), "Evidence", evidence.evidence_id)
 
     def load_evidence(self, evidence_id: str) -> Evidence:
         path = self._dirs["evidence"] / f"{evidence_id}.json"
@@ -526,7 +538,7 @@ class StateStore:
 
     def save_receipt(self, receipt: ExecutionReceipt) -> None:
         path = self._dirs["receipts"] / f"{receipt.receipt_id}.json"
-        _atomic_write(path, receipt.to_dict())
+        _write_once(path, receipt.to_dict(), "ExecutionReceipt", receipt.receipt_id)
 
     def load_receipt(self, receipt_id: str) -> ExecutionReceipt:
         path = self._dirs["receipts"] / f"{receipt_id}.json"
