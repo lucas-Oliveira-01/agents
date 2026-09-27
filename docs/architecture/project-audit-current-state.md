@@ -75,3 +75,8 @@ This closes a planning-coverage gap without adding new canonical entities, schem
 The deterministic Security PASS and applicability matrix are now connected for SECURITY/DEBUG_EXPOSURE. When inspectable project artifacts exist, the surface becomes an APPLICABLE planning decision and normal Security WorkItem; when no inspectable artifact is discovered, the state remains NOT_DETERMINABLE. The existing handler emits SEC-DEBUG-001 and preserves NOT_FOUND as an inspected result rather than an applicability exclusion.
 
 This closes the remaining known planning-coverage gap between an existing security handler and normal runtime planning without adding canonical entities, schema fields, WorkItem actions, routing responsibilities, or new semantic workers.
+
+
+## Phase 15 — Publication Lifecycle Closure
+
+The canonical publication lifecycle is now closed. After artifact generation and the final snapshot check, an eligible run crosses the Orchestrator publication barrier and is persisted as PUBLISHED_COMPLETE. Publication is idempotent, requires the existing can_publish() invariants plus physical required artifacts, and does not introduce a new WorkItem action, canonical entity, schema field, or OmniRoute responsibility. PUBLISHED_PARTIAL remains reserved pending an explicit authorization contract.
