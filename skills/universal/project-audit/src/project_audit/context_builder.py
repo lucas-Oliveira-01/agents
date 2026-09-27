@@ -308,7 +308,7 @@ def build_context(
         "target_surface": target_surface,
         "items": [
             {"path": item.path, "sha256": item.sha256, "content": item.content}
-            for item in items
+            for item in selected
         ],
     }
     fingerprint = hashlib.sha256(
