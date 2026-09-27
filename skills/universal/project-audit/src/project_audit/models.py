@@ -481,12 +481,20 @@ class Attempt:
     def finish(self, finished_at: datetime, exit_code: int, receipt_ref: Optional[str] = None) -> None:
         if self.finished_at is not None:
             raise ValueError(f"Attempt {self.attempt_id} is already finished.")
+        if finished_at < self.started_at:
+            raise IllegalAttemptOrderError(
+                f"Attempt {self.attempt_id} cannot finish before it starts."
+            )
         self.finished_at = finished_at
         self.receipt_ref = receipt_ref
 
     def fail(self, finished_at: datetime, reason: str, receipt_ref: Optional[str] = None) -> None:
         if self.finished_at is not None:
             raise ValueError(f"Attempt {self.attempt_id} is already finished.")
+        if finished_at < self.started_at:
+            raise IllegalAttemptOrderError(
+                f"Attempt {self.attempt_id} cannot fail before it starts."
+            )
         self.finished_at = finished_at
         self.failure_reason = reason
         self.receipt_ref = receipt_ref
