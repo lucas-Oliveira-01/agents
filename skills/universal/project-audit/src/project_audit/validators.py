@@ -32,6 +32,7 @@ from .models import (
     RunExecutionCompleteness,
     RunCoverageCompleteness,
     RunFailureState,
+    RunPublicationState,
     TargetSnapshot,
     WorkItemAction,
     WorkItemFailureState,
@@ -974,10 +975,10 @@ def validate_publication_state_consistency(
     to PUBLISHED_PARTIAL remain unsupported until an explicit partial
     publication authorization contract exists.
     """
-    if run.publication_state == __import__("project_audit.models", fromlist=["RunPublicationState"]).RunPublicationState.NOT_PUBLISHED:
+    if run.publication_state == RunPublicationState.NOT_PUBLISHED:
         return _pass("PUBLICATION_STATE_NOT_PUBLISHED", "Run has not been published.")
 
-    if run.publication_state == __import__("project_audit.models", fromlist=["RunPublicationState"]).RunPublicationState.PUBLISHED_PARTIAL:
+    if run.publication_state == RunPublicationState.PUBLISHED_PARTIAL:
         return _error(
             "PUBLISH_PARTIAL_UNAUTHORIZED",
             f"Run {run.run_id}: PUBLISHED_PARTIAL requires an explicit partial-publication authorization contract.",
