@@ -261,6 +261,7 @@ def _parse_candidate(item: Any) -> SemanticFindingCandidate:
         severity=severity,
         confidence=confidence,
         location=primary_location,
+        locations=locations,
         evidence=_normalize_evidence(item.get("evidence")),
         description=item["description"].strip(),
         cause=item.get("cause"),
