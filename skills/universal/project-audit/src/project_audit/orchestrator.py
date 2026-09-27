@@ -253,6 +253,7 @@ class Orchestrator:
         work_items: List[AuditWorkItem],
         known_run_ids: Optional[List[str]] = None,
         interrupted_run_ids: Optional[List[str]] = None,
+        publication_transition: bool = False,
     ) -> ValidationReport:
         """Validate (structural + semantic), then persist the AuditRun."""
         errors = validate_audit_run(run.to_dict())
@@ -267,8 +268,11 @@ class Orchestrator:
             except Exception:
                 existing_run = None
             if (
-                existing_run is None
-                or existing_run.publication_state != RunPublicationState.PUBLISHED_COMPLETE
+                not publication_transition
+                and (
+                    existing_run is None
+                    or existing_run.publication_state != RunPublicationState.PUBLISHED_COMPLETE
+                )
             ):
                 raise OrchestratorError(
                     f"AuditRun {run.run_id}: PUBLISHED_COMPLETE may only be committed "
@@ -368,6 +372,7 @@ class Orchestrator:
             plan,
             work_items,
             known_run_ids=self.store.list_run_ids(),
+            publication_transition=True,
         )
         logger.info("AuditRun published: %s (PUBLISHED_COMPLETE)", run.run_id)
         return run
