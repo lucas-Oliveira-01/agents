@@ -54,6 +54,51 @@ def test_missing_build_configuration_documentation_is_not_downgraded_to_not_appl
     assert by_surface[("DOCUMENTATION", "BASELINE")].state == ApplicabilityState.NOT_DETERMINABLE
 
 
+
+def test_ssrf_browser_fetch_is_not_server_side(tmp_path: Path) -> None:
+    _write(tmp_path, "frontend/public/js/api.js", "fetch('/api/orders')\n")
+    snapshot = discover(str(tmp_path))
+    applicability = classify_applicability(snapshot, classify_stack(snapshot))
+    decision = next(
+        item for item in applicability
+        if (item.category, item.subcategory) == ("SECURITY", "SSRF")
+    )
+
+    assert decision.state == ApplicabilityState.NOT_APPLICABLE
+    assert decision.evidence_paths == ("frontend/public/js/api.js",)
+    assert "browser/client-side" in decision.reason
+
+
+def test_ssrf_server_http_client_is_applicable(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "backend/HttpClient.java",
+        "import org.springframework.web.client.RestTemplate;\nclass HttpClient { RestTemplate client; }\n",
+    )
+    snapshot = discover(str(tmp_path))
+    applicability = classify_applicability(snapshot, classify_stack(snapshot))
+    decision = next(
+        item for item in applicability
+        if (item.category, item.subcategory) == ("SECURITY", "SSRF")
+    )
+
+    assert decision.state == ApplicabilityState.APPLICABLE
+    assert "backend/HttpClient.java" in decision.evidence_paths
+
+
+def test_authentication_applicability_uses_source_signals(tmp_path: Path) -> None:
+    _write(tmp_path, "src/auth/JwtValidator.java", "class JwtValidator {}\n")
+    _write(tmp_path, "src/auth/LoginService.java", "class LoginService {}\n")
+    snapshot = discover(str(tmp_path))
+    applicability = classify_applicability(snapshot, classify_stack(snapshot))
+    decision = next(
+        item for item in applicability
+        if (item.category, item.subcategory) == ("SECURITY", "AUTHENTICATION")
+    )
+
+    assert decision.state == ApplicabilityState.APPLICABLE
+    assert {"src/auth/JwtValidator.java", "src/auth/LoginService.java"} <= set(decision.evidence_paths)
+
 def test_engineering_pass_executes_new_deterministic_surfaces(tmp_path: Path) -> None:
     _write(tmp_path, "pyproject.toml", "[project]\nname='demo'\n")
     _write(tmp_path, "config.yaml", "service:\n  enabled: true\n")
