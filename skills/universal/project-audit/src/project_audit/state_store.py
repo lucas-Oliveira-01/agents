@@ -17,6 +17,7 @@ Storage layout under <store_root>/:
   evidences/<evidence_id>.json
   audit_runs/<run_id>.json
   execution_receipts/<receipt_id>.json
+  classification_lineage/<snapshot_fingerprint>.json  # auxiliary immutable planning artifact
 
 Recovery (ADR-07): load by ID from disk, reconstruct state.
 The Orchestrator reconciles recovered state against the disk artifacts.
@@ -419,10 +420,16 @@ class StateStore:
             )
             for item in d.get("results", [])
         )
-        return ClassificationLineage.create(
+        lineage = ClassificationLineage.create(
             snapshot_ref=d["snapshot_ref"],
             results=results,
         )
+        if lineage.lineage_fingerprint != d.get("lineage_fingerprint"):
+            raise StateStoreError(
+                "Classification lineage fingerprint mismatch; refusing corrupted "
+                f"lineage for snapshot {snapshot_ref}."
+            )
+        return lineage
 
     def classification_lineage_exists(self, snapshot_ref: str) -> bool:
         return (self._dirs["classification_lineage"] / f"{snapshot_ref}.json").exists()
