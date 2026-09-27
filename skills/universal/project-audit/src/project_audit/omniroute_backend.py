@@ -138,17 +138,53 @@ class OmniRouteDelegationBackend(DelegationBackend):
                 model = metadata["route"]
             return cleaned, provider, model
 
-        if isinstance(result, dict):
-            structured = result.get("structuredContent")
-            if isinstance(structured, dict) and structured:
-                cleaned, provider, model = metadata_and_payload(structured)
-                return SemanticPayload(
-                    payload=cleaned,
-                    raw_output=json.dumps(structured, ensure_ascii=False, sort_keys=True),
-                    provider=provider or self.provider,
-                    model=model or self.model,
-                )
+        def parse_text(raw_text: str) -> Any:
+            try:
+                return extract_json(raw_text)
+            except SchemaViolationError as exc:
+                setattr(exc, "raw_output", raw_text)
+                raise
 
+        def unwrap(value: Any, depth: int = 0) -> Any:
+            if depth > 2:
+                raise SchemaViolationError("OmniRoute semantic envelope nesting is too deep.")
+
+            if isinstance(value, str):
+                return parse_text(value)
+
+            if not isinstance(value, (dict, list)):
+                return value
+
+            if isinstance(value, dict):
+                structured = value.get("structuredContent")
+                if isinstance(structured, (dict, list)) and structured:
+                    return structured
+
+                # OmniRoute may expose the provider payload inside a named
+                # transport envelope. Only unwrap known envelope keys so an
+                # arbitrary repository/model object is never treated as data.
+                for key in ("result", "output"):
+                    if key in value and isinstance(value[key], (str, dict, list)):
+                        return unwrap(value[key], depth + 1)
+            return value
+
+        payload = unwrap(result)
+        cleaned, provider, model = metadata_and_payload(payload)
+        if isinstance(cleaned, str):
+            cleaned = parse_text(cleaned)
+            cleaned, nested_provider, nested_model = metadata_and_payload(cleaned)
+            provider = provider or nested_provider
+            model = model or nested_model
+
+        if isinstance(cleaned, (dict, list)):
+            return SemanticPayload(
+                payload=cleaned,
+                raw_output=self._raw_payload_text(result),
+                provider=provider or self.provider,
+                model=model or self.model,
+            )
+
+        if isinstance(result, dict):
             content = result.get("content", [])
             if isinstance(content, list):
                 raw_text = "".join(
@@ -157,31 +193,23 @@ class OmniRouteDelegationBackend(DelegationBackend):
                     if isinstance(item, dict) and item.get("type") == "text"
                 ).strip()
                 if raw_text:
-                    try:
-                        parsed = extract_json(raw_text)
-                    except SchemaViolationError as exc:
-                        setattr(exc, "raw_output", raw_text)
-                        raise
-                    cleaned, provider, model = metadata_and_payload(parsed)
+                    parsed = parse_text(raw_text)
+                    parsed, provider2, model2 = metadata_and_payload(parsed)
                     return SemanticPayload(
-                        payload=cleaned,
+                        payload=parsed,
                         raw_output=raw_text,
-                        provider=provider or self.provider,
-                        model=model or self.model,
+                        provider=provider2 or provider or self.provider,
+                        model=model2 or model or self.model,
                     )
 
         if isinstance(result, str):
-            try:
-                parsed = extract_json(result)
-            except SchemaViolationError as exc:
-                setattr(exc, "raw_output", result)
-                raise
-            cleaned, provider, model = metadata_and_payload(parsed)
+            parsed = parse_text(result)
+            parsed, provider2, model2 = metadata_and_payload(parsed)
             return SemanticPayload(
-                payload=cleaned,
+                payload=parsed,
                 raw_output=result,
-                provider=provider or self.provider,
-                model=model or self.model,
+                provider=provider2 or provider or self.provider,
+                model=model2 or model or self.model,
             )
 
         raise SchemaViolationError("OmniRoute returned no semantic payload.")
