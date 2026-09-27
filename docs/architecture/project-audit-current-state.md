@@ -69,3 +69,9 @@ Não houve nova entidade canônica de Layer 2 nem alteração dos schemas JSON c
 The deterministic file classifier and Engineering Auditor are now connected for `BUILD/MANIFESTS`, `CONFIGURATION/SURFACE`, and `DOCUMENTATION/BASELINE`. When corresponding artifacts are discovered, each surface becomes an `APPLICABLE` planning decision and executable Engineering WorkItem; when none is discovered, the state remains `NOT_DETERMINABLE` rather than being treated as absent.
 
 This closes a planning-coverage gap without adding new canonical entities, schema fields, WorkItem actions, LLM calls, or OmniRoute responsibilities. Existing coverage derivation remains authoritative and now receives Evidence from these already-supported deterministic handlers when the surfaces are present.
+
+## Phase 14 — Security Applicability Coverage Closure
+
+The deterministic Security PASS and applicability matrix are now connected for SECURITY/DEBUG_EXPOSURE. When inspectable project artifacts exist, the surface becomes an APPLICABLE planning decision and normal Security WorkItem; when no inspectable artifact is discovered, the state remains NOT_DETERMINABLE. The existing handler emits SEC-DEBUG-001 and preserves NOT_FOUND as an inspected result rather than an applicability exclusion.
+
+This closes the remaining known planning-coverage gap between an existing security handler and normal runtime planning without adding canonical entities, schema fields, WorkItem actions, routing responsibilities, or new semantic workers.
