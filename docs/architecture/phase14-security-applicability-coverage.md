@@ -20,7 +20,7 @@ When no inspectable artifact is discovered, the state is NOT_DETERMINABLE. The e
 
 ## Deterministic execution
 
-Ther existing Security PASS remains authoritative: SECURITY/DEBUG_EXPOSURE → SEC-DEBUG-001.
+The existing Security PASS remains authoritative: SECURITY/DEBUG_EXPOSURE → SEC-DEBUG-001.
 
 A project without a matching pattern can therefore produce NOT_FOUND only after the surface has actually been inspected.
 
