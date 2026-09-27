@@ -261,6 +261,19 @@ class Orchestrator:
                 f"AuditRun {run.run_id} schema validation failed:\n" + "\n".join(errors)
             )
         report = validate_run(run, plan, work_items, known_run_ids, interrupted_run_ids)
+        if run.publication_state == RunPublicationState.PUBLISHED_COMPLETE:
+            try:
+                existing_run = self.store.load_run(run.run_id)
+            except Exception:
+                existing_run = None
+            if (
+                existing_run is None
+                or existing_run.publication_state != RunPublicationState.PUBLISHED_COMPLETE
+            ):
+                raise OrchestratorError(
+                    f"AuditRun {run.run_id}: PUBLISHED_COMPLETE may only be committed "
+                    "through publish_run() after the NOT_PUBLISHED state exists."
+                )
         if report.has_errors:
             error_codes = [r.code for r in report.errors()]
             logger.error(
