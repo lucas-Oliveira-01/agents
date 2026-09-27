@@ -1201,17 +1201,26 @@ def validate_work_item(
     work_item: AuditWorkItem,
     known_plan_ids: List[str],
     evidence_for_item: Optional[List[Evidence]] = None,
+    *,
+    defer_reuse_validation: bool = False,
 ) -> ValidationReport:
-    """Run all semantic validators applicable to a single AuditWorkItem."""
+    """Run all semantic validators applicable to a single AuditWorkItem.
+
+    Planned/running REUSE items may not have materialized the historical
+    Evidence edge yet. The execution boundary can therefore defer the
+    existence/validity check until the REUSE transaction derives Evidence,
+    while the public validator remains strict by default.
+    """
     evidence_for_item = evidence_for_item or []
     results = [
         validate_work_item_plan_ref(work_item, known_plan_ids),
         validate_work_item_state_machine(work_item),
         validate_attempt_ordering(work_item),
         validate_execution_gate(work_item),
-        validate_reuse_action_has_valid_evidence(work_item, evidence_for_item),
-        validate_evidence_invalid_not_reused(work_item, evidence_for_item),
     ]
+    if not defer_reuse_validation:
+        results.append(validate_reuse_action_has_valid_evidence(work_item, evidence_for_item))
+    results.append(validate_evidence_invalid_not_reused(work_item, evidence_for_item))
     return ValidationReport(results=results)
 
 
