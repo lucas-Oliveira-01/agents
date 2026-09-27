@@ -49,6 +49,31 @@ def test_backend_delegates_only_through_gateway():
     assert "print('hello')" in task.context
 
 
+def test_backend_unwraps_known_result_envelope_with_markdown_json():
+    finding = {
+        "title": "Envelope finding",
+        "category": "CODE_QUALITY",
+        "type": "BUG",
+        "status": "PROBABLE",
+        "severity": "P2",
+        "confidence": "MEDIUM",
+        "evidence": "Observed",
+        "description": "Candidate",
+    }
+    import json
+    gateway = FakeGateway({
+        "result": "```json\n" + json.dumps({"findings": [finding]}) + "\n```"
+    })
+    result = OmniRouteDelegationBackend(gateway).delegate(_request())
+
+    assert result.status == DelegationStatus.SUCCESS
+    assert result.audit_contract is not None
+    assert len(result.audit_contract.findings) == 1
+    assert result.audit_contract.findings[0].title == "Envelope finding"
+    assert result.raw_output is not None
+    assert "Envelope finding" in result.raw_output
+
+
 def test_backend_preserves_partial_audit_contract():
     finding = {
         "title": "Valid finding",
