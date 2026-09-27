@@ -964,6 +964,62 @@ def validate_publication_artifacts_registered(run: AuditRun) -> ValidationResult
     )
 
 
+def validate_publication_state_consistency(
+    run: AuditRun,
+    work_items: List[AuditWorkItem],
+) -> ValidationResult:
+    """Published state may only represent an eligible run.
+
+    PUBLISHED_COMPLETE is a derived terminal publication state. Direct writes
+    to PUBLISHED_PARTIAL remain unsupported until an explicit partial
+    publication authorization contract exists.
+    """
+    if run.publication_state == __import__("project_audit.models", fromlist=["RunPublicationState"]).RunPublicationState.NOT_PUBLISHED:
+        return _pass("PUBLICATION_STATE_NOT_PUBLISHED", "Run has not been published.")
+
+    if run.publication_state == __import__("project_audit.models", fromlist=["RunPublicationState"]).RunPublicationState.PUBLISHED_PARTIAL:
+        return _error(
+            "PUBLISH_PARTIAL_UNAUTHORIZED",
+            f"Run {run.run_id}: PUBLISHED_PARTIAL requires an explicit partial-publication authorization contract.",
+        )
+
+    if run.execution_completeness != RunExecutionCompleteness.COMPLETE:
+        return _error(
+            "PUBLISHED_COMPLETE_EXECUTION_INCOMPLETE",
+            f"Run {run.run_id}: PUBLISHED_COMPLETE requires execution_completeness=COMPLETE.",
+        )
+    if run.coverage_completeness != RunCoverageCompleteness.FULL:
+        return _error(
+            "PUBLISHED_COMPLETE_COVERAGE_INCOMPLETE",
+            f"Run {run.run_id}: PUBLISHED_COMPLETE requires coverage_completeness=FULL.",
+        )
+    if run.failure_state != RunFailureState.NONE:
+        return _error(
+            "PUBLISHED_COMPLETE_FAILURE_STATE",
+            f"Run {run.run_id}: PUBLISHED_COMPLETE requires failure_state=NONE.",
+        )
+    failed_items = [
+        wi.work_item_id
+        for wi in work_items
+        if wi.failure_state != WorkItemFailureState.NONE
+    ]
+    if failed_items:
+        return _error(
+            "PUBLISHED_COMPLETE_FAILED_ITEMS",
+            f"Run {run.run_id}: PUBLISHED_COMPLETE cannot contain failed WorkItems.",
+            {"work_item_ids": failed_items},
+        )
+    registered = {ref.rsplit("/", 1)[-1] for ref in run.artifact_refs}
+    missing = sorted({"00_inventory.md", "01_coverage.md", "02_analytical.md", "03_audit_ledger.md"} - registered)
+    if missing:
+        return _error(
+            "PUBLISHED_COMPLETE_ARTIFACTS_MISSING",
+            f"Run {run.run_id}: PUBLISHED_COMPLETE requires all publication artifacts.",
+            {"missing_artifacts": missing},
+        )
+    return _pass("PUBLICATION_STATE_CONSISTENT", "Published state is consistent with a complete eligible run.")
+
+
 def can_publish(
     run: AuditRun,
     work_items: List[AuditWorkItem],
@@ -1161,6 +1217,7 @@ def validate_run(
         validate_coverage_not_full_with_blocked_items(run, work_items),
         validate_run_recovery_ref(run, known_run_ids, interrupted_run_ids),
         validate_run_previous_ref_distinct_from_recovery(run),
+        validate_publication_state_consistency(run, work_items),
     ]
     return ValidationReport(results=results)
 
