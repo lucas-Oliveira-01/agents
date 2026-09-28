@@ -6,6 +6,8 @@ import subprocess
 import time
 from datetime import datetime, timezone
 import threading
+import re
+
 
 def run_cmd(cmd, cwd=None):
     print(f"Running: {cmd} in {cwd}")
@@ -19,6 +21,7 @@ def run_cmd(cmd, cwd=None):
     )
     stdout, stderr = proc.communicate()
     return proc.returncode, stdout, stderr
+
 
 def run_with_drift(cmd, cwd, drift_file):
     print(f"Running with drift: {cmd} in {cwd}")
@@ -42,8 +45,10 @@ def run_with_drift(cmd, cwd, drift_file):
     stdout, stderr = proc.communicate()
     return proc.returncode, stdout, stderr
 
+
 SOURCE_PROJECT = "/home/oliveira/Projects/SKILLS/auditoring/test8/smartserv"
 RESULTS_DIR = "/home/oliveira/Projects/SKILLS/smartserv_replay_final_pr33_fixed"
+
 
 def get_git_info(repo_path):
     rc, branch, _ = run_cmd("git rev-parse --abbrev-ref HEAD", repo_path)
@@ -54,19 +59,50 @@ def get_git_info(repo_path):
         "commit": commit.strip()
     }
 
+
+def count_canonical_candidates(ledger_path):
+    """Count canonical verifier candidates from the ledger's dedicated table."""
+    if not os.path.exists(ledger_path):
+        return 0
+
+    in_verifier_section = False
+    candidate_ids = set()
+
+    with open(ledger_path, "r", encoding="utf-8") as f:
+        for line in f:
+            stripped = line.strip()
+
+            if stripped == "## Independent Verifier":
+                in_verifier_section = True
+                continue
+
+            if in_verifier_section and stripped.startswith("## "):
+                break
+
+            if not in_verifier_section:
+                continue
+
+            match = re.match(r"^\|\s*(VC-[^|]+?)\s*\|", line)
+            if match:
+                candidate_ids.add(match.group(1).strip())
+
+    return len(candidate_ids)
+
+
 def collect_audit_artifacts(audit_dir, dest_audit_dir):
     if not os.path.exists(audit_dir):
         return {}
         
     shutil.copytree(audit_dir, dest_audit_dir, dirs_exist_ok=True)
     
+    ledger_path = os.path.join(dest_audit_dir, "03_audit_ledger.md")
     findings_count = 0
+    canonical_count = count_canonical_candidates(ledger_path)
     published_count = 0
     
     # try to count findings if ledger exists
-    ledger_path = os.path.join(dest_audit_dir, "03_audit_ledger.md")
     if os.path.exists(ledger_path):
-        with open(ledger_path, "r") as f:
+        with open(ledger_path, "r", encoding="utf-8") as f:
             for line in f:
                 if line.startswith("## Finding:"):
                     published_count += 1
@@ -77,7 +113,7 @@ def collect_audit_artifacts(audit_dir, dest_audit_dir):
         for fname in os.listdir(raw_dir):
             if fname.endswith(".json"):
                 try:
-                    with open(os.path.join(raw_dir, fname), "r") as f:
+                    with open(os.path.join(raw_dir, fname), "r", encoding="utf-8") as f:
                         data = json.load(f)
                         if "findings" in data:
                             findings_count += len(data["findings"])
@@ -86,8 +122,10 @@ def collect_audit_artifacts(audit_dir, dest_audit_dir):
                     
     return {
         "raw_findings": max(findings_count, published_count),
+        "canonical_findings": canonical_count,
         "published_findings": published_count
     }
+
 
 def main():
     if os.path.exists(RESULTS_DIR):
