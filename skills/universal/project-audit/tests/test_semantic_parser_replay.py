@@ -205,10 +205,20 @@ def test_semantic_parser_accepts_smartserv_observed_type_aliases():
 
 def test_semantic_parser_normalizes_all_observed_severity_aliases():
     from project_audit.semantic_auditor import _parse_output
+    base_finding = {
+        "title": "base",
+        "category": "SECURITY",
+        "type": "RISK",
+        "status": "PROBABLE",
+        "severity": "P2",
+        "confidence": "MEDIUM",
+        "evidence": "Observed",
+        "description": "Candidate",
+    }
     payload = {
         "findings": [
             {
-                **finding,
+                **base_finding,
                 "title": "severity-" + severity,
                 "severity": severity,
             }
