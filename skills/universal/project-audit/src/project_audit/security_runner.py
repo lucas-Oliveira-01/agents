@@ -17,6 +17,7 @@ from .incremental import derive_reused_evidence, derive_stale_evidence
 from .security_pass import DeterministicSecurityAuditor, SecurityInspectionResult
 from .semantic_auditor import SemanticAuditor, SemanticReviewResult
 from .semantic_runner import execute_semantic_review
+from .planner import build_target_snapshot
 
 
 class SecurityPassResult:

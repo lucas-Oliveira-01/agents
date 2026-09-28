@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://antigravity.local/schemas/validation-report.schema.json",
+  "title": "Audit Validation Report",
+  "description": "Independent validation dimensions for a normalized audit run.",
+  "type": "object",
+  "properties": {
+    "schema_validity": {
+      "type": "string",
+      "enum": ["VALID", "INVALID"]
+    },
+    "execution_validity": {
+      "type": "string",
+      "enum": ["COMPLETE", "FAILED", "BLOCKED", "INCOMPLETE", "UNKNOWN"]
+    },
+    "coverage_validity": {
+      "type": "string",
+      "enum": ["FULL", "PARTIAL", "NONE", "UNKNOWN"]
+    },
+    "security_verdict": {
+      "type": "string",
+      "enum": ["COMPLETE_CLEAN", "COMPLETE_FINDINGS", "INCOMPLETE"]
+    },
+    "validations": {
+      "type": "object"
+    },
+    "errors": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "warnings": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "metrics_summary": {
+      "type": "object"
+    },
+    "sources_processed": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "required": [
+    "schema_validity",
+    "execution_validity",
+    "coverage_validity",
+    "security_verdict",
+    "validations",
+    "errors",
+    "warnings",
+    "metrics_summary"
+  ],
+  "additionalProperties": true
+}

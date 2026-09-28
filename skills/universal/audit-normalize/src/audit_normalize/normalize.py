@@ -27,19 +27,11 @@ from .validator import AuditDataValidator, get_default_schema_path
 
 def get_default_validation_report_schema_path() -> str:
     """Resolve the schema for validation_report.json."""
-    package_ref = os.path.abspath(
-        os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..",
-            "..",
-            "references",
-            "validation_report.schema.json",
-        )
+    return os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "references",
+        "validation_report.schema.json",
     )
-    if os.path.isfile(package_ref):
-        return package_ref
-    cwd_ref = os.path.abspath("references/validation_report.schema.json")
-    return cwd_ref
 
 
 def _validate_validation_report_schema(

@@ -132,4 +132,22 @@ Description: State changing POST requests do not require Anti-CSRF token.
             capture_output=True,
             text=True,
         )
-        assert val_cli_run.returncode == 0, f"audit-validate failed: {val_cli_run.stderr}"
+        # Without an execution-state sidecar, the CLI must preserve UNKNOWN
+        # execution and INCOMPLETE security even though the schema is valid.
+        assert val_cli_run.returncode == 3, f"unexpected audit-validate result: {val_cli_run.stderr}"
+        validation = json.loads(val_cli_run.stdout)
+        assert validation["schema_validity"] == "VALID"
+        assert validation["execution_validity"] == "UNKNOWN"
+        assert validation["security_verdict"] == "INCOMPLETE"
+
+
+def test_validation_report_schema_is_packaged_and_canonical():
+    from pathlib import Path
+    import audit_normalize
+    from audit_normalize.normalize import get_default_validation_report_schema_path
+    package = Path(audit_normalize.__file__).parent
+    packaged = package / 'references' / 'validation_report.schema.json'
+    assert packaged.is_file()
+    assert Path(get_default_validation_report_schema_path()) == packaged
+    canonical = Path(__file__).parents[1] / 'references' / 'validation_report.schema.json'
+    assert packaged.read_bytes() == canonical.read_bytes()
