@@ -74,6 +74,14 @@ class DelegationGateway:
                 else:
                     continue
             mapped[runtime_name] = value
+
+        instructions = task.instructions
+        if instructions:
+            task_text = mapped.get("task")
+            if not isinstance(task_text, str) or not task_text.strip():
+                raise SchemaViolationError("Task instructions require a non-empty task.")
+            mapped["task"] = instructions.strip() + "\n\n" + task_text
+
         return mapped
 
     def build_task(self, task: DelegationTask) -> Dict[str, Any]:
