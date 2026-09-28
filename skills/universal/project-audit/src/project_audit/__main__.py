@@ -43,6 +43,8 @@ def main() -> int:
     parser.add_argument("--allow-external", action="store_true", help="Explicitly allow external egress")
     parser.add_argument("--target-mode", choices=("WORKTREE", "COMMIT"), default="WORKTREE", help="Define whether the audit target is the current worktree or the Git commit state")
     args = parser.parse_args()
+    if args.no_persist and args.phase != "prepare":
+        parser.error("--no-persist is supported only with --phase prepare")
 
     root, vault, state_dir, output_dir = audit_paths(args.target, args.state_dir, args.output_dir)
     if not (args.phase == "prepare" and args.no_persist):
@@ -107,7 +109,8 @@ def main() -> int:
             worker_port = WorkerPort(backend, "omniroute/project-audit")
             semantic_worker = SemanticAuditor(worker_port)
         except Exception as e:
-            print(f"Semantic delegation disabled: {e}", file=sys.stderr)
+            print(f"failure_state=TRANSPORT_FAILURE: {e}", file=sys.stderr)
+            return 4
 
         if args.phase == "fix":
             if not args.run_id:

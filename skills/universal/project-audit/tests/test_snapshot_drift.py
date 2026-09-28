@@ -116,15 +116,19 @@ def test_cli_initializes_vault_for_each_persistent_phase(tmp_path, monkeypatch, 
         "argv",
         ["project_audit", "--target", str(tmp_path), "--phase", phase],
     )
+    if phase == "full":
+        def unavailable():
+            raise ConnectionError("test transport unavailable")
+        monkeypatch.setattr("project_audit.__main__.create_local_omniroute_backend", unavailable)
     ret = main()
     if phase == "full":
-        assert ret in (0, 4)
+        assert ret == 4
     else:
         assert ret == 0
     assert (tmp_path / ".audit" / ".git").is_dir()
     assert "/.audit/" in (tmp_path / ".gitignore").read_text()
     if phase == "full":
-        assert f"output_dir={tmp_path / '.audit'}" in capsys.readouterr().out
+        assert "TRANSPORT_FAILURE" in capsys.readouterr().err
 
 
 def test_drift_during_semantic_network_response_marks_semantic_evidence_stale(tmp_path):
@@ -323,3 +327,23 @@ def test_commit_mode_keeps_target_git_clean_and_audit_history_isolated(tmp_path)
         cwd=tmp_path,
         text=True,
     ).strip() == ".audit/00_inventory.md"
+
+
+def test_existing_external_ignore_preserves_commit_sources(tmp_path, monkeypatch):
+    import subprocess
+    from project_audit.models import TargetMode
+    root = tmp_path / 'target'
+    root.mkdir()
+    (root / 'app.py').write_text("print('ok')\n")
+    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+    subprocess.run(['git', '-C', str(root), 'add', 'app.py'], check=True)
+    subprocess.run(['git', '-C', str(root), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'fixture'], check=True)
+    excludes = tmp_path / 'audit-excludes'
+    excludes.write_text('/.audit/\n')
+    monkeypatch.setenv('GIT_CONFIG_COUNT', '1')
+    monkeypatch.setenv('GIT_CONFIG_KEY_0', 'core.excludesFile')
+    monkeypatch.setenv('GIT_CONFIG_VALUE_0', str(excludes))
+    result = run_full_audit(str(root), target_mode=TargetMode.COMMIT)
+    assert result.security.run.failure_state.value == 'NONE'
+    assert not (root / '.gitignore').exists()
+    assert subprocess.check_output(['git', '-C', str(root), 'status', '--porcelain'], text=True) == ''
