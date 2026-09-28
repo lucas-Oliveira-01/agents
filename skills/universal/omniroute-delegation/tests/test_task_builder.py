@@ -94,6 +94,17 @@ class TestTaskConstruction:
         task = TaskBuilder().objetivo("Test").restricoes("None").contexto("Some code").build()
         assert task["context"] == "Some code"
 
+
+    def test_request_scoped_instructions_are_preserved(self):
+        task = (
+            TaskBuilder()
+            .objetivo("Review code")
+            .restricoes("Read-only")
+            .instructions("Return JSON only")
+            .build()
+        )
+        assert task["instructions"] == "Return JSON only"
+
     def test_optional_params_excluded_when_none(self):
         task = TaskBuilder().objetivo("Test").restricoes("None").build()
         assert "profile" not in task
