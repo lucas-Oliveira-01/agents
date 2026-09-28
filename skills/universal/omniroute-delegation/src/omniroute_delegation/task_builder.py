@@ -144,6 +144,7 @@ class TaskBuilder:
     def __init__(self) -> None:
         self._objective: str = ""
         self._constraints: str = ""
+        self._instructions: str = ""
         self._context: str = ""
         self._format: str = ""
         self._criteria: str = ""
@@ -165,6 +166,13 @@ class TaskBuilder:
     def constraints(self, value: str) -> "TaskBuilder":
         """Set the task constraints."""
         self._constraints = value
+        return self
+
+    def instructions(self, value: str) -> "TaskBuilder":
+        """Set request-scoped instructions without changing the gateway's wire schema."""
+        if not value.strip():
+            raise ValueError("instructions must not be empty")
+        self._instructions = value
         return self
 
     def context(self, value: str) -> "TaskBuilder":
@@ -253,6 +261,9 @@ class TaskBuilder:
 
         # Build params
         params: Dict[str, Any] = {"task": task}
+
+        if self._instructions:
+            params["instructions"] = self._instructions
 
         if self._profile is not None:
             params["profile"] = self._profile
