@@ -169,3 +169,51 @@ def test_semantic_parser_rejects_unknown_severity():
     with pytest.raises(SemanticOutputError, match="unsupported severity: VERY_BAD"):
         _parse_output(payload)
 
+
+def test_semantic_parser_accepts_smartserv_observed_type_aliases():
+    aliases = {
+        "STORED_XSS": "VULNERABILITY",
+        "REFLECTED_XSS": "VULNERABILITY",
+        "MISSING_AUTHORIZATION_CHECK": "VULNERABILITY",
+        "OVERLY_PERMISSIVE_CORS": "VULNERABILITY",
+        "SESSION_MANAGEMENT": "RISK",
+        "LOGIC_FLAW": "BUG",
+        "IMPLEMENTATION": "TECHNICAL_DEFECT",
+    }
+    from project_audit.semantic_auditor import _parse_output
+
+    payload = {
+        "findings": [
+            {
+                **{
+                    "title": "Alias " + raw_type,
+                    "category": "SECURITY",
+                    "type": raw_type,
+                    "status": "PROBABLE",
+                    "severity": "HIGH",
+                    "confidence": "MEDIUM",
+                    "evidence": "Observed in source.",
+                    "description": "Candidate.",
+                },
+            }
+            for raw_type in aliases
+        ]
+    }
+    candidates = _parse_output(payload)
+    assert [candidate.finding_type for candidate in candidates] == list(aliases.values())
+    assert all(candidate.type_normalization_rule for candidate in candidates)
+
+def test_semantic_parser_normalizes_all_observed_severity_aliases():
+    from project_audit.semantic_auditor import _parse_output
+    payload = {
+        "findings": [
+            {
+                **finding,
+                "title": "severity-" + severity,
+                "severity": severity,
+            }
+            for severity in ("CRITICAL", "HIGH", "MEDIUM", "LOW")
+        ]
+    }
+    candidates = _parse_output(payload)
+    assert [candidate.severity for candidate in candidates] == ["P0", "P1", "P2", "P3"]
