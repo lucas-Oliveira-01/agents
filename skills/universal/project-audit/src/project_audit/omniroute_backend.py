@@ -132,7 +132,10 @@ class OmniRouteDelegationBackend(DelegationBackend):
         def metadata(value: Any) -> tuple[Optional[str], Optional[str]]:
             if not isinstance(value, dict):
                 return None, None
-            return value.get("_omniroute_meta", {}).get("provider"), value.get("_omniroute_meta", {}).get("model")
+            meta = value.get("_omniroute_meta")
+            if not isinstance(meta, dict):
+                return None, None
+            return meta.get("provider"), meta.get("model")
 
         def cleaned(value: Any) -> Any:
             if isinstance(value, dict) and isinstance(value.get("_omniroute_meta"), dict):

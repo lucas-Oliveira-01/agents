@@ -125,3 +125,30 @@ def test_backend_surfaces_whole_document_schema_failure():
     assert result.audit_contract is not None
     assert result.audit_contract.state == ExecutionState.SCHEMA_VIOLATION
     assert result.audit_contract.raw_errors
+
+def test_backend_recursively_unwraps_structured_content():
+    import json
+    finding = {
+        "title": "Nested structured finding",
+        "category": "SECURITY",
+        "type": "BUG",
+        "status": "CONFIRMED",
+        "severity": "P1",
+        "confidence": "HIGH",
+        "evidence": "Observed in structured content",
+        "description": "Candidate",
+    }
+    payload = {
+        "structuredContent": {
+            "result": "```json\n" + json.dumps({"findings": [finding]}) + "\n```"
+        }
+    }
+    gateway = FakeGateway(payload)
+    result = OmniRouteDelegationBackend(gateway).delegate(_request())
+
+    assert result.status == DelegationStatus.SUCCESS
+    assert result.audit_contract is not None
+    assert len(result.audit_contract.findings) == 1
+    assert result.audit_contract.findings[0].title == "Nested structured finding"
+    assert result.raw_output is not None
+    assert "Nested structured finding" in result.raw_output
