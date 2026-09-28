@@ -86,3 +86,21 @@ def test_partial_result_is_explicit():
     assert len(result.raw_errors) == 1
     assert result.leaf is not None
     assert result.leaf.raw_output
+
+def test_extracts_fenced_json_without_requiring_markdown_instructions():
+    payload = {"findings": [finding(title="Fenced")]}
+    fenced = "```json\\n" + __import__("json").dumps(payload) + "\\n```"
+    result = extract_json(fenced)
+    assert result["findings"][0]["title"] == "Fenced"
+
+def test_merges_multiple_findings_json_documents_without_silent_loss():
+    first = {"findings": [finding(title="First")]}
+    second = {"findings": [finding(title="Second", severity="MEDIUM")]}
+    text = __import__("json").dumps(first) + "\\n" + __import__("json").dumps(second)
+    result = extract_json(text)
+    assert [item["title"] for item in result["findings"]] == ["First", "Second"]
+
+def test_rejects_multiple_unrelated_json_documents():
+    text = '{"status": "partial"}\\n{"metadata": {"source": "model"}}'
+    with pytest.raises(Exception, match="Multiple JSON documents"):
+        extract_json(text)
