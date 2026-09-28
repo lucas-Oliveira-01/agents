@@ -39,7 +39,8 @@ class OmniRouteDelegationBackend(DelegationBackend):
         task = DelegationTask.model_validate(self._build_task_payload(request))
 
         def invoke(attempt: int) -> Any:
-            return self._extract_semantic_payload(self.gateway.delegate(task))
+            res = self.gateway.delegate(task)
+            return self._extract_semantic_payload(res)
 
         try:
             audit_contract = SemanticRecoveryLoop(invoke, max_attempts=2).run()
@@ -131,14 +132,7 @@ class OmniRouteDelegationBackend(DelegationBackend):
         def metadata(value: Any) -> tuple[Optional[str], Optional[str]]:
             if not isinstance(value, dict):
                 return None, None
-            item = value.get("_omniroute_meta")
-            if not isinstance(item, dict):
-                return None, None
-            provider = item.get("provider") if isinstance(item.get("provider"), str) else None
-            model = item.get("model") if isinstance(item.get("model"), str) else None
-            if model is None and isinstance(item.get("route"), str):
-                model = item["route"]
-            return provider, model
+            return value.get("_omniroute_meta", {}).get("provider"), value.get("_omniroute_meta", {}).get("model")
 
         def cleaned(value: Any) -> Any:
             if isinstance(value, dict) and isinstance(value.get("_omniroute_meta"), dict):
@@ -154,7 +148,7 @@ class OmniRouteDelegationBackend(DelegationBackend):
                 raise
 
         def decode(value: Any, depth: int = 0) -> SemanticPayload:
-            if depth > 3:
+            if depth > 5:
                 raise SchemaViolationError("OmniRoute semantic envelope nesting is too deep.")
 
             outer_provider, outer_model = metadata(value)
@@ -168,40 +162,31 @@ class OmniRouteDelegationBackend(DelegationBackend):
                 structured = value.get("structuredContent")
                 if isinstance(structured, (dict, list)) and structured:
                     parsed = cleaned(structured)
+                    # RECURSIVE DECODE HERE
+                    nested_result = decode(parsed, depth + 1)
                     provider, model = metadata(parsed)
                     return SemanticPayload(
-                        payload=parsed,
-                        raw_output=json.dumps(structured, ensure_ascii=False, sort_keys=True),
-                        provider=provider or outer_provider or self.provider,
-                        model=model or outer_model or self.model,
+                        payload=nested_result.payload,
+                        raw_output=nested_result.raw_output,
+                        provider=nested_result.provider or provider or outer_provider or self.provider,
+                        model=nested_result.model or model or outer_model or self.model,
                     )
 
-                for key in ("result", "output"):
+                for key in ("result", "output", "content"):
                     nested = value.get(key)
                     if isinstance(nested, (str, dict, list)):
+                        # If content is a list of blocks like in MCP
+                        if key == "content" and isinstance(nested, list):
+                            for block in nested:
+                                if isinstance(block, dict) and block.get("type") == "text":
+                                    return decode(block.get("text"), depth + 1)
+
                         nested_result = decode(nested, depth + 1)
                         return SemanticPayload(
                             payload=nested_result.payload,
                             raw_output=nested_result.raw_output,
                             provider=nested_result.provider or outer_provider or self.provider,
                             model=nested_result.model or outer_model or self.model,
-                        )
-
-                content = value.get("content")
-                if isinstance(content, list):
-                    raw_text = "".join(
-                        item.get("text", "")
-                        for item in content
-                        if isinstance(item, dict) and item.get("type") == "text"
-                    ).strip()
-                    if raw_text:
-                        parsed = cleaned(parse_text(raw_text))
-                        provider, model = metadata(parsed)
-                        return SemanticPayload(
-                            payload=parsed,
-                            raw_output=raw_text,
-                            provider=provider or outer_provider or self.provider,
-                            model=model or outer_model or self.model,
                         )
 
                 parsed = cleaned(value)
@@ -216,8 +201,8 @@ class OmniRouteDelegationBackend(DelegationBackend):
                 return SemanticPayload(
                     payload=value,
                     raw_output=json.dumps(value, ensure_ascii=False, sort_keys=True),
-                    provider=self.provider,
-                    model=self.model,
+                    provider=outer_provider or self.provider,
+                    model=outer_model or self.model,
                 )
 
             raise SchemaViolationError("OmniRoute returned no semantic payload.")
