@@ -108,3 +108,19 @@ def test_gateway_requires_discovered_tool():
 
     with pytest.raises(SchemaViolationError):
         DelegationGateway(client).delegate(DelegationTask(task="Review code"))
+
+def test_gateway_merges_request_scoped_instructions_without_wire_schema_expansion():
+    client = ready_client({})
+    gateway = DelegationGateway(client)
+
+    gateway.delegate(
+        DelegationTask(
+            task="Review code",
+            instructions="Return exactly one JSON object. Do not use Markdown.",
+        )
+    )
+
+    args = client.call_tool.call_args.args[1]
+    assert "instructions" not in args
+    assert args["task"].startswith("Return exactly one JSON object. Do not use Markdown.")
+    assert args["task"].endswith("Review code")
