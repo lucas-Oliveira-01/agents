@@ -44,6 +44,7 @@ class DelegationTask(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     task: str = Field(min_length=1)
+    instructions: Optional[str] = Field(default=None, min_length=1)
     profile: Optional[str] = None
     context: Optional[str] = None
     task_id: Optional[str] = None
