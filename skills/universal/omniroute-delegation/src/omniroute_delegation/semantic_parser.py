@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Iterable
 
@@ -74,19 +75,63 @@ def _extract_json_candidates(text: str) -> Iterable[str]:
                     break
 
 
+def _strip_code_fence(text: str) -> str:
+    match = re.fullmatch(r"\\s*\\`\\`\\`(?:json)?\\s*(.*?)\\s*\\`\\`\\`\\s*", text, flags=re.IGNORECASE | re.DOTALL)
+    return match.group(1).strip() if match else text.strip()
+
+
+def _is_findings_payload(value: Any) -> bool:
+    if isinstance(value, list):
+        return True
+    return isinstance(value, dict) and isinstance(value.get("findings"), list)
+
+
 def extract_json(text: str) -> Any:
-    """Extract the first valid JSON value from prose or fenced output."""
-    stripped = text.strip()
-    candidates = [stripped]
-    if stripped.startswith("FENCE") and stripped.endswith("FENCE"):
-        candidates.insert(0, stripped.strip("FENCE").strip())
-    candidates.extend(_extract_json_candidates(stripped))
-    for candidate in candidates:
+    """Extract one structured semantic payload without silently dropping siblings."""
+    stripped = _strip_code_fence(text)
+    direct_candidates = [stripped]
+    if stripped != text.strip():
+        direct_candidates.append(text.strip())
+
+    parsed_values: List[Any] = []
+    seen: set[str] = set()
+
+    for candidate in direct_candidates:
         try:
-            return json.loads(candidate)
+            value = json.loads(candidate)
         except json.JSONDecodeError:
             continue
-    raise SchemaViolationError("No valid JSON object or array could be extracted.")
+        fingerprint = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if fingerprint not in seen:
+            seen.add(fingerprint)
+            parsed_values.append(value)
+
+    for candidate in _extract_json_candidates(stripped):
+        try:
+            value = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        fingerprint = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if fingerprint not in seen:
+            seen.add(fingerprint)
+            parsed_values.append(value)
+
+    if not parsed_values:
+        raise SchemaViolationError("No valid JSON object or array could be extracted.")
+
+    if len(parsed_values) == 1:
+        return parsed_values[0]
+
+    if all(_is_findings_payload(value) for value in parsed_values):
+        merged: List[Any] = []
+        for value in parsed_values:
+            if isinstance(value, list):
+                merged.extend(value)
+            else:
+                merged.extend(value["findings"])
+        return {"findings": merged}
+
+    raise SchemaViolationError("Multiple JSON documents were returned and cannot be safely merged.")
 
 
 def _candidate_from_item(item: Any) -> LeafFinding:
