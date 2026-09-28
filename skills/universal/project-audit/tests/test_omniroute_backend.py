@@ -47,6 +47,9 @@ def test_backend_delegates_only_through_gateway():
     assert task.task_id == "test-req"
     assert task.temperature == 0
     assert "print('hello')" in task.context
+    assert "Return exactly one valid JSON object" in task.task
+    assert "Do not use Markdown or code fences" in task.task
+    assert "Canonical type values" in task.task
 
 
 def test_backend_unwraps_known_result_envelope_with_markdown_json():
