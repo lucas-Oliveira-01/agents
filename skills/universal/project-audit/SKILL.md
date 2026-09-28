@@ -2,7 +2,7 @@
 
 Core orchestration engine for the `project-audit` skill system.
 
-The current product runtime is **single-agent**. Development may use Codex, Antigravity, and OpenCode, but those are not runtime auditors.
+The current product runtime is a **multi-agent swarm** powered by OmniRoute Delegation. Development may use Codex, Antigravity, and OpenCode, but those are not runtime auditors.
 
 ## Scope
 
@@ -55,7 +55,10 @@ Implemented:
 - conservative progressive context selection;
 - sensitivity/egress classification with fail-closed behavior;
 - gated semantic-review capability with structured output validation;
-- execution receipts and Evidence persistence for completed engineering work.
+- execution receipts and Evidence persistence for completed engineering work;
+- Swarm Architecture (L2/L3) and OmniRoute Delegation Gateway;
+- Stateful Sandboxing (L3W) and WorkerManager;
+- Phase 11 to Phase 20 architectural closures (Evidence lineage, immutable Evidence, Snapshot Drift at Node-Level).
 
 Not implemented yet:
 
@@ -63,10 +66,7 @@ Not implemented yet:
 - independent Security PASS 2 execution;
 - final four-file Markdown audit output writer;
 - correlation between PASS 1 and PASS 2;
-- optional `audit-normalize` downstream handoff from the CLI; the normalizer remains a separate skill;
-- advanced incremental reuse/cache;
-- Evidence Dependency Graph;
-- multi-agent audit runtime.
+- optional `audit-normalize` downstream handoff from the CLI; the normalizer remains a separate skill.
 
 ## Safety boundary
 
