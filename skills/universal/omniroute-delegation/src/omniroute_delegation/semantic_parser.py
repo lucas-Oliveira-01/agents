@@ -119,17 +119,20 @@ def extract_json(text: str) -> Any:
     if not parsed_values:
         raise SchemaViolationError("No valid JSON object or array could be extracted.")
 
-    if len(parsed_values) == 1:
-        return parsed_values[0]
-
-    if all(_is_findings_payload(value) for value in parsed_values):
+    findings_values = [value for value in parsed_values if _is_findings_payload(value)]
+    if findings_values:
+        if len(findings_values) == 1:
+            return findings_values[0]
         merged: List[Any] = []
-        for value in parsed_values:
+        for value in findings_values:
             if isinstance(value, list):
                 merged.extend(value)
             else:
                 merged.extend(value["findings"])
         return {"findings": merged}
+
+    if len(parsed_values) == 1:
+        return parsed_values[0]
 
     raise SchemaViolationError("Multiple JSON documents were returned and cannot be safely merged.")
 
