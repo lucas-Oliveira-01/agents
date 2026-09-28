@@ -184,3 +184,15 @@ def test_consolidation_rejects_lower_severity_without_verified_evidence(target_s
     assert decision.verdict == VerificationVerdict.REJECTED
     assert not consolidated_reviews((review,), (decision,))[0].candidates
     assert not consolidated_reviews((review,), ())[0].candidates
+
+
+def test_verdict_for_same_candidate_cannot_cross_workitem(target_snapshot, work_item):
+    evidence = make_evidence(target_snapshot_ref=target_snapshot.snapshot_fingerprint, work_item_ref=work_item.work_item_id)
+    candidate = _candidate(severity='P2')
+    valid = _review(candidate, evidence)
+    invalid = replace(valid, work_item_ref='different-item')
+    accepted = IndependentVerifier().verify_candidate(candidate, valid, work_item, target_snapshot)
+    rejected = replace(accepted, work_item_ref='different-item', verdict=VerificationVerdict.REJECTED)
+    result = consolidated_reviews((invalid, valid), (rejected, accepted))
+    assert not result[0].candidates
+    assert result[1].candidates == (candidate,)

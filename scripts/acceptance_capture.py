@@ -44,6 +44,13 @@ def main() -> int:
                 "git_status": git("status", "--short", "--untracked-files=no"),
                 "tracked_diff_sha256": hashlib.sha256(git("diff", "HEAD").encode()).hexdigest(),
                 "python": sys.version, "redaction": "credential env values and credential-shaped text"}
+    source_hashes = {}
+    for name in git("ls-files", "--cached", "--others", "--exclude-standard", "--", "scripts", "skills", "mcp").splitlines():
+        path = Path(name)
+        if path.is_file() and path.suffix in {".py", ".toml", ".json", ".yml", ".yaml", ".txt"}:
+            source_hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    (out / "source_manifest.json").write_text(json.dumps(source_hashes, indent=2) + "\n")
+    metadata["source_manifest_sha256"] = hashlib.sha256(json.dumps(source_hashes, sort_keys=True).encode()).hexdigest()
     (out / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     start = time.monotonic()
     try:

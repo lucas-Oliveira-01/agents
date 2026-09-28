@@ -22,3 +22,19 @@ def test_counts_unique_verifier_candidates_only(tmp_path):
 
 def test_missing_ledger_is_zero(tmp_path):
     assert count_canonical_candidates(tmp_path / 'missing') == 0
+
+
+def test_rendered_findings_ignore_raw_output_fences():
+    from smartserv_acceptance import rendered_finding_titles
+    text = '''## SEMANTIC COVERAGE
+~~~text
+## SEMANTIC FINDINGS
+### SEM-999 — not published
+~~~
+## SEMANTIC FINDINGS
+### SEM-001 — Actual candidate
+Title: Actual candidate
+## Next section
+### SEM-002 — not a finding
+'''
+    assert rendered_finding_titles(text) == ['Actual candidate']

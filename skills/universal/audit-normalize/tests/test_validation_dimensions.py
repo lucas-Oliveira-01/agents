@@ -88,7 +88,9 @@ def test_validator_detects_metric_count_mismatch(canonical_schema, minimal_valid
     validator = AuditDataValidator(canonical_schema)
     minimal_valid_report["metrics"]["findings_total"] = 99
     res = validator.validate_all(minimal_valid_report)
-    assert res["schema_validity"] == "INVALID"
+    assert res["schema_validity"] == "VALID"
+    assert res["validations"]["semantic_validation"]["status"] == "FAIL"
+    assert res["security_verdict"] == "INCOMPLETE"
     assert any("findings_total=99 != len(findings)=1" in err for err in res["errors"])
 
 
@@ -96,7 +98,9 @@ def test_validator_detects_severity_count_mismatch(canonical_schema, minimal_val
     validator = AuditDataValidator(canonical_schema)
     minimal_valid_report["metrics"]["severity"]["P0"] = 0
     res = validator.validate_all(minimal_valid_report)
-    assert res["schema_validity"] == "INVALID"
+    assert res["schema_validity"] == "VALID"
+    assert res["validations"]["semantic_validation"]["status"] == "FAIL"
+    assert res["security_verdict"] == "INCOMPLETE"
     assert any("Metrics severity mismatch for P0" in err for err in res["errors"])
 
 
@@ -116,7 +120,9 @@ def test_validator_detects_invalid_line_range(canonical_schema, minimal_valid_re
         "line_end": 40,  # line_end < line_start
     }
     res = validator.validate_all(minimal_valid_report)
-    assert res["schema_validity"] == "INVALID"
+    assert res["schema_validity"] == "VALID"
+    assert res["validations"]["semantic_validation"]["status"] == "FAIL"
+    assert res["security_verdict"] == "INCOMPLETE"
     assert any("line_end (40) < line_start (50)" in err for err in res["errors"])
 
 
@@ -135,7 +141,9 @@ def test_validator_detects_invalid_provenance_source(canonical_schema, minimal_v
     validator = AuditDataValidator(canonical_schema)
     minimal_valid_report["findings"][0]["provenance"] = [{"source_id": "src-999", "file": "ghost.md"}]
     res = validator.validate_all(minimal_valid_report)
-    assert res["schema_validity"] == "INVALID"
+    assert res["schema_validity"] == "VALID"
+    assert res["validations"]["referential_validation"]["status"] == "FAIL"
+    assert res["security_verdict"] == "INCOMPLETE"
     assert any("provenance source_id 'src-999' not in audit_snapshot.sources" in err for err in res["errors"])
 
 
@@ -147,7 +155,9 @@ def test_validator_detects_orphan_conflict_id(canonical_schema, minimal_valid_re
         "conflict_id": "CONFLICT-999",
     }
     res = validator.validate_all(minimal_valid_report)
-    assert res["schema_validity"] == "INVALID"
+    assert res["schema_validity"] == "VALID"
+    assert res["validations"]["referential_validation"]["status"] == "FAIL"
+    assert res["security_verdict"] == "INCOMPLETE"
     assert any("non-existent conflict_id 'CONFLICT-999'" in err for err in res["errors"])
 
 

@@ -30,3 +30,9 @@ PR #34 foi preservado na história, mas run_audits.py removido por a53f391 e tes
 - Executor de aceitação registra SHA dinâmico, compara todos os arquivos descobertos com blobs de HEAD e preserva regra VC única do PR #34.
 
 Evidência: runtime_acceptance_red (2 falhas), cli_red e cli_transport_red; runtime_targeted_green (37 pass), cli_transport_green (2 pass), canonical_green (2 pass).
+
+## Revisão independente e normalização
+
+Revisor Codex isolado confirmou falha no vínculo do verificador: candidatos iguais em WorkItems diferentes compartilhavam decisão. Corrigido índice para (work_item_ref, candidate_id), com regressão red/green. Contagem publicada do executor passou a ignorar blocos fenced e exigir correspondência com candidatos consolidados; somente IDs canônicos verificados são contados. Auditor/target drift final agora impede PASS, e capturador inclui manifesto dos arquivos executáveis.
+
+Na suíte audit-normalize, cinco testes esperavam INVALID estrutural para erros semânticos/referenciais. Código, documentação do SKILL e resultado fail-closed concordavam: schema VALID, eixo específico FAIL e verdict INCOMPLETE. Corrigidas as cinco expectativas, preservando asserts dos erros. Uma falha de packaging foi DNS bloqueado no sandbox ao baixar setuptools; será feita uma única execução dirigida com rede autorizada.

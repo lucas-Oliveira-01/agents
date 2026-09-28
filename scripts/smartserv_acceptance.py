@@ -36,6 +36,34 @@ def count_canonical_candidates(ledger_path):
     return len(ids)
 
 
+def rendered_finding_titles(report):
+    """Read canonical headings only, excluding fenced raw model output."""
+    fence = None
+    active = False
+    titles = []
+    for line in report.splitlines():
+        marker = re.match(r"^\s*(`{3,}|~{3,})", line)
+        if marker:
+            value = marker.group(1)
+            if fence is None:
+                fence = value
+            elif value[0] == fence[0] and len(value) >= len(fence) and not line.strip()[len(value):].strip():
+                fence = None
+            continue
+        if fence:
+            continue
+        if line == "## SEMANTIC FINDINGS":
+            active = True
+            continue
+        if active and line.startswith("## "):
+            active = False
+        if active:
+            match = re.match(r"^### SEM-\d+ — (.*)$", line)
+            if match:
+                titles.append(match.group(1))
+    return titles
+
+
 def git(root, *args):
     return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
 
@@ -98,6 +126,8 @@ def main():
     before = prove_target(a.target)
     (dest / 'target_before.json').write_text(json.dumps(before, indent=2))
     assert not before['mismatches'], 'Target materialization does not match commit'
+    assert not before['working_tree'], 'Target worktree must be clean before execution'
+    assert not git(Path.cwd(), 'diff', 'HEAD', '--', 'scripts', 'skills', 'mcp'), 'Commit executable candidate before acceptance'
     auditor = git(Path.cwd(), 'rev-parse', 'HEAD')
     info = {'execution': a.execution, 'mode': a.mode, 'auditor_commit': auditor, 'target_commit': before['target_commit'],
             'raw': None, 'canonical': None, 'verified': None, 'published': None, 'normalized': 'NOT_REQUESTED'}
@@ -127,7 +157,7 @@ def main():
             from project_audit.delegation import WorkerPort
             from project_audit.semantic_auditor import SemanticAuditor
             from project_audit.state_store import StateStore
-            from project_audit.verifier import candidate_identity
+            from project_audit.verifier import candidate_identity, consolidated_reviews
             from omniroute_delegation.semantic_parser import extract_json
             worker = None
             if a.mode != 'drift':
@@ -181,11 +211,16 @@ def main():
             canonical = count_canonical_candidates(output / '03_audit_ledger.md')
             assert canonical == len(ids), 'Verifier ledger count disagrees with canonical identities'
             report = (output / '03_audit_ledger.md').read_text()
-            # Count only rendered canonical sections, after the raw coverage section.
-            rendered = report.split('## SEMANTIC FINDINGS\n', 1)[-1] if '## SEMANTIC FINDINGS\n' in report else ''
-            rendered_count = len(re.findall(r'^### SEM-\d+ — ', rendered, re.M))
+            consolidated = consolidated_reviews(result.semantic_reviews, result.verification_results)
+            approved = [c for review in consolidated for c in review.candidates]
+            rendered_titles = rendered_finding_titles(report)
+            assert sorted(rendered_titles) == sorted(c.title for c in approved), "Rendered report differs from verified candidates"
+            rendered_count = len(rendered_titles)
             publication = run.publication_state.value
-            published = rendered_count if publication == 'PUBLISHED_COMPLETE' else 0
+            published_ids = {candidate_identity(c) for c in approved} if publication == 'PUBLISHED_COMPLETE' else set()
+            published = len(published_ids)
+            assert published_ids <= verified <= ids
+            assert raw >= canonical or raw_unparseable, "Raw/canonical count mismatch"
             info.update(status='PASS' if (run.execution_completeness.value, run.coverage_completeness.value, run.failure_state.value) == ('COMPLETE','FULL','NONE') else 'FAIL',
                 run_id=run.run_id, snapshot=run.target_snapshot_ref, execution_state=run.execution_completeness.value,
                 coverage=run.coverage_completeness.value, failure_state=run.failure_state.value, publication_state=publication,
@@ -233,6 +268,10 @@ def main():
         after = prove_target(a.target)
         (dest / 'target_after.json').write_text(json.dumps(after, indent=2))
         info['target_unchanged'] = before['files'] == after['files'] and before['target_commit'] == after['target_commit']
+        if not info['target_unchanged'] or after['working_tree'] or git(Path.cwd(), 'rev-parse', 'HEAD') != auditor:
+            info['status'] = 'FAIL'
+            info['provenance_error'] = 'Target or auditor changed during execution'
+            exit_code = 5
         info['exit_code'] = exit_code
         info['artifact_manifest'] = archive(vault, dest / 'audit')
         (dest / 'result.json').write_text(redact(json.dumps(info, indent=2)))
