@@ -119,7 +119,13 @@ def extract_json(text: str) -> Any:
     if not parsed_values:
         raise SchemaViolationError("No valid JSON object or array could be extracted.")
 
-    findings_values = [value for value in parsed_values if _is_findings_payload(value)]
+    object_findings = [
+        value for value in parsed_values
+        if isinstance(value, dict) and isinstance(value.get("findings"), list)
+    ]
+    findings_values = object_findings or [
+        value for value in parsed_values if _is_findings_payload(value)
+    ]
     if findings_values:
         if len(findings_values) == 1:
             return findings_values[0]
