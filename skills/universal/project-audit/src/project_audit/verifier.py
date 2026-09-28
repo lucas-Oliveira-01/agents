@@ -271,20 +271,17 @@ def consolidated_reviews(
     reviews: Iterable[SemanticReviewResult],
     verification_results: Iterable[VerificationResult],
 ) -> Tuple[SemanticReviewResult, ...]:
-    """Filter only verifier-blocked P0/P1 candidates before report consolidation."""
+    """Publish candidates only when independent evidence verification passes."""
     decisions = {
-        result.candidate_id: result
+        (result.work_item_ref, result.candidate_id): result
         for result in verification_results
     }
     output = []
     for review in reviews:
         kept = []
         for candidate in review.candidates:
-            result = decisions.get(candidate_identity(candidate))
-            if candidate.severity in {"P0", "P1"}:
-                if result is not None and result.verdict == VerificationVerdict.VERIFIED:
-                    kept.append(candidate)
-            else:
+            result = decisions.get((review.work_item_ref, candidate_identity(candidate)))
+            if result is not None and result.verdict == VerificationVerdict.VERIFIED:
                 kept.append(candidate)
         output.append(__import__("dataclasses").replace(review, candidates=tuple(kept)))
     return tuple(output)

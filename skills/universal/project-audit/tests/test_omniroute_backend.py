@@ -152,3 +152,14 @@ def test_backend_recursively_unwraps_structured_content():
     assert result.audit_contract.findings[0].title == "Nested structured finding"
     assert result.raw_output is not None
     assert "Nested structured finding" in result.raw_output
+
+
+def test_backend_invalid_meta_falls_back_without_attribute_error():
+    gateway = FakeGateway({
+        '_omniroute_meta': 'invalid',
+        'structuredContent': {'result': '{"findings": []}'},
+    })
+    result = OmniRouteDelegationBackend(gateway).delegate(_request())
+    assert result.status == DelegationStatus.SUCCESS
+    assert result.provider == 'omniroute'
+    assert result.model == 'UNREPORTED'

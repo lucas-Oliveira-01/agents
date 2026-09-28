@@ -99,3 +99,11 @@ def test_snapshot_drift_adds_stale_lineage_without_rewriting_original(tmp_path, 
         original_evidence = store.load_evidence(stale_evidence.derived_from_evidence_ref)
         assert original_evidence.validity == EvidenceValidity.VALID
         assert original_evidence.target_snapshot_ref == stale_evidence.target_snapshot_ref
+
+
+def test_security_snapshot_drift_path_has_target_snapshot_builder(tmp_path):
+    """Security drift handling must resolve the snapshot helper at runtime."""
+    from project_audit.security_runner import build_target_snapshot
+    from project_audit.discovery import discover
+
+    assert build_target_snapshot(discover(tmp_path)).snapshot_fingerprint

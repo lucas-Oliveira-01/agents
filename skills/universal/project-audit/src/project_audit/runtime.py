@@ -68,7 +68,13 @@ def initialize_audit_repository(root: Path, vault: Path) -> None:
     if ignore.is_symlink():
         raise ValueError("Cannot update a symlinked .gitignore")
     content = ignore.read_text(encoding="utf-8") if ignore.exists() else ""
-    if not any(line.strip() in {".audit/", "/.audit/"} for line in content.splitlines()):
+    # Honor an existing Git exclusion (including a caller-owned excludesFile).
+    # This permits a genuinely clean COMMIT audit without changing target files.
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", ".audit/acceptance-probe"],
+        cwd=root, capture_output=True, timeout=5,
+    ).returncode == 0
+    if not ignored and not any(line.strip() in {".audit/", "/.audit/"} for line in content.splitlines()):
         ignore.write_text(content + ("\n" if content and not content.endswith("\n") else "") + "/.audit/\n", encoding="utf-8")
     vault.mkdir(parents=True, exist_ok=True)
     if not (vault / ".git").exists():

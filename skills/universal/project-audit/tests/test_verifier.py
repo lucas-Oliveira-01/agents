@@ -134,7 +134,8 @@ def test_consolidation_filters_unverified_p1_but_keeps_lower_severity(target_sna
         verdict=VerificationVerdict.NOT_DETERMINABLE,
         reasons=("independent verification did not establish the P1 gate",),
     )
-    consolidated = consolidated_reviews((review,), (p1_result,))
+    p2_result = verifier.verify_candidate(p2, review, work_item, target_snapshot)
+    consolidated = consolidated_reviews((review,), (p1_result, p2_result))
     assert [c.title for c in consolidated[0].candidates] == ["P2 retained"]
 
 
@@ -173,3 +174,25 @@ def test_verifier_is_independent_of_llm_narrative(target_snapshot, work_item):
     )
     assert result.verdict == VerificationVerdict.VERIFIED
     assert all("narrative" not in reason.lower() for reason in result.reasons)
+
+
+def test_consolidation_rejects_lower_severity_without_verified_evidence(target_snapshot, work_item):
+    evidence = make_evidence(target_snapshot_ref=target_snapshot.snapshot_fingerprint, work_item_ref=work_item.work_item_id)
+    candidate = _candidate(severity='P2', location={'file': 'invented.py', 'line': 1})
+    review = _review(candidate, evidence)
+    decision = IndependentVerifier().verify_candidate(candidate, review, work_item, target_snapshot)
+    assert decision.verdict == VerificationVerdict.REJECTED
+    assert not consolidated_reviews((review,), (decision,))[0].candidates
+    assert not consolidated_reviews((review,), ())[0].candidates
+
+
+def test_verdict_for_same_candidate_cannot_cross_workitem(target_snapshot, work_item):
+    evidence = make_evidence(target_snapshot_ref=target_snapshot.snapshot_fingerprint, work_item_ref=work_item.work_item_id)
+    candidate = _candidate(severity='P2')
+    valid = _review(candidate, evidence)
+    invalid = replace(valid, work_item_ref='different-item')
+    accepted = IndependentVerifier().verify_candidate(candidate, valid, work_item, target_snapshot)
+    rejected = replace(accepted, work_item_ref='different-item', verdict=VerificationVerdict.REJECTED)
+    result = consolidated_reviews((invalid, valid), (rejected, accepted))
+    assert not result[0].candidates
+    assert result[1].candidates == (candidate,)

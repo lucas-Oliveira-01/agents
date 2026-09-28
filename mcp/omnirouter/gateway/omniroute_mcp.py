@@ -177,7 +177,7 @@ def _settings() -> dict[str, Any]:
     return {
         "url": os.getenv(
             "OMNIROUTE_URL",
-            "http://omniroute:20128",
+            "http://omniroute:20129",
         ).rstrip("/"),
 
         "api_key": api_key,
@@ -506,6 +506,8 @@ def _error_from_response(
 def _extract_content(
     data: dict[str, Any],
 ) -> tuple[str, str | None]:
+    if not isinstance(data, dict):
+        raise WrapperError("INVALID_UPSTREAM_RESPONSE", "Expected a JSON object from OmniRoute")
     choices = data.get("choices")
 
     if not isinstance(choices, list) or not choices:
@@ -914,11 +916,18 @@ def delegate_task(
 
     # --- Deterministic local cache check ----------------------------------
     if cache_mode == "deterministic":
-        row = _deterministic_cache_get(
-            settings,
-            cache_key=cache_key.strip(),
-            input_hash=input_hash,
-        )
+        try:
+            row = _deterministic_cache_get(
+                settings,
+                cache_key=cache_key.strip(),
+                input_hash=input_hash,
+            )
+        except WrapperError as error:
+            _record_finish(
+                settings, task_id=task_id, status="error", finished_at=_utc_now(),
+                error_code=error.code, error_message=error.message,
+            )
+            raise
         if row is not None:
             _record_finish(
                 settings,
@@ -1084,7 +1093,7 @@ def delegate_task(
             status="error",
             finished_at=_utc_now(),
             selected_model=(
-                response.headers.get("X-OmniRoute-Model") or data.get("model")
+                response.headers.get("X-OmniRoute-Model") or (data.get("model") if isinstance(data, dict) else None)
             ),
             selected_provider=response.headers.get("X-OmniRoute-Provider"),
             gateway_request_id=response.headers.get("X-OmniRoute-Request-Id"),
@@ -1108,7 +1117,9 @@ def delegate_task(
     # --- Success ----------------------------------------------------------
     # Headers are the primary telemetry source (documented OmniRoute 3.8.x API).
     # body.usage is the fallback for forward-compatibility.
-    usage_body = data.get("usage") or {}
+    usage_body = data.get("usage")
+    if not isinstance(usage_body, dict):
+        usage_body = {}
 
     prompt_tokens = (
         _safe_int_or_none(response.headers.get("X-OmniRoute-Tokens-In"))
@@ -1167,7 +1178,7 @@ def delegate_task(
         response_hash=response_hash,
     )
 
-    if cache_mode == "deterministic":
+    if cache_mode == "deterministic" and completion_status == "stop":
         _deterministic_cache_put(
             settings,
             cache_key=cache_key.strip(),
@@ -1426,7 +1437,7 @@ def invalidate_cache(
     """
     settings = _settings()
 
-    if not cache_key and not limpar_expirados:
+    if not cache_key and not clear_expired:
         raise WrapperError(
             "INVALID_INPUT",
             "Informe cache_key ou limpar_expirados=true",
@@ -1473,13 +1484,7 @@ def invalidate_cache(
     return json.dumps({"deleted": deleted}, ensure_ascii=False)
 
 
-if __name__ == "__main__":
-    port = _env_int("GATEWAY_PORT", 8000, 1, 65535)
-    mcp.run(
-        transport="streamable-http",
-        host="0.0.0.0",
-        port=port,
-    )
+
 
 
 # =============================================================================
@@ -1501,7 +1506,7 @@ def delegar_tarefa(
 ) -> str:
     '''[DEPRECATED] Alias for delegate_task'''
     return delegate_task(
-        task=tarefa, profile=profile, context=contexto, task_id=task_id, 
+        task=tarefa, profile=perfil, context=contexto, task_id=task_id,
         session_id=session_id, cache_mode=cache_mode, cache_key=cache_key, 
         max_tokens=max_tokens, temperature=temperature
     )
@@ -1543,3 +1548,12 @@ def invalidar_cache(
 ) -> str:
     '''[DEPRECATED] Alias for invalidate_cache'''
     return invalidate_cache(cache_key=cache_key, clear_expired=limpar_expirados)
+
+
+if __name__ == "__main__":
+    port = _env_int("GATEWAY_PORT", 8000, 1, 65535)
+    mcp.run(
+        transport="streamable-http",
+        host="0.0.0.0",
+        port=port,
+    )
