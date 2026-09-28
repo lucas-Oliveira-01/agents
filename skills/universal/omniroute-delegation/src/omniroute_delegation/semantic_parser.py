@@ -76,7 +76,7 @@ def _extract_json_candidates(text: str) -> Iterable[str]:
 
 
 def _strip_code_fence(text: str) -> str:
-    match = re.fullmatch(r"\\s*\\`\\`\\`(?:json)?\\s*(.*?)\\s*\\`\\`\\`\\s*", text, flags=re.IGNORECASE | re.DOTALL)
+    match = re.fullmatch(r"\\s*```(?:json)?\\s*(.*?)\\s*```\\s*", text, flags=re.IGNORECASE | re.DOTALL)
     return match.group(1).strip() if match else text.strip()
 
 
