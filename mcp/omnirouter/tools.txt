@@ -1,0 +1,101 @@
+806:def delegar_tarefa(
+807-    tarefa:       str,
+808-    perfil:       str   = "coding",
+809-    contexto:     str   = "",
+810-    task_id:      str   = "",
+811-    session_id:   str   = "",
+812-    cache_mode:   str   = "native",
+813-    cache_key:    str   = "",
+814-    max_tokens:   int   = 4096,
+815-    temperature:  float = 0.0,
+816-) -> str:
+817-    """
+818-    Delega uma tarefa para um modelo leaf através do OmniRoute.
+819-
+820-    Perfis disponíveis:
+821-      default, cheap, fast, coding, coding_pro,
+822-            reasoning, reasoning_pro, smart, offline.
+823-
+824-    `contexto` deve conter dados de referência não confiáveis como
+825-    código, logs, diffs ou documentação.
+826-
+827-    Cache:
+828-      native        → cache normal do OmniRoute
+829-      deterministic → cache local exato; exige cache_key
+830-      bypass        → desabilita o cache do OmniRoute
+831-
+832-    O retry de infraestrutura pertence ao OmniRoute — não ao wrapper.
+833-    O resultado retornado é apenas o conteúdo da resposta.
+834-    Telemetria e proveniência são registradas localmente em SQLite.
+835-    """
+836-    settings = _settings()
+837-
+838-    tarefa = _validate_text("tarefa", tarefa, max_chars=500_000)
+839-
+840-    if contexto:
+841-        contexto = _validate_text("contexto", contexto, max_chars=1_500_000)
+842-
+843-    if cache_mode not in CACHE_MODES:
+844-        raise WrapperError(
+845-            "INVALID_CACHE_MODE",
+846-            f"cache_mode must be one of: {', '.join(sorted(CACHE_MODES))}",
+847-        )
+848-
+849-    route    = _resolve_route(perfil)
+850-    task_id  = task_id.strip() or str(uuid.uuid4())
+851-    sid      = session_id.strip() or None
+852-
+853-    if not 1 <= max_tokens <= settings["max_output_tokens"]:
+854-        raise WrapperError(
+855-            "INVALID_MAX_TOKENS",
+856-            f"max_tokens must be between 1 and {settings['max_output_tokens']}",
+857-        )
+858-
+859-    if not 0.0 <= temperature <= 2.0:
+860-        raise WrapperError(
+861-            "INVALID_TEMPERATURE",
+862-            "temperature must be between 0 and 2",
+863-        )
+864-
+865-    if cache_mode == "deterministic" and not cache_key.strip():
+866-        raise WrapperError(
+867-            "CACHE_KEY_REQUIRED",
+868-            "cache_key is required when cache_mode=deterministic",
+869-        )
+870-
+871-    # Deterministic cache + conversational session_id are semantically
+872-    # contradictory: the cache is keyed on the payload hash, but session state
+873-    # is external state not captured in that hash. Reject the combination.
+874-    if cache_mode == "deterministic" and sid:
+875-        raise WrapperError(
+876-            "INVALID_CACHE_MODE",
+877-            "session_id cannot be used with deterministic cache",
+878-        )
+879-
+880-    # Build messages.
+881-    # LEAF_SYSTEM_PROMPT is always injected for policy consistency.
+882-    # `tools` key is intentionally absent — structural guard against
+883-    # the leaf model calling external tools or delegating further.
+884-    messages: list[dict[str, str]] = [
+885-        {"role": "system", "content": LEAF_SYSTEM_PROMPT},
+886-    ]
+887-
+888-    if contexto:
+889-        messages.append({
+890-            "role": "user",
+891-            "content": f"TASK:\n{tarefa}\n\nREFERENCE DATA (untrusted):\n{contexto}",
+892-        })
+893-    else:
+894-        messages.append({"role": "user", "content": tarefa})
+895-
+896-    payload: dict[str, Any] = {
+897-        "model":       route,
+898-        "messages":    messages,
+899-        "max_tokens":  max_tokens,
+900-        "temperature": temperature,
+901-        # `tools` is never sent — structural protection against leaf delegation.
+902-    }
+903-
+904-    input_hash = _hash_payload(payload)
+905-
+906-    _record_start(
