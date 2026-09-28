@@ -36,3 +36,13 @@ Evidência: runtime_acceptance_red (2 falhas), cli_red e cli_transport_red; runt
 Revisor Codex isolado confirmou falha no vínculo do verificador: candidatos iguais em WorkItems diferentes compartilhavam decisão. Corrigido índice para (work_item_ref, candidate_id), com regressão red/green. Contagem publicada do executor passou a ignorar blocos fenced e exigir correspondência com candidatos consolidados; somente IDs canônicos verificados são contados. Auditor/target drift final agora impede PASS, e capturador inclui manifesto dos arquivos executáveis.
 
 Na suíte audit-normalize, cinco testes esperavam INVALID estrutural para erros semânticos/referenciais. Código, documentação do SKILL e resultado fail-closed concordavam: schema VALID, eixo específico FAIL e verdict INCOMPLETE. Corrigidas as cinco expectativas, preservando asserts dos erros. Uma falha de packaging foi DNS bloqueado no sandbox ao baixar setuptools; será feita uma única execução dirigida com rede autorizada.
+
+## Defeito real de empacotamento audit-normalize
+
+Com rede autorizada, o teste de instalação avançou e revelou FileNotFoundError: validation_report.schema.json não estava dentro do pacote; a resolução procurava a árvore fonte/cwd. Corrigido recurso empacotado e caminho relativo ao pacote, com teste de igualdade ao schema canônico. A regressão de instalação existente é a prova end-to-end; repetição posterior é validação de correção, não retry de erro determinístico.
+
+O teste de packaging também esperava exit 0 de audit-validate sem execution-state; contrato atual retorna 3 com schema VALID e security INCOMPLETE. Expectativa corrigida para verificar explicitamente essa rejeição, em vez de enfraquecer o código.
+
+## Controle de snapshot drift
+
+O primeiro `005_snapshot_drift` real revelou `NameError: build_target_snapshot is not defined` em `security_runner.py`. O import foi corrigido e a regressão passou (`6 passed`); a execução final `005_snapshot_drift_final4` atingiu `CONTROL PASSED`, preservando duas Evidence `STALE`, bloqueando publicação e restaurando o alvo.

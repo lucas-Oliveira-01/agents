@@ -8,11 +8,11 @@ Execução direta autorizada pelo usuário; nenhuma promoção/merge é implicit
 
 ## Plano executável
 
-- [ ] T1: gateway — reproduzir aliases, JSON malformado, cache e metadata em `mcp/omnirouter/gateway/tests/test_gateway.py`; corrigir somente defeitos comprovados em `omniroute_mcp.py`; confirmar portas contra imagem 3.8.50; alinhar Compose e env.
-- [ ] T2: regressões — executar project-audit, omniroute-delegation e gateway no mesmo Python; preservar structuredContent, meta fallback, canonical findings e ADR-23.
-- [ ] T3: integração — capturar identificação da imagem/código, health e chamada MCP real com task_id único, resposta e query_delegation. Nenhuma matriz completa antes do PASS.
-- [ ] T4: alvo/matriz — clone único novo, branch/SHA/estado, modos CLI/API descobertos, snapshot materializado para COMMIT, incremental com baseline/reuse, drift adversarial, fix se suportado com precondições reais.
-- [ ] T5: aceitação — reconciliar contagens, validar findings contra código, completar documentação, revisar diff e SHA, verdict fail-closed.
+- [x] T1: gateway — reproduzir aliases, JSON malformado, cache e metadata em `mcp/omnirouter/gateway/tests/test_gateway.py`; corrigir defeitos comprovados em `omniroute_mcp.py`; confirmar portas contra imagem 3.8.50; alinhar Compose e env.
+- [x] T2: regressões — executar project-audit, omniroute-delegation e gateway no mesmo Python; preservar structuredContent, meta fallback, canonical findings e ADR-23.
+- [x] T3: integração — capturar identificação da imagem/código, health e chamada MCP real com task_id único, resposta e query_delegation. O smoke passou; a matriz semântica posterior ficou bloqueada pelo transporte do sandbox.
+- [ ] T4: alvo/matriz — clone único novo, branch/SHA/estado, modos CLI/API descobertos, snapshot materializado para COMMIT, incremental com baseline/reuse, drift adversarial, fix se suportado com precondições reais. Drift passou; full/COMMIT/incremental ficaram não comprovados pelo bloqueio de transporte.
+- [x] T5: aceitação — reconciliar contagens, validar findings contra código, completar documentação, revisar diff e SHA, verdict fail-closed. Veredicto final: RED.
 
 Invariantes: sem execução de código SmartServ no host, sem credenciais/contexto sensível no leaf; ferramentas ausentes do payload; preservação de falhas; zero retries determinísticos. Testes não provam integração real.
 

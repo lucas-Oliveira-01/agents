@@ -1,3 +1,3 @@
 RED
 
-Aceitação em andamento; cadeia completa ainda não comprovada.
+A cadeia completa não pode ser declarada GREEN. O smoke real MCP→gateway→OmniRoute passou, e as suítes determinísticas passaram, mas `full worktree` falhou antes da execução semântica porque o sandbox bloqueou TCP (`Operation not permitted`); o retry com escalada foi rejeitado pelo limite do avaliador. Sem full, não há prova atual de `COMPLETE/FULL/NONE`, normalização, findings canônicos/verified/publicados, COMMIT ou incremental. O controle adversarial de snapshot drift passou fechado após corrigir um NameError real em `security_runner.py`. O checkout principal também não recebeu commit final porque `.git/index` ficou somente leitura; a matriz usou o snapshot candidato explicitamente identificado em `CURRENT_STATE.md`.
