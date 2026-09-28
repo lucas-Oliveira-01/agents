@@ -232,7 +232,7 @@ class TestPromptInjectionDefense:
                 TaskBuilder()
                 .objetivo("Test")
                 .restricoes("None")
-                .contexto("SECRET=abc123secrettoken789012345")
+                .contexto('SECRET="abc123secrettoken789012345"')
                 .build()
             )
 
@@ -249,7 +249,7 @@ class TestPromptInjectionDefense:
 
     def test_credential_in_objective_rejected(self):
         with pytest.raises(ValueError, match="credential"):
-            TaskBuilder().objetivo("Use api_key=secret123").restricoes("None").build()
+            TaskBuilder().objetivo('Use api_key="sk-abc123secrettoken789012345"').restricoes("None").build()
 
 
 # ===========================================================================

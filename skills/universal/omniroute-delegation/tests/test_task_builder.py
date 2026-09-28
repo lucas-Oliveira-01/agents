@@ -212,16 +212,16 @@ class TestCredentialScanning:
         assert result.is_clean
 
     def test_detect_api_key(self):
-        result = TaskBuilder.scan_for_credentials("api_key=sk-12345abcdef")
+        result = TaskBuilder.scan_for_credentials('api_key="sk-12345abcdefghijklmnopqrst"')
         assert not result.is_clean
         assert len(result.findings) > 0
 
     def test_detect_password(self):
-        result = TaskBuilder.scan_for_credentials("password=mySecret123!")
+        result = TaskBuilder.scan_for_credentials('password="mySecret123!@#$abcd"')
         assert not result.is_clean
 
     def test_detect_bearer_token(self):
-        result = TaskBuilder.scan_for_credentials("authorization=Bearer eyJhb...")
+        result = TaskBuilder.scan_for_credentials("authorization=Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")
         assert not result.is_clean
 
     def test_detect_github_token(self):
@@ -254,7 +254,7 @@ class TestCredentialScanning:
 
     def test_build_rejects_credentials_in_task_id(self):
         with pytest.raises(ValueError, match="credential"):
-            (TaskBuilder().objetivo("Test").restricoes("None").task_id("token=secret123").build())
+            (TaskBuilder().objetivo("Test").restricoes("None").task_id('token="super_secret_token_12345"').build())
 
 
 # ===========================================================================
