@@ -162,13 +162,7 @@ class OmniRouteDelegationBackend(DelegationBackend):
             if isinstance(value, str):
                 parsed = parse_text(value)
                 parsed = cleaned(parsed)
-                provider, model = metadata(parsed)
-                return SemanticPayload(
-                    payload=parsed,
-                    raw_output=value,
-                    provider=provider or outer_provider or self.provider,
-                    model=model or outer_model or self.model,
-                )
+                return decode(parsed, depth + 1)
 
             if isinstance(value, dict):
                 structured = value.get("structuredContent")
