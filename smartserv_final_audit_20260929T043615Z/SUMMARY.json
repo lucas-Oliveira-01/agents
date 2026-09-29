@@ -1,0 +1,104 @@
+{
+  "verdict": "BLOCKED",
+  "auditor_commit": "21406c6d0ff5f7135e70cea7e6384488e25b300b",
+  "origin_main": "9ed3db671a46274a93cc5b13cf270e163b2256de",
+  "branch": "fix/smartserv-acceptance-closure",
+  "smartserv_commit": "f7798ca700166e618389c1d1a9037a1ab2c32e7e",
+  "remote_sha_confirmed": false,
+  "smartserv_commit_scope": "confirmed local checkout only; not current remote HEAD",
+  "mcp_local_transport": "PASS \u2014 TCP/HTTP local, initialize, tools/list and tools/call",
+  "gateway_real": true,
+  "mcp_smoke": "FAIL \u2014 refusal then UPSTREAM_TIMEOUT",
+  "normalize_local": "PASS \u2014 wheel/schema/import/isolated CLI, Python 3.9 and 3.13",
+  "normalize_full": "BLOCKED",
+  "raw": null,
+  "canonical": null,
+  "verified": null,
+  "published": null,
+  "baseline": "NOT_CREATED",
+  "matrix": {
+    "012_full_normalize": {
+      "status": "BLOCKED",
+      "executed": false,
+      "reason": "Required real MCP smoke did not pass; user gate forbids matrix execution before PASS."
+    },
+    "001_full_worktree": {
+      "status": "BLOCKED",
+      "executed": false,
+      "reason": "Required real MCP smoke did not pass; user gate forbids matrix execution before PASS."
+    },
+    "002_full_commit": {
+      "status": "BLOCKED",
+      "executed": false,
+      "reason": "Required real MCP smoke did not pass; user gate forbids matrix execution before PASS."
+    },
+    "003_transient": {
+      "status": "BLOCKED",
+      "executed": false,
+      "reason": "Required real MCP smoke did not pass; user gate forbids matrix execution before PASS."
+    },
+    "004_incremental": {
+      "status": "BLOCKED",
+      "executed": false,
+      "reason": "Required real MCP smoke did not pass; user gate forbids matrix execution before PASS."
+    },
+    "005_snapshot_drift": {
+      "status": "BLOCKED",
+      "executed": false,
+      "reason": "Required real MCP smoke did not pass; user gate forbids matrix execution before PASS."
+    },
+    "006_prepare_only": {
+      "status": "BLOCKED",
+      "executed": false,
+      "reason": "Required real MCP smoke did not pass; user gate forbids matrix execution before PASS."
+    },
+    "007_engineering_only": {
+      "status": "BLOCKED",
+      "executed": false,
+      "reason": "Required real MCP smoke did not pass; user gate forbids matrix execution before PASS."
+    }
+  },
+  "blockers": [
+    {
+      "layer": "C \u2014 SmartServ remote SSH",
+      "state": "REMOTE_SHA_UNCONFIRMED",
+      "evidence": "checks/smartserv-remote/stderr.log",
+      "cause": "Remote project not found or access denied; alternate configured SSH alias also failed publickey authentication."
+    },
+    {
+      "layer": "D \u2014 gateway upstream/provider",
+      "state": "MCP_SMOKE_FAILED",
+      "evidence": [
+        "checks/mcp-smoke-ready/stdout.log",
+        "checks/mcp-smoke-confirmation/stdout.log"
+      ],
+      "cause": "Real provider refused echo with \"I can't discuss that.\"; next cache-bypassed call timed out after 180 seconds with UPSTREAM_TIMEOUT."
+    }
+  ],
+  "tests": {
+    "project_audit_py313": {
+      "passed": 404
+    },
+    "project_audit_py39": {
+      "passed": 404
+    },
+    "audit_normalize_py313": {
+      "passed": 58,
+      "skipped": 1
+    },
+    "audit_normalize_py39": {
+      "passed": 58,
+      "skipped": 1
+    },
+    "delegation_py313": {
+      "passed": 219
+    },
+    "delegation_py39_host": {
+      "passed": 219
+    },
+    "gateway_and_acceptance_py313": {
+      "passed": 42
+    }
+  },
+  "skip_reason": "Optional historical audit-v1 fixture is absent; not counted as PASS."
+}

@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest>=7.0",
+    "setuptools>=82.0",
 ]
 
 [project.scripts]

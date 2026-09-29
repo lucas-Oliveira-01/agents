@@ -1,0 +1,7 @@
+BLOCKED
+Auditor: 21406c6d0ff5f7135e70cea7e6384488e25b300b
+SmartServ local only: f7798ca700166e618389c1d1a9037a1ab2c32e7e
+REMOTE_SHA_UNCONFIRMED
+Real MCP transport works, provider smoke failed (refusal, then UPSTREAM_TIMEOUT).
+Local package tests pass; all eight real matrix entries blocked by MCP prerequisite.
+Semantic counts are null (not executed), never zero-findings claims.

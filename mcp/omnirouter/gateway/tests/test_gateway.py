@@ -186,3 +186,22 @@ def test_concurrency_limit_records_failure(upstream, monkeypatch):
     assert query()['status'] == 'error'
     upstream[0].post.assert_not_called()
     semaphore.release.assert_not_called()
+
+
+@pytest.mark.parametrize("host,expected", [(None, "127.0.0.1"), ("0.0.0.0", "0.0.0.0")])
+def test_server_bind_default_and_explicit_container(monkeypatch, host, expected):
+    if host is None:
+        monkeypatch.delenv("GATEWAY_HOST", raising=False)
+    else:
+        monkeypatch.setenv("GATEWAY_HOST", host)
+    calls = []
+    monkeypatch.setattr(MCPServer, "run", lambda self, **kwargs: calls.append(kwargs))
+    runpy.run_path(str(SOURCE), run_name="__main__")
+    assert calls[0]["host"] == expected
+
+
+def test_docker_explicitly_binds_all_interfaces():
+    import yaml
+    compose = yaml.safe_load((SOURCE.parents[1] / "docker-compose.yml").read_text())
+    assert compose["services"]["omniroute-gateway"]["environment"]["GATEWAY_HOST"] == "0.0.0.0"
+    assert "GATEWAY_HOST=0.0.0.0" in (SOURCE.parent / "Dockerfile").read_text()

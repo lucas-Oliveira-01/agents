@@ -1554,6 +1554,6 @@ if __name__ == "__main__":
     port = _env_int("GATEWAY_PORT", 8000, 1, 65535)
     mcp.run(
         transport="streamable-http",
-        host="0.0.0.0",
+        host=os.environ.get("GATEWAY_HOST", "127.0.0.1"),
         port=port,
     )

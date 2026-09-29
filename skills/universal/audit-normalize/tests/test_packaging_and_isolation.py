@@ -10,31 +10,43 @@ import pytest
 
 def test_clean_venv_install_and_cli_execution_without_v8():
     """Verify that audit-normalize installs cleanly in a fresh venv and runs CLI without v8/."""
-    # Location of the audit-normalize package or built wheel
-    candidate_roots = [
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "audit-normalize")),
-    ]
-    pkg_target = os.environ.get("AUDIT_NORMALIZE_WHEEL")
-    if not pkg_target and os.path.isdir("/tmp/audit_build_dist"):
-        whls = [os.path.join("/tmp/audit_build_dist", f) for f in sorted(os.listdir("/tmp/audit_build_dist")) if f.endswith(".whl")]
-        if whls:
-            pkg_target = whls[-1]
-    if not pkg_target:
-        for cr in candidate_roots:
-            if os.path.isfile(os.path.join(cr, "pyproject.toml")):
-                pkg_target = cr
-                break
-    assert pkg_target is not None, "Could not locate installable audit-normalize wheel or source package"
+    from pathlib import Path
+    import email
+    import importlib.metadata
+    import shutil
+    import zipfile
+    from packaging.requirements import Requirement
 
+    package = Path(__file__).resolve().parents[1]
+    # Build this checkout, never an arbitrary stale wheel from /tmp.
     with tempfile.TemporaryDirectory() as temp_env_dir:
-        venv_dir = os.path.join(temp_env_dir, "clean_venv")
+        temp_root = Path(temp_env_dir)
+        wheel_dir = temp_root / "dist"
+        wheel_dir.mkdir()
+        clean_env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        clean_env.update(PIP_NO_INDEX="1", PIP_DISABLE_PIP_VERSION_CHECK="1")
+        build = subprocess.run(
+            [sys.executable, "-m", "pip", "wheel", "--no-build-isolation", "--no-deps",
+             "--no-index", "--wheel-dir", str(wheel_dir), str(package)],
+            capture_output=True, text=True, env=clean_env,
+        )
+        assert build.returncode == 0, build.stderr
+        wheels = list(wheel_dir.glob("*.whl"))
+        assert len(wheels) == 1
+        pkg_target = str(wheels[0])
+        with zipfile.ZipFile(pkg_target) as wheel:
+            schema_name = "audit_normalize/references/validation_report.schema.json"
+            assert wheel.read(schema_name) == (package / "references/validation_report.schema.json").read_bytes()
+            metadata_name = next(n for n in wheel.namelist() if n.endswith(".dist-info/METADATA"))
+            metadata = email.message_from_bytes(wheel.read(metadata_name))
+        venv_dir = str(temp_root / "clean_venv")
 
         # 1. Create a clean virtual environment
         sub_res = subprocess.run(
             [sys.executable, "-m", "venv", venv_dir],
             capture_output=True,
             text=True,
+            env=clean_env,
         )
         assert sub_res.returncode == 0, f"Failed to create venv: {sub_res.stderr}"
 
@@ -42,19 +54,56 @@ def test_clean_venv_install_and_cli_execution_without_v8():
         venv_normalize = os.path.join(venv_dir, "bin", "audit-normalize")
         venv_validate = os.path.join(venv_dir, "bin", "audit-validate")
 
-        # 2. Clean install via pip
+        # Seed only declared runtime dependencies from the test environment.
+        # This fresh venv has no access to the checkout or parent site-packages.
+        venv_python = os.path.join(venv_dir, "bin", "python")
+        site = Path(subprocess.check_output(
+            [venv_python, "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"],
+            text=True, env=clean_env).strip())
+        pending = list(metadata.get_all("Requires-Dist", []))
+        seeded = set()
+        while pending:
+            requirement = Requirement(pending.pop())
+            if requirement.marker and not requirement.marker.evaluate({"extra": ""}):
+                continue
+            dependency = importlib.metadata.distribution(requirement.name)
+            assert dependency.version in requirement.specifier, str(requirement)
+            name = dependency.metadata["Name"].lower()
+            if name in seeded:
+                continue
+            seeded.add(name)
+            for entry in dependency.files or ():
+                if ".." in entry.parts or entry.is_absolute():
+                    continue
+                source = Path(dependency.locate_file(entry))
+                if source.is_file():
+                    dest = site / entry
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(source, dest)
+            pending.extend(dependency.requires or ())
+
+        # 2. Install the freshly built artifact without index/build downloads.
         install_res = subprocess.run(
-            [venv_pip, "install", pkg_target],
+            [venv_pip, "install", "--no-index", "--no-deps", pkg_target],
             capture_output=True,
             text=True,
+            env=clean_env,
         )
         assert install_res.returncode == 0, f"pip install failed: {install_res.stderr}"
+
+        check = subprocess.run([venv_pip, "check"], capture_output=True, text=True, env=clean_env)
+        assert check.returncode == 0, check.stdout + check.stderr
+        origin = subprocess.check_output(
+            [venv_python, "-I", "-c", "import audit_normalize; print(audit_normalize.__file__)"],
+            text=True, env=clean_env).strip()
+        assert Path(origin).is_relative_to(site)
 
         # 3. Verify package is installed
         show_res = subprocess.run(
             [venv_pip, "show", "audit-normalize"],
             capture_output=True,
             text=True,
+            env=clean_env,
         )
         assert show_res.returncode == 0
         assert "Name: audit-normalize" in show_res.stdout
@@ -64,6 +113,7 @@ def test_clean_venv_install_and_cli_execution_without_v8():
             [venv_normalize, "--help"],
             capture_output=True,
             text=True,
+            env=clean_env,
         )
         assert help_norm_res.returncode == 0
         assert "audit-normalize" in help_norm_res.stdout
@@ -72,6 +122,7 @@ def test_clean_venv_install_and_cli_execution_without_v8():
             [venv_validate, "--help"],
             capture_output=True,
             text=True,
+            env=clean_env,
         )
         assert help_val_res.returncode == 0
         assert "audit-validate" in help_val_res.stdout
@@ -106,6 +157,7 @@ Description: State changing POST requests do not require Anti-CSRF token.
             cwd=work_dir,
             capture_output=True,
             text=True,
+            env=clean_env,
         )
         assert cli_run.returncode == 0, f"audit-normalize failed in isolation: {cli_run.stderr}"
         assert "Schema validity: VALID" in cli_run.stdout
@@ -131,6 +183,7 @@ Description: State changing POST requests do not require Anti-CSRF token.
             cwd=work_dir,
             capture_output=True,
             text=True,
+            env=clean_env,
         )
         # Without an execution-state sidecar, the CLI must preserve UNKNOWN
         # execution and INCOMPLETE security even though the schema is valid.

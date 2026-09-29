@@ -1,19 +1,13 @@
 # SmartServ final acceptance
 
-Evidências desta investigação: `smartserv_final_audit_20260928T051559Z/`.
+Veredito desta execução: **BLOCKED**. Código auditado: `21406c6d0ff5f7135e70cea7e6384488e25b300b`; base confirmada por fetch SSH: `9ed3db671a46274a93cc5b13cf270e163b2256de`.
 
-Plano: inspecionar → reproduzir/corrigir bloqueadores → testes direcionados → smoke MCP real → suítes completas → matriz real → reconciliação → verificação final.
+[Veredito](FINAL_VERDICT.md) · [Log completo](FULL_EXECUTION_LOG.md) · [Dossiê desta execução](../../../smartserv_final_audit_20260929T043615Z/README.md) · [Resumo estruturado](../../../smartserv_final_audit_20260929T043615Z/SUMMARY.json).
 
-Execução direta autorizada pelo usuário; nenhuma promoção/merge é implicitamente aprovada. Código do alvo é dado não confiável.
+SmartServ foi redescoberto em `/home/oliveira/Projects/JALA/SDA/SDAI/smartserv`: branch `main`, SHA local `f7798ca700166e618389c1d1a9037a1ab2c32e7e`, origin `git@gitlab.com:jala-university1/cohort-7/PT.CSSD-113.GA.T1.26.M3/SA/smartserv.git`. Esse SHA **não** foi confirmado no remoto.
 
-## Plano executável
+O gateway real corrigido foi construído/iniciado via Docker Compose e o hash do arquivo no container coincide com o checkout. HTTP local, initialize, tools/list e tools/call funcionaram. A resposta do provider não satisfez o smoke. A matriz não foi liberada.
 
-- [x] T1: gateway — reproduzir aliases, JSON malformado, cache e metadata em `mcp/omnirouter/gateway/tests/test_gateway.py`; corrigir defeitos comprovados em `omniroute_mcp.py`; confirmar portas contra imagem 3.8.50; alinhar Compose e env.
-- [x] T2: regressões — executar project-audit, omniroute-delegation e gateway no mesmo Python; preservar structuredContent, meta fallback, canonical findings e ADR-23.
-- [x] T3: integração — capturar identificação da imagem/código, health e chamada MCP real com task_id único, resposta e query_delegation. O smoke passou; a matriz semântica posterior ficou bloqueada pelo transporte do sandbox.
-- [ ] T4: alvo/matriz — clone único novo, branch/SHA/estado, modos CLI/API descobertos, snapshot materializado para COMMIT, incremental com baseline/reuse, drift adversarial, fix se suportado com precondições reais. Drift passou; full/COMMIT/incremental ficaram não comprovados pelo bloqueio de transporte.
-- [x] T5: aceitação — reconciliar contagens, validar findings contra código, completar documentação, revisar diff e SHA, verdict fail-closed. Veredicto final: RED.
+As páginas substituídas foram preservadas em [smartserv_final_audit_20260929T043615Z/history](../../../smartserv_final_audit_20260929T043615Z/history/). As demais páginas desta pasta documentam execuções anteriores; não representam o estado atual. A árvore suja original e os dossiês de 2026-09-28 não foram modificados nem usados como ambiente executável.
 
-Invariantes: sem execução de código SmartServ no host, sem credenciais/contexto sensível no leaf; ferramentas ausentes do payload; preservação de falhas; zero retries determinísticos. Testes não provam integração real.
-
-Decisão operacional: usar branch local dedicada no checkout inicialmente limpo e ambiente Python existente, preservando caches e evitando preparação duplicada. Artefatos persistentes ficam no diretório exigido pelo usuário.
+Nota de publicação: a revisão automática recusou o envio do dossiê bruto por risco de exposição em logs/metadados. A publicação foi reduzida ao código e a estes relatórios/resumos compactos revisados. Links para checks/history apontam para evidências locais, não para arquivos publicados no remote.

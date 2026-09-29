@@ -127,6 +127,7 @@ services:
       OMNIROUTE_URL: "http://omniroute:${API_PORT:-20129}"
       OMNIROUTE_API_KEY: "${OMNIROUTE_API_KEY}"
       GATEWAY_PORT: "8000"
+      GATEWAY_HOST: "0.0.0.0"
       OMNIROUTE_WRAPPER_STATE_DIR: "/state"
 
     ports:
