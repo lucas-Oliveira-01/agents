@@ -376,3 +376,35 @@ def test_finding_lifecycle_exercises_new_persisting_modified_fixed_regressed(tmp
     assert fixed_records[-1].lifecycle == FindingLifecycle.FIXED
 
     assert reconcile("run-5", "PROBABLE", "P2") == FindingLifecycle.REGRESSED
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_lifecycle_verdicts_are_scoped_to_work_item(tmp_path, audit_plan, reverse):
+    candidate = _candidate()
+    reviews = tuple(SemanticReviewResult(
+        work_item_ref=item, target_surface="SECURITY/AUTHENTICATION",
+        status="COMPLETED", sensitivity=SensitivityAssessment(SensitivityState.UNKNOWN, (), "test"),
+        candidates=(candidate,), raw_output_fingerprint=None, receipt=None, evidence=None,
+    ) for item in ("A", "B"))
+    results = [VerificationResult(candidate_identity(candidate), item, "P2", verdict, (), evidence)
+        for item, verdict, evidence in (
+            ("A", VerificationVerdict.VERIFIED, "evidence-A"),
+            ("B", VerificationVerdict.REJECTED, "evidence-B"),
+        )]
+    if reverse:
+        results.reverse()
+    records = reconcile_finding_lifecycle(StateStore(tmp_path / "state"),
+        _lifecycle_run(audit_plan.target_snapshot_ref, "run"), audit_plan, reviews, results)
+    assert len(records) == 1
+    assert records[0].evidence_ref == "evidence-A"
+
+
+def test_lifecycle_requires_verification(tmp_path, audit_plan):
+    review = SemanticReviewResult(
+        work_item_ref="A", target_surface="SECURITY/AUTHENTICATION", status="COMPLETED",
+        sensitivity=SensitivityAssessment(SensitivityState.UNKNOWN, (), "test"),
+        candidates=(_candidate(),), raw_output_fingerprint=None, receipt=None, evidence=None,
+    )
+    records = reconcile_finding_lifecycle(StateStore(tmp_path / "state"),
+        _lifecycle_run(audit_plan.target_snapshot_ref, "run"), audit_plan, (review,), ())
+    assert records == ()

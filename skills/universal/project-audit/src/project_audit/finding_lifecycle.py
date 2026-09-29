@@ -82,15 +82,15 @@ def reconcile_finding_lifecycle(
     preserved_finding_keys: Iterable[str] = (),
 ) -> Tuple[FindingRecord, ...]:
     """Persist lifecycle transitions and only infer FIXED from a complete/full run."""
-    verification = {result.candidate_id: result for result in verification_results}
+    verification = {(result.work_item_ref, result.candidate_id): result for result in verification_results}
     now = datetime.now(timezone.utc)
     seen = set(preserved_finding_keys)
     updated = []
 
     for review in reviews:
         for candidate in review.candidates:
-            result = verification.get(candidate_identity(candidate))
-            if result is not None and result.verdict != VerificationVerdict.VERIFIED:
+            result = verification.get((review.work_item_ref, candidate_identity(candidate)))
+            if result is None or result.verdict != VerificationVerdict.VERIFIED:
                 continue
 
             fingerprint = canonical_finding_fingerprint(candidate, review.target_surface)

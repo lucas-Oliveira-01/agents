@@ -195,7 +195,10 @@ def main():
             run = result.security.run
             raw = 0
             raw_unparseable = 0
+            raw_reviews = []
             for review in result.semantic_reviews:
+                raw_reviews.append({'work_item_ref': review.work_item_ref, 'surface': review.target_surface,
+                    'status': review.status, 'raw_output': review.raw_output})
                 if review.raw_output:
                     try:
                         data = extract_json(review.raw_output)
@@ -206,6 +209,8 @@ def main():
                             raw_unparseable += 1
                     except Exception:
                         raw_unparseable += 1
+            info.update(raw=raw, raw_unparseable=raw_unparseable)
+            (dest / 'raw_reviews.json').write_text(redact(json.dumps(raw_reviews, indent=2)))
             ids = {x.candidate_id for x in result.verification_results}
             verified = {x.candidate_id for x in result.verification_results if x.verdict.value == 'VERIFIED'}
             canonical = count_canonical_candidates(output / '03_audit_ledger.md')
@@ -219,8 +224,6 @@ def main():
             publication = run.publication_state.value
             published_ids = {candidate_identity(c) for c in approved} if publication == 'PUBLISHED_COMPLETE' else set()
             published = len(published_ids)
-            assert published_ids <= verified <= ids
-            assert raw >= canonical or raw_unparseable, "Raw/canonical count mismatch"
             info.update(status='PASS' if (run.execution_completeness.value, run.coverage_completeness.value, run.failure_state.value) == ('COMPLETE','FULL','NONE') else 'FAIL',
                 run_id=run.run_id, snapshot=run.target_snapshot_ref, execution_state=run.execution_completeness.value,
                 coverage=run.coverage_completeness.value, failure_state=run.failure_state.value, publication_state=publication,
@@ -230,9 +233,20 @@ def main():
             candidates = []
             for review in result.semantic_reviews:
                 for c in review.candidates:
-                    candidates.append({'id': candidate_identity(c), 'surface': review.target_surface, **asdict(c)})
+                    candidates.append({'id': candidate_identity(c), 'work_item_ref': review.work_item_ref, 'surface': review.target_surface, **asdict(c)})
             (dest / 'candidates.json').write_text(redact(json.dumps(candidates, indent=2)))
             (dest / 'verification.json').write_text(json.dumps([asdict(v) for v in result.verification_results], indent=2))
+            info['rejected'] = sum(v.verdict.value == 'REJECTED' for v in result.verification_results)
+            info['indeterminate'] = sum(v.verdict.value == 'NOT_DETERMINABLE' for v in result.verification_results)
+            info['schema_failures'] = sum(r.status == 'SCHEMA_VIOLATION' for r in result.semantic_reviews)
+            info['parser_failures'] = raw_unparseable
+            (dest / 'publication.json').write_text(json.dumps({
+                'state': publication, 'published_ids': sorted(published_ids),
+                'rendered_titles': rendered_titles,
+            }, indent=2))
+            assert published_ids <= verified <= ids
+            assert raw_unparseable == 0, "SEMANTIC_COVERAGE_FAILED: unparseable raw output"
+            assert raw >= canonical, "Raw/canonical count mismatch"
             store = StateStore(state)
             missing = []
             for evidence in (*result.engineering.evidence, *result.security.evidence):

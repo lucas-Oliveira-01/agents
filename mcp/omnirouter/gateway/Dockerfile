@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy gateway source
 COPY omniroute_mcp.py .
 
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 GATEWAY_HOST=0.0.0.0
 
 EXPOSE 8000
 
